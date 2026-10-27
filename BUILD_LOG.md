@@ -525,3 +525,80 @@
   AutoSpace turn publishing on Robert device; the picker and puck
   appearance at real map and settings sizes still need his eyes on a
   device, since this VM cannot render the Compose UI.
+
+## GitHub-native switch (2026-10-27) — patch-stack model retired
+
+- MODEL CHANGE ONLY. No routing, traffic, places, search, voice, backup,
+  palette, Automatic default, or SunShading code was touched. The repo
+  DocBobert6/AutoMap main is now the full AutoMap source tree, and CI
+  builds from that tree — the AutoSpace/Notscape model Robert asked for.
+- PUSH 1 — full tree, commit 1a06da9bade0eeb06afb96f57a6a699afc2d915e
+  (force-updated main; history resets to this commit by design, since
+  the previous main held only a patch stack, not a tree). Staged from the
+  local worktree (upstream Vela 85eb69c + builds 0-19 + SunShading
+  follow-up + Altima puck/colour picker): 978 files, 31,207,119 bytes.
+  Pushed via the git-database API in chained trees (600 + 378 entries;
+  a single create-tree 502/422s above ~650 entries). Excluded:
+  build/, .gradle-home/, build-logs/ (APKs), patches/,
+  automap-patch-stack.diff (retired, kept only in local history),
+  local.properties (absent), and the local-only gradle.properties line
+  org.gradle.java.installations.paths (repo copy is the upstream HEAD
+  version). No keystore exists anywhere in the tree — verified by scan
+  (only mentions in docs, no key material, no secrets).
+- WORKFLOW REPLACED, not just edited: .github/workflows/
+  automap-debug-release.yml now checks out this repo and runs
+  ./gradlew :app:assembleDebug -PappId=app.automap, then attaches the
+  APK to the unchanged prerelease tag v0.3.0-automap-debug. Manual
+  dispatch only. It contains NO upstream-Vela checkout, NO git apply,
+  and NO patch-stack reference except comments saying the model is
+  retired (verified by read-back). Upstream Vela's 30 workflows are
+  deliberately NOT carried over: 19 of them are scheduled, and their
+  data bakes, nightly cuts, and weekly promotions must not run under
+  AutoMap's name. The only workflow in the repo is the AutoMap one
+  (plus harmless issue/discussion templates).
+- README REWRITTEN on main: GitHub-native model stated up front,
+  patch stack declared not authoritative, upstream base 85eb69c,
+  built-so-far list including the Altima puck, and the debug-install
+  caveat. PLAN.md, LICENSE, and docs/icon.png preserved from the old
+  main. BUILD_AND_SYNC.md and RELEASE_NOTES.md also carried over.
+- VERIFICATION BY READ-BACK FROM GITHUB (not local files): main HEAD
+  1a06da9b..., recursive tree 1,151 entries (files + tree nodes);
+  Puck3D.kt, VehicleColorPicker.kt, VelaMapView.kt (palette #f8edd7
+  present), Onboarding.kt (sun_prompt_done present), the new workflow,
+  README model text, and gradle.properties without the local line all
+  confirmed on GitHub. No automap-patch-stack.diff, no upstream
+  workflows on main.
+- CI TEST RUN — workflow dispatch run 40445501164, on head
+  1a06da9bade0, COMPLETED SUCCESS (11 build steps green, 2026-10-27
+  03:40-03:42 UTC; the short runtime is Gradle/setup caching on the
+  runner — the published asset was verified by content, not by the
+  clock). Published asset downloaded back through the authenticated
+  API and checked: https://github.com/DocBobert6/AutoMap/releases/tag/v0.3.0-automap-debug
+  asset AutoMap-0.3.0-debug.apk, 143,750,068 bytes, sha256
+  6e4f6c1ac615bb6b77aacac87a9f887d62cb10e8f46bd48dc65895cd68b04f2a,
+  aapt2 package app.automap, versionCode 1, versionName 0.3.0, label
+  AutoMap, dex markers altimaTopDownPreviewBitmap (classes16/18),
+  VehicleColorPicker (classes18), sun_prompt_done +
+  dismissSunShadingPrompt (classes21) all present.
+- CERT CAVEAT (unchanged model, new key): this CI APK is signed with
+  the runner's ephemeral debug keystore, cert SHA-256
+  4bdcc5ab0f1d28ebf585bab19f944967caa110280b686b4a24d6844ad5d70428
+  (SHA-1 99faeefc13e5896e6fd5f849715df9f40a9991f6) — different from
+  the Altima CI cert (700059a4...) and from every local debug cert.
+  It will NOT install over any earlier build; uninstall first. CI
+  debug builds cannot update over each other. No release keystore
+  was created; the repo was NOT made public (both are separate,
+  still-open decisions for the in-app updater).
+- FUTURE BUILDERS — READ THIS FIRST: the local worktree at
+  ~/workspace/automap/ is now a MIRROR, not the source of truth.
+  Work in a checkout of DocBobert6/AutoMap main, push work commits to
+  GitHub main, and let CI build from the tree. Do NOT regenerate a
+  patch stack, do NOT apply one, do NOT push a tree export as a
+  routine (the full-tree push script ~/workspace/push_automap_fulltree.py
+  and staging dir ~/workspace/automap-github-export/ exist only for
+  this one switch). To cut a debug build: dispatch
+  automap-debug-release.yml by hand, wait for green, download the
+  asset back and verify package/hash/markers before announcing it.
+  Device verification, release keystore, repo visibility, region-bake
+  hosting, and the settings-default audit verdicts remain owed/open
+  as before.
