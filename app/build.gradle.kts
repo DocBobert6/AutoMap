@@ -35,8 +35,15 @@ android {
         // Overridable from CI: -PappVersionCode / -PappVersionName (ci.yml derives them from the
         // run number: 0.5.<run> / (2000+run)*10 since 2026-09-23 (0.4.<run> until 2026-10-08), the last digit being the chip
         // type in a per-chip build, see `splits` below). Defaults are local/dev only.
-        versionCode = (project.findProperty("appVersionCode") as String?)?.toIntOrNull() ?: 1
-        versionName = (project.findProperty("appVersionName") as String?) ?: "0.3.0"
+        // AutoMap alpha versioning (from 2026-10-27): alpha builds bump
+        // versionName AND versionCode together (0.3.0-alpha.1 / 2, then
+        // .alpha.2 / 3, and so on). The in-app updater compares
+        // versionName, and the release workflow tags by versionName, so
+        // a build that does not bump these can never present as an
+        // update. The old 0.3.0 / 1 scheme, with every build on one
+        // reused tag, is what made updates indistinguishable.
+        versionCode = (project.findProperty("appVersionCode") as String?)?.toIntOrNull() ?: 2
+        versionName = (project.findProperty("appVersionName") as String?) ?: "0.3.0-alpha.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }

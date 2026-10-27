@@ -276,6 +276,94 @@ internal fun AboutSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
         updateStatus?.let { Hint(it) }
         Spacer(Modifier.height(10.dp))
         }
+        Spacer(Modifier.height(8.dp))
+        // AutoMap updates (2026-10-27): the AutoSpace UpdateChecker pattern,
+        // ported as AutoMapUpdater and pointed at DocBobert6/AutoMap. This
+        // section is separate from the Vela self-updater section above on
+        // purpose: that one checks upstream Vela releases, this one checks
+        // AutoMap releases. Alpha is the default channel for alpha builds.
+        SettingsGroup(title = stringResource(R.string.settings_automap_updates)) {
+            val updState by app.vela.update.AutoMapUpdater.state.collectAsStateWithLifecycle()
+            val updContext = LocalContext.current
+            var updAuto by remember { mutableStateOf(app.vela.update.AutoMapUpdater.autoCheckEnabled(updContext)) }
+            ToggleRow(
+                label = stringResource(R.string.settings_automap_update_auto),
+                checked = updAuto,
+                onCheckedChange = { updAuto = it; app.vela.update.AutoMapUpdater.setAutoCheckEnabled(updContext, it) },
+                hint = stringResource(R.string.settings_automap_update_auto_hint),
+            )
+            GroupDivider()
+            var updChannel by remember { mutableStateOf(app.vela.update.AutoMapUpdater.channel(updContext)) }
+            Text(
+                stringResource(R.string.settings_automap_update_channel),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+            )
+            listOf(
+                app.vela.update.AutoMapUpdater.Channel.STABLE to stringResource(R.string.settings_automap_update_channel_stable),
+                app.vela.update.AutoMapUpdater.Channel.BETA to stringResource(R.string.settings_automap_update_channel_beta),
+                app.vela.update.AutoMapUpdater.Channel.ALPHA to stringResource(R.string.settings_automap_update_channel_alpha),
+            ).forEach { (id, label) ->
+                SelectableRow(
+                    label = label,
+                    selected = updChannel == id,
+                    onClick = { updChannel = id; app.vela.update.AutoMapUpdater.setChannel(updContext, id) },
+                )
+            }
+            Hint(stringResource(R.string.settings_automap_update_channel_hint))
+            GroupDivider()
+            Spacer(Modifier.height(14.dp))
+            when (val st = updState) {
+                is app.vela.update.AutoMapUpdater.State.Checking -> Hint(stringResource(R.string.settings_automap_update_checking))
+                is app.vela.update.AutoMapUpdater.State.UpToDate -> Hint(stringResource(R.string.settings_automap_update_none))
+                is app.vela.update.AutoMapUpdater.State.Available -> {
+                    Text(
+                        stringResource(R.string.settings_automap_update_available, st.release.version),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                    DpadRingBox(androidx.compose.material3.ButtonDefaults.filledTonalShape, Modifier.padding(horizontal = 16.dp)) {
+                        FilledTonalButton(onClick = { app.vela.update.AutoMapUpdater.download(updContext, st.release) }) {
+                            Text(stringResource(R.string.settings_automap_update_download))
+                        }
+                    }
+                }
+                is app.vela.update.AutoMapUpdater.State.Downloading -> {
+                    Text(
+                        stringResource(R.string.settings_automap_update_downloading, (st.fraction * 100).toInt()),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    app.vela.ui.VelaProgressBar(st.fraction, Modifier.padding(horizontal = 16.dp))
+                }
+                is app.vela.update.AutoMapUpdater.State.Ready -> {
+                    Text(
+                        stringResource(R.string.settings_automap_update_available, st.release.version),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                    DpadRingBox(androidx.compose.material3.ButtonDefaults.filledTonalShape, Modifier.padding(horizontal = 16.dp)) {
+                        FilledTonalButton(onClick = { app.vela.update.AutoMapUpdater.install(updContext) }) {
+                            Text(stringResource(R.string.settings_automap_update_install))
+                        }
+                    }
+                }
+                is app.vela.update.AutoMapUpdater.State.Failed -> Hint(stringResource(R.string.settings_automap_update_failed, st.message))
+                else -> {}
+            }
+            Spacer(Modifier.height(10.dp))
+            DpadRingBox(androidx.compose.material3.ButtonDefaults.filledTonalShape, Modifier.padding(horizontal = 16.dp)) {
+                FilledTonalButton(onClick = { app.vela.update.AutoMapUpdater.check(updContext) }) {
+                    Text(stringResource(R.string.settings_automap_update_check_now))
+                }
+            }
+            Hint(stringResource(R.string.settings_automap_update_caveat))
+            Spacer(Modifier.height(10.dp))
+        }
         // Breathing room under the last control so the button doesn't sit right on the
         // gesture bar at the end of the scroll.
         Spacer(Modifier.height(56.dp))

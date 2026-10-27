@@ -9,8 +9,14 @@ name: AutoMap debug release
 # Debug-signed only: there is no release keystore yet, so this is a testing
 # build, not a release-signed build. Each CI run signs with the runner's
 # ephemeral debug keystore, so a CI debug APK will NOT install over any
-# earlier build — uninstall first. It attaches the APK to the existing
-# prerelease tag v0.3.0-automap-debug (tag scheme unchanged).
+# earlier build — uninstall first.
+# Alpha release scheme (from 2026-10-27, for the in-app updater): the
+# release tag follows the built versionName (v0.3.0-alpha.1, then
+# .alpha.2, and so on), one prerelease per alpha version, instead of
+# every build overwriting the old v0.3.0-automap-debug tag. That old
+# release is left untouched. Future alpha builds MUST bump versionName
+# and versionCode in app/build.gradle.kts together, or the updater
+# cannot tell the new build from the installed one.
 # Upstream Vela's workflows are deliberately NOT carried over: their
 # scheduled data bakes and nightly cuts must not run under AutoMap's name.
 on:
@@ -76,12 +82,20 @@ jobs:
       - name: Build debug APK (app.automap)
         run: ./gradlew :app:assembleDebug -PappId=app.automap --no-daemon
 
-      - name: Attach APK to the debug prerelease
+      - name: Attach APK to the versioned alpha prerelease
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          cp app/build/outputs/apk/debug/app-debug.apk AutoMap-0.3.0-debug.apk
-          ls -lh AutoMap-0.3.0-debug.apk
-          sha256sum AutoMap-0.3.0-debug.apk
-          gh release upload v0.3.0-automap-debug AutoMap-0.3.0-debug.apk --clobber --repo "$GITHUB_REPOSITORY"
+          VERSION=$(sed -nE 's/.*appVersionName.*\? *: *"([^"]+)".*/\1/p' app/build.gradle.kts | head -1)
+          test -n "$VERSION"
+          TAG="v$VERSION"
+          ASSET="AutoMap-$VERSION.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "$ASSET"
+          ls -lh "$ASSET"
+          sha256sum "$ASSET"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$TAG" --prerelease --repo "$GITHUB_REPOSITORY" \
+              --title "AutoMap $VERSION (alpha, debug)" \
+              --notes "Alpha build, debug-signed: no release keystore yet, so this build may need the previous build uninstalled first. In-app updates check this release channel."
+          gh release upload "$TAG" "$ASSET" --clobber --repo "$GITHUB_REPOSITORY"

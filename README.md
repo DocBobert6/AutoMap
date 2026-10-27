@@ -23,7 +23,9 @@ Upstream Vela's workflows are deliberately NOT carried over: their scheduled
 data bakes, nightly cuts, and weekly promotions must not run under AutoMap's
 name. The only workflow here is the manual-dispatch
 `.github/workflows/automap-debug-release.yml`, which builds the debug APK
-from this tree and attaches it to the `v0.3.0-automap-debug` prerelease.
+from this tree and attaches it to a versioned alpha prerelease
+(`v0.3.0-alpha.1`, then `.alpha.2`, and so on). The old
+`v0.3.0-automap-debug` prerelease is left untouched.
 
 ## What AutoMap is
 
@@ -60,6 +62,13 @@ See `PLAN.md` for the original phase-by-phase, build-by-build plan (Builds
   settings preview of the same top-down 3D car and a colour picker (hex
   code, colour wheel, and sliders, kept in sync, persisted, applied to the
   puck).
+- Follow-up: in-app updater, ported from AutoSpace (Stable / Beta /
+  Alpha channels, Alpha default, Updates section in Settings > About,
+  once-a-day automatic checks on release builds, manual Check for
+  updates, size and SHA-256 checked downloads, system installer).
+  Alpha versioning starts here: version 0.3.0-alpha.1, versionCode 2,
+  with future alphas bumping both together so the updater can tell a
+  new build from the installed one.
 
 In scope: 3D buildings, fade-away buildings, bigger traffic lights and stop
 signs, highway lanes, crosswalks and detailed road markings, overpass and
@@ -78,13 +87,17 @@ also has no arrows.
 
 ## Releases and install caveat
 
-Debug builds are attached to the prerelease
-`v0.3.0-automap-debug` on the Releases page. There is no release keystore
-yet, and CI debug builds are signed with the runner's ephemeral debug
-keystore, which changes every run. **A CI debug APK will not install over
+Alpha debug builds are attached to versioned prereleases on the Releases
+page (starting with `v0.3.0-alpha.1`; the old `v0.3.0-automap-debug`
+prerelease is left untouched). There is no release keystore yet, and CI
+debug builds are signed with the runner's ephemeral debug keystore,
+which changes every run. **A CI debug APK will not install over
 any earlier build — uninstall first.** A release keystore, created and
 backed up durably before any published release, is still the fix for stable
-updates, and in-app updates depend on it.
+updates, and in-app updates depend on it. The repo is private, so an
+unauthenticated in-app update check cannot read its releases (GitHub
+answers 404); the updater reports that as a failure instead of claiming
+the app is up to date.
 
 ## Icon
 

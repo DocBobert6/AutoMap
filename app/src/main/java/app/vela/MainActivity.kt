@@ -48,6 +48,9 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         // The 12/24-hour clock setting can change while Vela sits in the background (issue #357).
         app.vela.ui.Clock24.refresh(this)
+        // AutoMap updates (2026-10-27): AutoSpace-style on-app-opened check,
+        // at most once a day, gated to release builds inside the updater.
+        app.vela.update.AutoMapUpdater.onAppOpened(this)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

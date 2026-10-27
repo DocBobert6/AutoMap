@@ -892,7 +892,24 @@
     <string name="settings_update_check_now">Check for updates</string>
     <string name="settings_update_checking">Checking…</string>
     <string name="settings_update_none">You\'re on the latest version.</string>
-    <string name="settings_place_pages">Place pages</string>
+
+    <string name="settings_automap_updates" translatable="false">AutoMap updates</string>
+    <string name="settings_automap_update_auto" translatable="false">Check for updates automatically</string>
+    <string name="settings_automap_update_auto_hint" translatable="false">Checks GitHub about once a day when the app opens. Automatic checks run on release builds only; debug alpha builds check only when you tap Check for updates.</string>
+    <string name="settings_automap_update_channel" translatable="false">AutoMap update channel</string>
+    <string name="settings_automap_update_channel_stable" translatable="false">Stable (finished releases only)</string>
+    <string name="settings_automap_update_channel_beta" translatable="false">Beta (test versions that are nearly done)</string>
+    <string name="settings_automap_update_channel_alpha" translatable="false">Alpha (every test version, first. Expect bugs)</string>
+    <string name="settings_automap_update_channel_hint" translatable="false">Alpha is the default for these alpha builds. Changing the channel clears any update already found.</string>
+    <string name="settings_automap_update_check_now" translatable="false">Check for updates</string>
+    <string name="settings_automap_update_checking" translatable="false">Checking GitHub for AutoMap updates.</string>
+    <string name="settings_automap_update_none" translatable="false">You are on the latest AutoMap version for this channel.</string>
+    <string name="settings_automap_update_available" translatable="false">AutoMap %1$s is available</string>
+    <string name="settings_automap_update_downloading" translatable="false">Downloading update. %1$d%%</string>
+    <string name="settings_automap_update_download" translatable="false">Download update</string>
+    <string name="settings_automap_update_install" translatable="false">Install update</string>
+    <string name="settings_automap_update_failed" translatable="false">Update check failed: %1$s</string>
+    <string name="settings_automap_update_caveat" translatable="false">Alpha builds are debug-signed for now, so an update may need the previous build uninstalled first. Updates come from the private AutoMap repo on GitHub, and an unauthenticated check cannot read a private repo, so a 404 here means the check could not reach the releases, not that you are up to date.</string>    <string name="settings_place_pages">Place pages</string>
     <plurals name="place_transit_stops"> <!-- format -->
         <item quantity="one">%1$d stop</item>
         <item quantity="other">%1$d stops</item>
