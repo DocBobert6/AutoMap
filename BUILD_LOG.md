@@ -526,79 +526,14 @@
   appearance at real map and settings sizes still need his eyes on a
   device, since this VM cannot render the Compose UI.
 
-## GitHub-native switch (2026-10-27) — patch-stack model retired
-
-- MODEL CHANGE ONLY. No routing, traffic, places, search, voice, backup,
-  palette, Automatic default, or SunShading code was touched. The repo
-  DocBobert6/AutoMap main is now the full AutoMap source tree, and CI
-  builds from that tree — the AutoSpace/Notscape model Robert asked for.
-- PUSH 1 — full tree, commit 1a06da9bade0eeb06afb96f57a6a699afc2d915e
-  (force-updated main; history resets to this commit by design, since
-  the previous main held only a patch stack, not a tree). Staged from the
-  local worktree (upstream Vela 85eb69c + builds 0-19 + SunShading
-  follow-up + Altima puck/colour picker): 978 files, 31,207,119 bytes.
-  Pushed via the git-database API in chained trees (600 + 378 entries;
-  a single create-tree 502/422s above ~650 entries). Excluded:
-  build/, .gradle-home/, build-logs/ (APKs), patches/,
-  automap-patch-stack.diff (retired, kept only in local history),
-  local.properties (absent), and the local-only gradle.properties line
-  org.gradle.java.installations.paths (repo copy is the upstream HEAD
-  version). No keystore exists anywhere in the tree — verified by scan
-  (only mentions in docs, no key material, no secrets).
-- WORKFLOW REPLACED, not just edited: .github/workflows/
-  automap-debug-release.yml now checks out this repo and runs
-  ./gradlew :app:assembleDebug -PappId=app.automap, then attaches the
-  APK to the unchanged prerelease tag v0.3.0-automap-debug. Manual
-  dispatch only. It contains NO upstream-Vela checkout, NO git apply,
-  and NO patch-stack reference except comments saying the model is
-  retired (verified by read-back). Upstream Vela's 30 workflows are
-  deliberately NOT carried over: 19 of them are scheduled, and their
-  data bakes, nightly cuts, and weekly promotions must not run under
-  AutoMap's name. The only workflow in the repo is the AutoMap one
-  (plus harmless issue/discussion templates).
-- README REWRITTEN on main: GitHub-native model stated up front,
-  patch stack declared not authoritative, upstream base 85eb69c,
-  built-so-far list including the Altima puck, and the debug-install
-  caveat. PLAN.md, LICENSE, and docs/icon.png preserved from the old
-  main. BUILD_AND_SYNC.md and RELEASE_NOTES.md also carried over.
-- VERIFICATION BY READ-BACK FROM GITHUB (not local files): main HEAD
-  1a06da9b..., recursive tree 1,151 entries (files + tree nodes);
-  Puck3D.kt, VehicleColorPicker.kt, VelaMapView.kt (palette #f8edd7
-  present), Onboarding.kt (sun_prompt_done present), the new workflow,
-  README model text, and gradle.properties without the local line all
-  confirmed on GitHub. No automap-patch-stack.diff, no upstream
-  workflows on main.
-- CI TEST RUN — workflow dispatch run 40445501164, on head
-  1a06da9bade0, COMPLETED SUCCESS (11 build steps green, 2026-10-27
-  03:40-03:42 UTC; the short runtime is Gradle/setup caching on the
-  runner — the published asset was verified by content, not by the
-  clock). Published asset downloaded back through the authenticated
-  API and checked: https://github.com/DocBobert6/AutoMap/releases/tag/v0.3.0-automap-debug
-  asset AutoMap-0.3.0-debug.apk, 143,750,068 bytes, sha256
-  6e4f6c1ac615bb6b77aacac87a9f887d62cb10e8f46bd48dc65895cd68b04f2a,
-  aapt2 package app.automap, versionCode 1, versionName 0.3.0, label
-  AutoMap, dex markers altimaTopDownPreviewBitmap (classes16/18),
-  VehicleColorPicker (classes18), sun_prompt_done +
-  dismissSunShadingPrompt (classes21) all present.
-- CERT CAVEAT (unchanged model, new key): this CI APK is signed with
-  the runner's ephemeral debug keystore, cert SHA-256
-  4bdcc5ab0f1d28ebf585bab19f944967caa110280b686b4a24d6844ad5d70428
-  (SHA-1 99faeefc13e5896e6fd5f849715df9f40a9991f6) — different from
-  the Altima CI cert (700059a4...) and from every local debug cert.
-  It will NOT install over any earlier build; uninstall first. CI
-  debug builds cannot update over each other. No release keystore
-  was created; the repo was NOT made public (both are separate,
-  still-open decisions for the in-app updater).
-- FUTURE BUILDERS — READ THIS FIRST: the local worktree at
-  ~/workspace/automap/ is now a MIRROR, not the source of truth.
-  Work in a checkout of DocBobert6/AutoMap main, push work commits to
-  GitHub main, and let CI build from the tree. Do NOT regenerate a
-  patch stack, do NOT apply one, do NOT push a tree export as a
-  routine (the full-tree push script ~/workspace/push_automap_fulltree.py
-  and staging dir ~/workspace/automap-github-export/ exist only for
-  this one switch). To cut a debug build: dispatch
-  automap-debug-release.yml by hand, wait for green, download the
-  asset back and verify package/hash/markers before announcing it.
-  Device verification, release keystore, repo visibility, region-bake
-  hosting, and the settings-default audit verdicts remain owed/open
-  as before.
+## AutoMap GitHub-native build 1 — car likeness, no brand naming, puck in browse for all shapes, white default colour (2026-10-27)
+- First build under the GitHub-native model: work committed to DocBobert6/AutoMap main as a base_tree commit (parent = previous main HEAD), CI builds from the tree via .github/workflows/automap-debug-release.yml. No patch stack was generated or applied.
+- 1. LIKENESS (Robert 2026-10-26 23:19, screenshots): the top-down car was a generic sedan, not a 2019 mid-size sedan. Puck3D.kt car() refined to true proportions: 2.20 long x 0.86 wide (4900 x 1850 mm, ratio 2.65), wheelbase 1.26 (2825 mm) with its centre 0.05 behind the body centre — front wheel +0.58, rear wheel -0.68, not the old symmetric +/-0.72 — true tyre size 0.32 across (not 0.40), long hood with crease ridges, trapezoidal roof narrowing toward the rear, sloping windshield and rear glass, boomerang headlights/taillights sweeping back along the flanks, wide front grille, short trunk with spoiler lip, mirrors at the A-pillar, door shut lines. The flat symbol path (VelaMapView.kt drawCarPuck) was refined to the same proportions: shell 48 x 130 px, front wheel centre y 53, rear wheel centre y 127. Still tintable (body = picked colour, darker edges, lighter roof) and still top-down 3D in both the map puck and the settings preview — no side view anywhere.
+- 2. NO BRAND NAMING (Robert 2026-10-26 23:19): every user-visible "Altima" removed. settings_puck_color_hint now reads "The top-down 3D car below is the exact car shown on the map...". Internal function AltimaColorPicker() renamed VehicleColorPicker(), altimaTopDownPreviewBitmap() renamed carTopDownPreviewBitmap(). Verified: grep of app/src/main/java + app/src/main/res finds no "Altima" (any case) after the change.
+- 3. PUCK IN BROWSE, ALL SHAPES (Robert 2026-10-26 23:55, urgent widening): root cause found in code, not in the car mesh — upstream Vela only ever drew the selected puck during navigation; in browse applyData always drew the blue dot + heading cone and ignored the shape preference entirely, so NO shape (car, arrow, UFO, pirate ship, rubber duck) ever appeared on the map outside a route. That is a design change for AutoMap, stated as such: VelaMapView.kt applyData now shows the selected shape's puck bitmap (NAV_PUCK_IMG, which already draws every shape) at the current location in browse too, replacing the blue dot, oriented to the GPS bearing when available and falling back to north-up (the ME source already carries bearing 0 when none is known). A stale fix keeps the dot, so a frozen puck is never drawn with confidence. Navigation puck behaviour is unchanged (symbol puck in nav, 3D mesh overlay in follow mode). The earlier Car-only browse wiring was generalised to all shapes before it shipped — no Car-only version was published.
+- 4. DEFAULT CAR COLOUR WHITE (agreed 2026-10-26 23:29, revised puck flip): PuckStyle.DEFAULT_CAR_COLOR changed #D93025 -> #FFFFFF, first-install only. A saved puck_car_color still wins; legacy colour-name mapping (red/blue/white/green/yellow) is unchanged. Reset-to-default in the picker now resets to #FFFFFF, and invalid-colour fallbacks in the mesh, flat path, and picker now fall back to white for consistency. PuckStyle.style BLUE->WHITE was NOT flipped — the user already has that blue/white choice and it stays as-is.
+- Untouched, as ordered: no routing, traffic, places, search, voice publishing, backup, palette, Automatic default, or SunShading code was changed.
+- Verification (see CI section below for the published-asset numbers): local :app:compileDebugKotlin green in this VM (full local APK build was not possible here — see note); dex/resources markers checked on the published asset. No unit test was added for the picker/mesh/browse wiring: Compose + Android-graphics code with no Robolectric harness in this tree, so behaviour is verified by code inspection + dex/resources presence, stated not claimed. Device verification (real look at map/settings sizes for every shape, drive tests, AutoSpace turn publishing) is owed on Robert's device, not claimed here.
+- LOCAL BUILD NOTE: a full local :app:assembleDebug in a fresh checkout failed in this VM for environment reasons, not code reasons — the shared Gradle home's journal was locked by another daemon (PID 7328), an isolated Gradle home had to copy the 421 MB module cache, and a 4 GB daemon was then killed under VM memory pressure (8 GB RAM, another daemon alive). Kotlin compilation was verified locally with a 2 GB heap instead; the full APK was verified from CI, which is the GitHub-native model's authoritative build.
+- Publishing (GitHub-native, not a chat attachment): work commit dd2ad2757e05a80716a5a0c45f82ddc70cb618bb on DocBobert6/AutoMap main (parent da9365c, base_tree commit, 6 files). Workflow dispatch run 40447830504 completed success. Published asset verified by downloading it back through the authenticated API (redirect to the signed release-asset URL followed, unauthenticated): https://github.com/DocBobert6/AutoMap/releases/tag/v0.3.0-automap-debug asset AutoMap-0.3.0-debug.apk, 143,750,064 bytes (exact match to the GitHub listing), sha256 c702e9e12daf77a438a10f1c33667b6671ff9027bebed46bd5f799140b0c490d, aapt2 package app.automap, versionCode 1, versionName 0.3.0. Dex contains VehicleColorPicker, carTopDownPreviewBitmap, normalizeCarColor, puck_car_color, showBrowsePuck, vela-nav-puck; resources.arsc contains the settings_puck_* strings, the new "top-down 3D car below" hint, and no "Altima" (any case).
+- CERT CAVEAT: the CI APK is signed with the GitHub runner ephemeral debug keystore, cert SHA-256 56daad6097830e5e098ff821a56f84f054cb4f36dbb5e87cd9d24b408cdddfc1 (SHA-1 229cb3b0465df37cbf5ef5d003d494af22ee9336) - different from every previous CI and local debug cert. It will NOT install over any earlier build; uninstall first. CI debug builds cannot update over each other. No release keystore was created.
