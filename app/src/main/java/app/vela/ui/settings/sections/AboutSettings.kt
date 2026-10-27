@@ -189,6 +189,12 @@ internal fun AboutSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
             onCheckedChange = { app.vela.ui.WhatsNew.setEnabled(context, it) },
         )
         GroupDivider()
+        // AutoMap 2026-10-27: upstream Vela self-updater section REMOVED
+        // from view. It checked PimpinPumpkin/Vela and could offer an
+        // upstream build that would replace AutoMap. AutoMap updates live
+        // in the AutoMap updates section below (AutoMapUpdater). The block
+        // below is compiled out, not deleted, so the diff stays reviewable.
+        if (false) {
         // Self-updater: a launch check (throttled to ~daily) plus a manual check here.
         // The system installer does the install either way.
         var selfUpdate by remember { mutableStateOf(prefs.getBoolean("self_update_check", true)) }
@@ -275,6 +281,7 @@ internal fun AboutSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
         }
         updateStatus?.let { Hint(it) }
         Spacer(Modifier.height(10.dp))
+        } // end if (false) — upstream self-updater section
         }
         Spacer(Modifier.height(8.dp))
         // AutoMap updates (2026-10-27): the AutoSpace UpdateChecker pattern,

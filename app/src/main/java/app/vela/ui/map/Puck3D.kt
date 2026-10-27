@@ -58,16 +58,19 @@ internal class PuckMesh(private val faces: List<Face>) {
         val th = Math.toRadians(tiltDeg.coerceIn(0f, 80f).toDouble())
         val cp = cos(psi).toFloat(); val sp = sin(psi).toFloat()
         val ct = cos(th).toFloat(); val st = sin(th).toFloat()
-        // Ground shadow: a soft disc under the footprint, flattened by the tilt like the road.
+        // Ground shadow: a disc under the footprint, NOT flattened by the tilt.
+        // AutoMap 2026-10-27 (flat/stretched puck): the overlay is screen
+        // space, and the map camera already renders the ground tilted, so
+        // foreshortening the puck a second time by cos(tilt) is wrong for
+        // an icon that must read at a glance. The footprint keeps its exact
+        // length-to-width ratio at any tilt; only height (z) is projected
+        // by sin(tilt) below, so side faces still read as depth.
         val r = footprint * s * 1.05f
         if (r > 1f) {
             shadowPaint.shader = RadialGradient(
                 cx, cy, r, intArrayOf(0x55000000, 0x33000000, 0x00000000), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP,
             )
-            canvas.save()
-            canvas.scale(1f, ct.coerceAtLeast(0.2f), cx, cy)
             canvas.drawCircle(cx, cy, r, shadowPaint)
-            canvas.restore()
         }
         // Light fixed to the map (sun up and to the right), toward-camera vector for culling.
         val lx = 0.35f; val ly = 0.45f; val lz = 0.82f
@@ -109,7 +112,13 @@ internal class PuckMesh(private val faces: List<Face>) {
                 val y = -f.pts[i] * sp + f.pts[i + 1] * cp
                 val z = f.pts[i + 2]
                 val px = cx + x * s
-                val py = cy - (y * ct + z * st) * s
+                // AutoMap 2026-10-27: do NOT foreshorten the ground plane by
+                // cos(tilt) — that made the car look flat/squashed at the
+                // 55-degree browse/nav tilt (length x0.57, width x1.0) and,
+                // combined with rotation, stretched it diagonally. Ground
+                // (y) is unscaled; height (z) still projects by sin(tilt),
+                // so the model keeps its 3D depth without changing shape.
+                val py = cy - (y + z * st) * s
                 if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
                 i += 3
             }

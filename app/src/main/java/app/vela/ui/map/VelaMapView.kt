@@ -1354,7 +1354,10 @@ fun VelaMapView(
         puckOverlayX.floatValue = x
         puckOverlayY.floatValue = y
         puckOverlayRot.floatValue = ((relBearing.toFloat() % 360f) + 360f) % 360f
-        puckOverlaySquash.floatValue = kotlin.math.cos(Math.toRadians(tiltDeg)).toFloat().coerceIn(0.2f, 1f)
+        // AutoMap 2026-10-27 (flat/stretched puck): NO tilt squash. The
+        // overlay is screen space; squashing it by cos(tilt) in screen
+        // space after rotation non-uniformly distorts the car. Always 1.
+        puckOverlaySquash.floatValue = 1f
         puckOverlayTilt.floatValue = tiltDeg.toFloat()
         if (!puckOverlayOn.value) puckOverlayOn.value = true
         if (!puckOverlayHidLayer[0]) {
@@ -5770,7 +5773,7 @@ fun VelaMapView(
                 .graphicsLayer {
                     translationX = puckOverlayX.floatValue - sizePx / 2f
                     translationY = puckOverlayY.floatValue - sizePx / 2f
-                    scaleY = puckOverlaySquash.floatValue
+                    scaleY = 1f // AutoMap 2026-10-27: never squash by tilt (see showPuckOverlay)
                 }
                 // Inner layer: the heading, relative to the camera (the map rotates under it).
                 .graphicsLayer { rotationZ = puckOverlayRot.floatValue }
@@ -6658,6 +6661,9 @@ PropertyFactory.iconPadding(2f),
                 PropertyFactory.iconImage(ME_ARROW_IMG),
                 PropertyFactory.iconRotate(Expression.get("bearing")),
                 PropertyFactory.iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP),
+                // AutoMap 2026-10-27: viewport pitch alignment, locked — the
+                // symbol is a screen-space icon, never foreshortened by map tilt.
+                PropertyFactory.iconPitchAlignment(Property.ICON_PITCH_ALIGNMENT_VIEWPORT),
                 PropertyFactory.iconAllowOverlap(true),
                 PropertyFactory.iconIgnorePlacement(true),
             ),

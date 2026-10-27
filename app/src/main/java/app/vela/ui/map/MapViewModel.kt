@@ -1664,6 +1664,12 @@ class MapViewModel @Inject constructor(
      *  NB called from init{}, which runs BEFORE the later-declared `settingsPrefs` field
      *  initializer — resolve the prefs locally or this NPEs on launch (it did). */
     private fun maybeCheckForUpdate() {
+        // AutoMap 2026-10-27: upstream Vela self-updater DISABLED. It points
+        // at PimpinPumpkin/Vela and offered "AutoMap 0.5.2621" — an upstream
+        // Vela build that would replace AutoMap. AutoMap updates come only
+        // from AutoMapUpdater (Settings > About > AutoMap updates). No
+        // upstream check, no banner, no download from this path.
+        return
         val prefs = appContext.getSharedPreferences("vela_settings", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("self_update_check", true)) return
         val now = System.currentTimeMillis()
@@ -1680,6 +1686,11 @@ class MapViewModel @Inject constructor(
     /** Settings "Check for updates" button — unthrottled, reports back via [onResult]
      *  (true = an update was found and the card is up; false = already current / check failed). */
     fun checkForUpdateNow(onResult: (Boolean) -> Unit) {
+        // AutoMap 2026-10-27: upstream check disabled (see maybeCheckForUpdate).
+        // Report "none found" so the old Settings button can never offer an
+        // upstream Vela build; AutoMapUpdater is the only update path.
+        onResult(false)
+        return
         val channel = app.vela.update.SelfUpdater.channel(settingsPrefs)
         viewModelScope.launch {
             val info = selfUpdater.check(app.vela.BuildConfig.VERSION_CODE, channel)
