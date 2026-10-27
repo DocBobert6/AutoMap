@@ -499,7 +499,7 @@ internal class NavController(
      *  NavStrings table doesn't implement passLights (currently all but English). Best-effort + IO;
      *  a fetch miss just leaves the route unchanged. */
     /**
-     * Settings > Navigation "Traffic-light guidance" (pref `nav_traffic_lights`, off by default):
+     * Settings > Navigation "Traffic-light guidance" (pref `nav_traffic_lights`, on by default):
      * mark the lights before each turn of [route], the one just taken up by the drive, and hand
      * the marked copy to the session, which speaks "Pass the traffic light, then ..." from it.
      * Nothing is looked up with the switch off or in a language with no such phrase. The lights
@@ -507,7 +507,7 @@ internal class NavController(
      * Overpass server is asked for the [first] route of a drive only, never for each reroute.
      */
     private fun lightCues(route: app.vela.core.model.Route, first: Boolean) {
-        if (!settingsPrefs.getBoolean("nav_traffic_lights", false)) return
+        if (!settingsPrefs.getBoolean("nav_traffic_lights", true)) return
         if (app.vela.core.i18n.NavStringsRegistry.current().passLights(1).isBlank()) return
         scope.launch {
             val lit = runCatching { enrichLights(route, overpass = first) }.getOrNull() ?: return@launch

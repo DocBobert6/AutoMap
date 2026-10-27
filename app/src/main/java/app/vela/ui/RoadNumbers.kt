@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.compose.runtime.mutableStateOf
 
 /**
- * Settings > Navigation > Road numbers first (issue #836). Off by default: a numbered road
+ * Settings > Navigation > Road numbers first (issue #836). On by default: a numbered road
  * through a town keeps its street name, as its signs do. On, a road with a route number goes
  * by the number: the pill under the arrow and the car's "Continue on" at once, the turn
  * directions from the next route on, for the roads whose dedication names ("Pearl Harbor
@@ -12,7 +12,7 @@ import androidx.compose.runtime.mutableStateOf
  * name, which `roadLabel` and the instruction builders read.
  */
 object RoadNumbers {
-    val on = mutableStateOf(false)
+    val on = mutableStateOf(true)
 
     private const val KEY = "road_numbers"
 
@@ -20,7 +20,7 @@ object RoadNumbers {
         context.getSharedPreferences("vela_settings", Context.MODE_PRIVATE)
 
     fun init(context: Context) {
-        on.value = prefs(context).getBoolean(KEY, false)
+        on.value = prefs(context).getBoolean(KEY, true)
         app.vela.core.nav.RoadNumbers.preferred = on.value
     }
 

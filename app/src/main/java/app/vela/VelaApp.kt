@@ -208,7 +208,7 @@ class VelaApp : Application(), coil.ImageLoaderFactory {
         app.vela.ui.QuickChipsPref.init(this) // which quick-category chips show, and their order (issue #779)
         app.vela.ui.RoadLabel.init(this)
         app.vela.ui.NavNorthUp.init(this)
-        app.vela.ui.ZoomToTurn.init(this) // zoom out to the next turn while driving, off by default (issue #781)
+        app.vela.ui.ZoomToTurn.init(this) // zoom out to the next turn while driving, on by default (issue #781)
         app.vela.ui.PuckStyle.init(this)
         app.vela.ui.CarAlwaysOn.init(this) // AutoMap: "Car always on" toggle for the Bluetooth-gated browse puck
         app.vela.ui.HouseNumbers.init(this) // house-number zoom gate (issue #329)
@@ -224,7 +224,7 @@ class VelaApp : Application(), coil.ImageLoaderFactory {
         app.vela.ui.MapPoiPrefs.init(this)
         // Mirrors into the :core flag NavEngine reads (issue #596).
         app.vela.ui.SpokenRoadNames.init(this)
-        app.vela.ui.RoadNumbers.init(this) // numbered roads go by their number (issue #836), off by default
+        app.vela.ui.RoadNumbers.init(this) // numbered roads go by their number (issue #836), on by default
         app.vela.ui.SpokenDetail.init(this)
         app.vela.ui.RoutePicker.init(this)
         app.vela.ui.VoiceSearch.init(this)

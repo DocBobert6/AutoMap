@@ -4,11 +4,11 @@ import android.content.Context
 import androidx.compose.runtime.mutableStateOf
 
 /** Whether the drive camera zooms out until the next turn sits just under the turn card, and back
- *  in as the car nears it (issue #781, SPEC 4.7 "Framing"). Off by default: it trades the street
+ *  in as the car nears it (issue #781, SPEC 4.7 "Framing"). On by default: it trades the street
  *  names and lights of the close zoom for a view of the stretch ahead. Read per frame by the nav
  *  ticker. */
 object ZoomToTurn {
-    val on = mutableStateOf(false)
+    val on = mutableStateOf(true)
     /** How far out the camera may go to keep the turn on screen: a zoom floor of 12, 10 or 8
      *  ([FLOORS]), or 0 for no pick, when the `turnZoomMin` dial and `ZOOM_TURN_MIN` decide. */
     val floor = mutableStateOf(0.0)
@@ -16,7 +16,7 @@ object ZoomToTurn {
     val FLOORS = listOf(12.0, 10.0, 8.0)
 
     fun init(context: Context) {
-        on.value = prefs(context).getBoolean(KEY, false)
+        on.value = prefs(context).getBoolean(KEY, true)
         floor.value = prefs(context).getFloat(FLOOR_KEY, 0f).toDouble()
     }
 
