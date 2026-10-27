@@ -10612,12 +10612,17 @@ private fun drawCarPuck(canvas: Canvas, colorName: String) {
     canvas.restore()
     val tire = paint(android.graphics.Color.parseColor("#1B1B1B"))
     // Wheels at the true wheelbase: front centre 53, rear centre 127, 18 px tall.
-    canvas.drawRoundRect(android.graphics.RectF(cx - 34f, 44f, cx - 24f, 62f), 3f, 3f, tire)
-    canvas.drawRoundRect(android.graphics.RectF(cx + 24f, 44f, cx + 34f, 62f), 3f, 3f, tire)
-    canvas.drawRoundRect(android.graphics.RectF(cx - 34f, 118f, cx - 24f, 136f), 3f, 3f, tire)
-    canvas.drawRoundRect(android.graphics.RectF(cx + 24f, 118f, cx + 34f, 136f), 3f, 3f, tire)
-    canvas.drawOval(android.graphics.RectF(cx - 34f, 50f, cx - 24f, 56f), paint(body))
-    canvas.drawOval(android.graphics.RectF(cx + 24f, 50f, cx + 34f, 56f), paint(body))
+    // TUCKED UNDER the body (AutoMap 2026-10-27 wheel fix, Robert:
+    // wheels stuck out past the flanks). The body half-width is 24, so
+    // wheels at cx±19..28 sit mostly under the body: the body path
+    // drawn next covers their inner part (19..24), leaving only the
+    // outer 4 px tire edge peeking out, like a real top-down car. The
+    // old wheels ran to cx±34 — 10 px fully outside the body — and the
+    // body-coloured ovals that patched their middles are gone with them.
+    canvas.drawRoundRect(android.graphics.RectF(cx - 28f, 44f, cx - 19f, 62f), 3f, 3f, tire)
+    canvas.drawRoundRect(android.graphics.RectF(cx + 19f, 44f, cx + 28f, 62f), 3f, 3f, tire)
+    canvas.drawRoundRect(android.graphics.RectF(cx - 28f, 118f, cx - 19f, 136f), 3f, 3f, tire)
+    canvas.drawRoundRect(android.graphics.RectF(cx + 19f, 118f, cx + 28f, 136f), 3f, 3f, tire)
     canvas.drawPath(shellPath, paint(body))
     canvas.drawPath(shellPath, paint(edge, 3f))
     // Mirrors at the A-pillar (canvas y 64..70, at the windshield base).

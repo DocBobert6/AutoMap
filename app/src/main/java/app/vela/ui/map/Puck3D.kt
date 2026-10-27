@@ -258,12 +258,18 @@ internal object PuckModels {
         val tire = c("#1B1B1B")
         val silver = c("#C9CED6")
         // Wheels at the true wheelbase: front +0.58, rear -0.68, tyre 0.32
-        // across, protruding past the flanks, silver hubs on top.
+        // across — TUCKED UNDER the body (AutoMap 2026-10-27 wheel fix,
+        // Robert: wheels stuck out past the flanks). The body flank is
+        // at |x| = 0.43, so the tyre outer edge at 0.45 peeks out only
+        // 0.02, with the rest of the tyre (0.34..0.43) under the body
+        // top cap, which sits higher (z 0.42 vs tyre top 0.32) and is
+        // drawn over it in painter's order. Silver hubs are centred on
+        // the tyre (±0.395) and likewise stay inside the flank.
         for (y in listOf(0.58f, -0.68f)) {
-            box(-0.49f, -0.37f, y - 0.16f, y + 0.16f, 0f, 0.32f, tire)
-            box(0.37f, 0.49f, y - 0.16f, y + 0.16f, 0f, 0.32f, tire)
-            box(-0.46f, -0.40f, y - 0.10f, y + 0.10f, 0.32f, 0.35f, silver)
-            box(0.40f, 0.46f, y - 0.10f, y + 0.10f, 0.32f, 0.35f, silver)
+            box(-0.45f, -0.34f, y - 0.16f, y + 0.16f, 0f, 0.32f, tire)
+            box(0.34f, 0.45f, y - 0.16f, y + 0.16f, 0f, 0.32f, tire)
+            box(-0.425f, -0.365f, y - 0.10f, y + 0.10f, 0.32f, 0.35f, silver)
+            box(0.365f, 0.425f, y - 0.10f, y + 0.10f, 0.32f, 0.35f, silver)
         }
         // Lower body, AutoMap 2026-10-27 likeness refinement (Robert, with
         // side-profile + front-3/4 photos): the old 14-point outline read as
