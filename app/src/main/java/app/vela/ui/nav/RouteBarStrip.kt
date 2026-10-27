@@ -1,0 +1,198 @@
+package app.vela.ui.nav
+
+import app.vela.ui.icons.Sym
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.dp
+import app.vela.core.nav.RouteBar
+import app.vela.ui.formatDistance
+
+/**
+ * The road ahead as a bar (issue #228, TomTom's RouteBar as the reference the reporter attached):
+ * a track from the arrow at the bottom to the top of the look-ahead window, congestion painted on
+ * it as red/amber segments, and what is coming up as ROUND ICON BADGES (speed and surveillance
+ * cameras, level crossings, speed humps) or small dots (lights, stop signs, which are too frequent
+ * in a town to badge). The arrow marker carries the remaining trip distance; the top cap says how
+ * much road the bar spans, so it reads as a scale rather than as decoration. The first cut of this
+ * (2026-09-02) was a 10 dp strip with 3 dp colored ticks: technically the same information, and
+ * unreadable in practice (user 2026-09-04).
+ */
+@Composable
+fun RouteBarStrip(model: RouteBar.Model, modifier: Modifier = Modifier) {
+    if (model.isEmpty) return
+    val track = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
+    val chip = MaterialTheme.colorScheme.surface
+    val ink = MaterialTheme.colorScheme.onSurface
+    val lightImage = androidx.compose.runtime.remember { app.vela.ui.map.trafficLightBitmap().asImageBitmap() }
+    val stopImage = androidx.compose.runtime.remember { app.vela.ui.map.stopSignBitmap().asImageBitmap() }
+    Column(modifier.width(STRIP_W.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            if (model.reachesDestination) "" else formatDistance(model.spanM),
+            style = MaterialTheme.typography.labelSmall,
+            color = ink.copy(alpha = 0.8f),
+            maxLines = 1,
+            softWrap = false,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.width(STRIP_W.dp).padding(bottom = 2.dp),
+        )
+        Box(Modifier.fillMaxWidth().weight(1f)) {
+            Layout(content = {
+                // The track: a rounded channel the badges sit on.
+                Box(
+                    Modifier
+                        .width(TRACK_W.dp)
+                        .clip(RoundedCornerShape((TRACK_W / 2).dp))
+                        .background(track)
+                        .span(0.0, 1.0, kind = ROLE_TRACK),
+                )
+                for (b in model.bands) {
+                    Box(
+                        Modifier
+                            .width(TRACK_W.dp)
+                            .clip(RoundedCornerShape((TRACK_W / 2).dp))
+                            .background(congestionColor(b.level))
+                            .span(b.from, b.to, kind = ROLE_BAND),
+                    )
+                }
+                for (p in model.pins) {
+                    when (p.kind) {
+                        // A light and a stop sign are the map's own glyphs on the track (issue #828),
+                        // the light's housing and the sign's octagon; small, since a town has many of both.
+                        RouteBar.Mark.SIGNAL -> androidx.compose.foundation.Image(
+                            bitmap = lightImage, contentDescription = null,
+                            modifier = Modifier.size(width = (MINI / 2).dp, height = MINI.dp).span(p.at, p.at, kind = ROLE_DOT),
+                        )
+                        RouteBar.Mark.STOP -> androidx.compose.foundation.Image(
+                            bitmap = stopImage, contentDescription = null,
+                            modifier = Modifier.size(MINI.dp).span(p.at, p.at, kind = ROLE_DOT),
+                        )
+                        else -> Box(
+                            Modifier
+                                .size(BADGE.dp)
+                                .shadow(2.dp, CircleShape)
+                                .clip(CircleShape)
+                                .background(pinColor(p.kind))
+                                .span(p.at, p.at, kind = ROLE_BADGE),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                when (p.kind) {
+                                    RouteBar.Mark.CAMERA -> Sym.Videocam
+                                    RouteBar.Mark.RAIL_CROSSING -> Sym.Train
+                                    else -> Sym.Warning
+                                },
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size((BADGE - 10).dp),
+                            )
+                        }
+                    }
+                }
+                // The arrow, at the bottom of the track, where you are.
+                Box(
+                    Modifier
+                        .size(BADGE.dp)
+                        .shadow(2.dp, CircleShape)
+                        .clip(CircleShape)
+                        .background(chip)
+                        .span(0.0, 0.0, kind = ROLE_PUCK),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Sym.Navigation, contentDescription = null, tint = ink, modifier = Modifier.size(16.dp))
+                }
+            }) { measurables, constraints ->
+                val h = constraints.maxHeight
+                val w = constraints.maxWidth
+                // The track runs from the arrow's center (bottom) to the top cap; badges center on it.
+                val inset = (BADGE.dp.roundToPx() / 2)
+                val trackH = (h - 2 * inset).coerceAtLeast(1)
+                fun yAt(f: Double) = h - inset - (f * trackH).toInt()
+                val placed = measurables.map { m ->
+                    val d = m.parentData as RouteBarSpan
+                    val p = when (d.kind) {
+                        ROLE_TRACK -> m.measure(constraints.copy(minHeight = trackH, maxHeight = trackH, minWidth = 0))
+                        ROLE_BAND -> {
+                            // coerceIn throws when min > max: on a strip shorter than the track width
+                            // (a tiny multi-window pane) clamp to the track height instead.
+                            val bh = ((d.to - d.from) * trackH).toInt().coerceAtMost(trackH).coerceAtLeast(minOf(TRACK_W.dp.roundToPx(), trackH))
+                            m.measure(constraints.copy(minHeight = bh, maxHeight = bh, minWidth = 0))
+                        }
+                        else -> m.measure(constraints.copy(minWidth = 0, minHeight = 0))
+                    }
+                    Triple(p, d, d.kind)
+                }
+                val trackCx = TRACK_COL.dp.roundToPx() / 2
+                val badgeCx = TRACK_COL.dp.roundToPx() + 2.dp.roundToPx() + BADGE.dp.roundToPx() / 2
+                layout(w, h) {
+                    for ((p, d, kind) in placed) {
+                        // Badges ride in their own lane to the right; the track, its congestion
+                        // bands, the dots and the arrow stay in the track column.
+                        val cx = if (kind == ROLE_BADGE) badgeCx else trackCx
+                        val x = (cx - p.width / 2).coerceAtLeast(0)
+                        val y = when (kind) {
+                            ROLE_TRACK -> inset
+                            ROLE_BAND -> yAt(d.to)
+                            else -> yAt(d.from) - p.height / 2
+                        }
+                        p.place(x, y.coerceIn(0, (h - p.height).coerceAtLeast(0)))
+                    }
+                }
+            }
+        }
+    }
+}
+
+private const val STRIP_W = 52 // the track column plus a badge lane beside it
+private const val TRACK_COL = 26 // the track/dots/arrow column (a badge-wide column, so the arrow fits)
+private const val TRACK_W = 8
+private const val BADGE = 26
+private const val DOT = 9   // the arrow marker's own dot
+private const val MINI = 16 // a light's disc or a stop sign on the track
+private const val ROLE_TRACK = 0
+private const val ROLE_BAND = 1
+private const val ROLE_DOT = 2
+private const val ROLE_BADGE = 3
+private const val ROLE_PUCK = 4
+
+private fun congestionColor(level: Int): Color = when {
+    level >= 3 -> Color(0xFF9C1C1C) // severe
+    level == 2 -> Color(0xFFD93025) // heavy
+    else -> Color(0xFFF9AB00)       // moderate
+}
+
+private fun pinColor(kind: RouteBar.Mark): Color = when (kind) {
+    RouteBar.Mark.CAMERA -> Color(0xFF8E24AA)        // the purple the camera badge uses
+    RouteBar.Mark.RAIL_CROSSING -> Color(0xFF37474F)
+    RouteBar.Mark.SPEED_HUMP -> Color(0xFFFFA000)
+    RouteBar.Mark.STOP -> Color(0xFFD32F2F)
+    RouteBar.Mark.SIGNAL -> Color(0xFF388E3C)
+}
+
+private fun Modifier.span(from: Double, to: Double, kind: Int) = this.then(RouteBarSpan(from, to, kind))
+
+private data class RouteBarSpan(val from: Double, val to: Double, val kind: Int) :
+    androidx.compose.ui.layout.ParentDataModifier, Modifier.Element {
+    override fun androidx.compose.ui.unit.Density.modifyParentData(parentData: Any?) = this@RouteBarSpan
+}
+

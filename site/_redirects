@@ -1,0 +1,4 @@
+# velamaps.org is the website only. The docs, the F-Droid repository and the map fonts stay at
+# their GitHub Pages addresses, which installed apps and F-Droid clients already point at.
+/docs    https://pimpinpumpkin.github.io/Vela/docs/    302
+/docs/*  https://pimpinpumpkin.github.io/Vela/docs/:splat  302

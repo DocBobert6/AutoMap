@@ -1,0 +1,2575 @@
+package app.vela.core.i18n
+
+import app.vela.core.model.LaneSide
+import app.vela.core.voice.SpeechText
+import java.util.Locale
+import kotlin.math.roundToInt
+
+/**
+ * All Vela-GENERATED spoken/banner nav text for ONE language. Vela builds turn instructions itself
+ * (from OSRM step geometry) rather than scraping them, so localizing navigation = translating this
+ * small, bounded set of templates — NOT machine-translating prose. The road/dest NAME passed in is
+ * DATA (already in the local language) and is never translated; each method decides the word ORDER
+ * around it (which differs by language — "Turn left onto X" vs "Tournez à gauche sur X"), which is why
+ * this is per-language templates, not per-word substitution.
+ *
+ * Resolved by [NavStringsRegistry] (set explicitly from the app locale, never `Locale.getDefault()`,
+ * because these run off the main thread — the nav loop + the TTS worker). Part of the app localization
+ * effort (see the `project_vela_i18n` memory note).
+ */
+interface NavStrings {
+    val locale: Locale
+
+    /**
+     * The full instruction for an OSRM maneuver — mirrors `RouteGeometry.osrmPhrase`. [type] is the
+     * OSRM maneuver type ("turn", "off ramp", "roundabout", …, language-independent); [mod] is the OSRM
+     * modifier token ("left", "slight right", "straight", …, language-independent — each language maps
+     * it); [road] is the road being entered; [dest] a ramp's sign destination; [exitNo] a ramp exit
+     * number; [rbExit] a roundabout exit count.
+     */
+    fun phrase(type: String, mod: String?, road: String?, dest: String?, exitNo: String?, rbExit: Int?): String
+
+    /** Landmark lead-in "Pass the traffic light" / "Pass N traffic lights" for Google-style guidance, prepended
+     *  to a turn ("Pass the light, then turn left onto 5th Ave"). Default "" = feature omitted for that language
+     *  (English-first); only added when it makes sense (1–2 signals right before a surface-street turn). */
+    fun passLights(count: Int): String = ""
+
+    /** The lights lead-in joined to the turn: "Pass the traffic light, then turn left". A language
+     *  with a [passLights] phrase joins it in its own words. */
+    fun lightThen(lead: String, instruction: String): String = "$lead, then " + instruction.replaceFirstChar { it.lowercaseChar() }
+
+    /** The SPOKEN form of a sign instruction: the secondary sign destinations after a colon are
+     *  dropped ("Take the ramp toward I 5 North: Vancouver British Columbia" -> "... toward I 5
+     *  North"). The full sign stays on the banner; speaking it all took so long the next prompt
+     *  interrupted mid-sentence (real-drive report 2026-07-16 - Google speaks only the primary
+     *  destination too). Default = unchanged; English overrides (the colon convention is
+     *  osrmPhrase's own formatting, so per-language overrides are safe as tables adopt it). */
+    fun spokenSign(instruction: String): String = instruction
+
+    /** A repeated prompt's SHORT form: the instruction with its sign-destination tail ("toward X")
+     *  dropped. Spoken for a step's second/third announcement — the first one already named the
+     *  destination, and re-reading the whole sign at every band read as spam off an exit (real-drive
+     *  report 2026-07-17). Default = unchanged (a language keeps full repeats until it overrides
+     *  with its own destination marker, same English-first pattern as [passLights]). */
+    fun repeatShort(instruction: String): String = instruction
+
+    /** A distance phrased for SPEECH, honoring the imperial/metric preference — "500 feet" / "150 mètres". */
+    fun spokenDistance(meters: Double, imperial: Boolean): String
+
+    /** The pre-turn frame combining a distance phrase and the instruction — EN "In X, Y" / FR "Dans X, Y". */
+    fun inThen(distancePhrase: String, instruction: String): String
+
+    /** The at-arrival spoken callout — EN "You have arrived". */
+    fun arrived(): String
+
+    /** Which side the destination is on — EN "Your destination is on the left/right". Used as
+     *  the ARRIVE step's banner text and appended to the spoken arrival when OSRM sent a side. */
+    fun destinationSide(left: Boolean): String
+
+    /** Spoken when navigation begins — EN "Starting navigation. <first instruction>". */
+    fun startNav(firstInstruction: String): String
+
+    /** Spoken as each intermediate stop is passed — EN "You've reached <label>" (blank → "your stop"). */
+    fun reachedStop(label: String): String
+
+    /** A stop coming up, framed by [inThen] ("In 500 feet, <this>"). EN "<stop> will be on your
+     *  right" (or left), or "<stop> will be ahead" when [left] is null (the side is not known). A
+     *  blank [label] is "your stop". Built like [destinationAhead] and [destinationSide]. */
+    fun stopAhead(label: String, left: Boolean?): String
+
+    /** [instruction] (the last maneuver before a stop) with the stop after it. EN "Turn left onto
+     *  Covell Boulevard, then <stop> will be on your right" (or "will be ahead"). */
+    fun thenStop(instruction: String, label: String, left: Boolean?): String
+
+    /** The last turn before a stop when it turns into the parking lot the stop sits in. EN "Turn
+     *  left into the parking lot, then <stop> is on your right". [turnLeft] is the turn's
+     *  direction, [left] the stop's side (null = ahead). */
+    fun intoLotThen(turnLeft: Boolean, label: String, left: Boolean?): String
+
+    /** Two turns too close together to say one at a time: [instruction] with the turn after it.
+     *  EN "Turn right onto Elm Street, then turn left onto Oak Avenue". Default = [instruction]
+     *  alone: a language leaves this out until it has a line of its own that reads right. */
+    fun thenNext(instruction: String, next: String): String = instruction
+
+    /** The last turn of a trip when it turns into the destination's parking lot, as the step's own
+     *  text. EN "Turn left into the parking lot". The clause [intoLotThen] opens with. */
+    fun intoLot(turnLeft: Boolean): String
+
+    /** Spoken when auto-switching to a faster route — EN "Taking the faster route. <first instruction>". */
+    fun fasterRoute(firstInstruction: String): String
+
+    /** The "Test voice" sample — a short nav-style phrase to hear the selected voice. */
+    fun voiceTest(): String
+
+    /** "Rerouting" — spoken when the driver leaves the route and a new one is being fetched. */
+    fun rerouting(): String = "Rerouting"
+
+    /** The faster-route OFFER ("Faster route available, saving about N minutes"). */
+    fun fasterRouteAvailable(minutes: Int): String =
+        if (minutes == 1) "Faster route available, saving about a minute"
+        else "Faster route available, saving about $minutes minutes"
+
+    /** A reroute landed but couldn't route through the remaining stops. */
+    fun stopsNotIncluded(): String = "Couldn't include your stops in this route. I'll keep trying."
+    /** The drive was on a saved route and has left it: it goes on by the fastest way. */
+    fun leftYourRoute(): String = "You left your route. Taking the fastest way."
+
+    /** Approach cue for the FINAL destination, framed by [inThen] ("In 400 meters, <this>"). */
+    fun destinationAhead(): String = "Your destination will be ahead"
+
+    /** A spoken lane recommendation — EN "Use the right 2 lanes" / "Use the left lane". */
+    fun useLanes(side: LaneSide, count: Int): String
+
+    /** Lane guidance spoken as a PREFACE to the maneuver (Google-style: "Use the right 2 lanes to take
+     *  exit 172 toward Sacramento"), rather than appended after it. Default is a safe two-sentence,
+     *  lanes-first form that works in every language; [EnNavStrings] overrides it with the smooth
+     *  "…to <maneuver>" connective. */
+    fun useLanesToDo(side: LaneSide, count: Int, instruction: String): String =
+        useLanes(side, count) + ". " + instruction
+
+    /**
+     * Expand road abbreviations + numbers so the TTS engine SAYS them ("St"→"Street", "128th"→"one
+     * twenty-eighth"). English-specific, so it's **opt-in**: the default is identity, and ONLY
+     * [EnNavStrings] overrides it. Other languages must leave the text — including road-name DATA —
+     * untouched, so an English rule can never mangle a foreign name (a French "Rue"/"Bd" is read
+     * natively by the French voice).
+     */
+    fun expandForSpeech(text: String): String = text
+}
+
+/** English (source of truth) — byte-identical to the original `osrmPhrase`, so existing nav tests pass. */
+object EnNavStrings : NavStrings {
+    override val locale: Locale = Locale.US
+
+    override fun phrase(type: String, mod: String?, road: String?, dest: String?, exitNo: String?, rbExit: Int?): String {
+        val onto = if (road != null) " onto $road" else ""
+        val m = (mod ?: "").trim()
+        val toward = when {
+            dest != null -> " toward $dest"
+            road != null -> " onto $road"
+            else -> ""
+        }
+        val exitTab = if (exitNo != null) " $exitNo" else ""
+        return when (type) {
+            "depart" -> if (road != null) "Head out on $road" else "Start your route"
+            "arrive" -> "Arrive at your destination"
+            "turn", "end of road" -> ("Turn $m").trim() + onto
+            "continue", "new name" -> if (m.isNotBlank() && m != "straight") ("Bear $m").trim() + onto else "Continue$onto"
+            "merge" -> "Merge$toward"
+            "on ramp", "ramp" -> when {
+                mod?.contains("right") == true -> "Take the ramp on the right$toward"
+                mod?.contains("left") == true -> "Take the ramp on the left$toward"
+                else -> "Take the ramp$toward"
+            }
+            "off ramp" -> if (exitNo != null) "Take exit$exitTab$toward" else "Take the exit$toward"
+            "fork" -> ("Keep $m").trim() + toward
+            // Ordinal, like every other language here and like Google ("take the 2nd exit"): "take
+            // exit 2" read as a numbered motorway exit (user 2026-09-05). Straight through is named
+            // as such, with the exit count kept as the confirmation.
+            "roundabout", "rotary", "exit roundabout", "exit rotary" -> when {
+                rbExit == null -> "Enter the roundabout$onto"
+                mod == "straight" -> "At the roundabout, go straight through$onto, the ${enOrdinal(rbExit)} exit"
+                else -> "At the roundabout, take the ${enOrdinal(rbExit)} exit$onto"
+            }
+            "roundabout turn" -> ("At the roundabout, turn $m").trim() + onto
+            "uturn" -> "Make a U-turn$onto"
+            else -> if (m.isNotBlank()) ("Turn $m").trim() + onto else "Continue$onto"
+        }
+    }
+
+    // Feet under ~0.15 mi, else miles; meters under ~1 km, else kilometers (unchanged from NavEngine).
+    override fun spokenDistance(meters: Double, imperial: Boolean): String = if (imperial) {
+        val feet = meters * 3.28084
+        if (feet < 800) "${(if (feet < 100) maxOf(10, (feet / 10).roundToInt() * 10) else (feet / 50).roundToInt() * 50)} feet"
+        else {
+            // Sub-mile distances SPEAK at quarter-mile granularity (user 2026-07-16: the voice
+            // read "zero point five miles"; a human says "half a mile"). Google phrases the
+            // whole band this way; the banner keeps the exact figure. Above a mile, decimals
+            // read fine ("1.2 miles").
+            when ((meters / 402.336).roundToInt().coerceAtLeast(1)) {
+                1 -> "a quarter mile"
+                2 -> "half a mile"
+                3 -> "three quarters of a mile"
+                else -> {
+                    val miles = (meters / 1609.34 * 10).roundToInt() / 10.0
+                    if (miles == 1.0) "1 mile" else "$miles miles"
+                }
+            }
+        }
+    } else {
+        if (meters < 950) "${(meters / 10).roundToInt() * 10} meters"
+        else {
+            val km = (meters / 100).roundToInt() / 10.0
+            if (km == 1.0) "1 kilometer" else "$km kilometers"
+        }
+    }
+
+    override fun inThen(distancePhrase: String, instruction: String): String = "In $distancePhrase, $instruction"
+
+    override fun passLights(count: Int): String = if (count <= 1) "Pass the traffic light" else "Pass $count traffic lights"
+
+    // Trailing SEMICOLON on purpose (spoken-only string — NavEngine Speak, never displayed): bare text
+    // gives the Piper voice no final prosody contour and the callout ended oddly; the user A/B'd
+    // punctuation and the semicolon's contour sounds best (period OK, semicolon better). 2026-07-06.
+    override fun arrived(): String = "You have arrived;"
+
+    override fun destinationSide(left: Boolean): String = if (left) "Your destination is on the left" else "Your destination is on the right"
+
+    override fun startNav(firstInstruction: String): String = "Starting navigation. $firstInstruction"
+
+    override fun reachedStop(label: String): String =
+        if (label.isNotBlank()) "You've reached $label" else "You've reached your stop"
+
+    override fun stopAhead(label: String, left: Boolean?): String {
+        val who = label.ifBlank { "Your stop" }
+        return when (left) { true -> "$who will be on your left"; false -> "$who will be on your right"; null -> "$who will be ahead" }
+    }
+
+    override fun thenStop(instruction: String, label: String, left: Boolean?): String =
+        "$instruction, then " + stopAhead(label.ifBlank { "your stop" }, left)
+
+    override fun intoLot(turnLeft: Boolean): String = "Turn ${if (turnLeft) "left" else "right"} into the parking lot"
+
+    override fun thenNext(instruction: String, next: String): String = "$instruction, then " + next.replaceFirstChar { it.lowercase() }
+
+    override fun intoLotThen(turnLeft: Boolean, label: String, left: Boolean?): String {
+        val where = when (left) { true -> "is on your left"; false -> "is on your right"; null -> "is ahead" }
+        return "Turn ${if (turnLeft) "left" else "right"} into the parking lot, then ${label.ifBlank { "your stop" }} $where"
+    }
+
+    override fun fasterRoute(firstInstruction: String): String = "Taking the faster route. $firstInstruction"
+
+    override fun voiceTest(): String = "Voice guidance is on. In a quarter mile, turn right."
+
+    override fun useLanes(side: LaneSide, count: Int): String {
+        val sideWord = when (side) { LaneSide.LEFT -> "left"; LaneSide.RIGHT -> "right"; LaneSide.CENTER -> "center" }
+        return if (count > 1) "Use the $sideWord $count lanes" else "Use the $sideWord lane"
+    }
+
+    // Drop the secondary sign destinations: the colon only ever comes from osrmPhrase's own
+    // "ref: cities" sign formatting, and only after a " toward " - so a plain colon elsewhere
+    // (times, addresses) can never be touched.
+    override fun spokenSign(instruction: String): String {
+        val t = instruction.indexOf(" toward ")
+        if (t < 0) return instruction
+        val colon = instruction.indexOf(':', startIndex = t)
+        return if (colon > 0) instruction.substring(0, colon) else instruction
+    }
+
+    // "Take the ramp on the right toward CA-99 North, Downtown" -> "Take the ramp on the right".
+    // The exit number stays ("Take exit 172"); only the sign-destination tail drops. The " toward "
+    // marker is exactly what osrmPhrase/ghPhrase emit for EN ramp/exit/fork steps.
+    override fun repeatShort(instruction: String): String = instruction.substringBefore(" toward ")
+
+    override fun useLanesToDo(side: LaneSide, count: Int, instruction: String): String {
+        val sideWord = when (side) { LaneSide.LEFT -> "left"; LaneSide.RIGHT -> "right"; LaneSide.CENTER -> "center" }
+        val lanes = if (count > 1) "the $sideWord $count lanes" else "the $sideWord lane"
+        // "Use the right 2 lanes to take exit 172 toward Sacramento" — lowercase the maneuver's first
+        // word so it reads as one sentence after the "In <distance>, " frame.
+        return "Use $lanes to " + instruction.replaceFirstChar { it.lowercaseChar() }
+    }
+
+    /** "1st", "2nd", "3rd", "4th"... (11th-13th are "th"). TTS engines read these as the ordinal words. */
+    private fun enOrdinal(n: Int): String {
+        val suffix = when {
+            n % 100 in 11..13 -> "th"
+            n % 10 == 1 -> "st"
+            n % 10 == 2 -> "nd"
+            n % 10 == 3 -> "rd"
+            else -> "th"
+        }
+        return "$n$suffix"
+    }
+
+    /** Whole-word road abbreviation → spoken form, "I-80"→"Interstate 80", and 3-digit street ordinals
+     *  ("128th"→"one twenty eighth"). Moved here from VoiceGuide.forSpeech so it's English-scoped. */
+    override fun expandForSpeech(text: String): String {
+        var s = text
+        s = Regex("\\bI-(\\d+)").replace(s) { "Interstate ${it.groupValues[1]}" }
+        s = Regex("\\bUS-(\\d+)").replace(s) { "US ${it.groupValues[1]}" }
+        // State/province highway refs (CA-99, SR-99, NY-17, …) → "State Route N". Reading the bare 2-letter
+        // code (e.g. "CA") makes espeak's G2P mangle the K/C onset — a cause of the "the K/T sounds off
+        // sometimes" bug. Runs AFTER I-/US- so those keep their spoken forms (US- is already de-hyphenated).
+        s = Regex("\\b[A-Z]{2}-(\\d+)").replace(s) { "State Route ${it.groupValues[1]}" }
+        // Break the maneuver clause off the sign destination with a comma before " toward ":
+        // espeak's G2P is context-sensitive, and on a full "take the ramp toward Woodland" it
+        // mis-voweled "take" to "tyke" — chopping "toward Woodland" made it correct (user
+        // 2026-07-11). The comma is a fragment boundary (see SpeechText.speechFragments), so the
+        // model phonemizes "take the ramp" in isolation, where it's right, and reads the
+        // destination as its own beat (Google pauses there too). "toward" only appears on ramp/
+        // exit/highway-sign steps, so plain turns ("... onto Main St") are untouched.
+        s = Regex(" toward ", RegexOption.IGNORE_CASE).replace(s, ", toward ")
+        // "Take exit 186" mis-vowels the same way ("tacake") now that the short repeat forms can
+        // end right after the number - "take the ..." is the onset espeak reliably gets right
+        // (user ear-report 2026-07-16), so speak it as "take the 186 exit". Display keeps
+        // "Take exit 186"; the exit-tab chip is unaffected (it reads the banner text).
+        s = Regex("""\btake exit (\w+)""", RegexOption.IGNORE_CASE).replace(s) { "take the ${it.groupValues[1]} exit" }
+        EN_SPEECH_WORDS.forEach { (re, rep) -> s = re.replace(s, rep) }
+        s = SpeechText.spokenNumbers(s) // "128th" → "one twenty eighth" (space, not hyphen — the compound got a mushy -ty), not a mangled "one hundred and 28th"
+        // "5:49 PM" -> "five forty nine PM": the phonemizer reads a colon between numbers as a
+        // measurement and said "five foot nine" for an arrival time (user 2026-09-18).
+        s = SpeechText.spokenClock(s)
+        return s
+    }
+}
+
+/** Whole-word road-abbreviation → spoken form, applied only by [EnNavStrings.expandForSpeech]. Road-type
+ *  suffixes are case-insensitive; the directionals are uppercase (as they appear in road names) and come
+ *  LAST so they can't chew into a word an earlier rule expanded. */
+private val EN_SPEECH_WORDS: List<Pair<Regex, String>> = listOf(
+    Regex("\\bSt\\b", RegexOption.IGNORE_CASE) to "Street",
+    Regex("\\bAve\\b", RegexOption.IGNORE_CASE) to "Avenue",
+    Regex("\\bBlvd\\b", RegexOption.IGNORE_CASE) to "Boulevard",
+    Regex("\\bRd\\b", RegexOption.IGNORE_CASE) to "Road",
+    Regex("\\bDr\\b", RegexOption.IGNORE_CASE) to "Drive",
+    Regex("\\bLn\\b", RegexOption.IGNORE_CASE) to "Lane",
+    Regex("\\bCt\\b", RegexOption.IGNORE_CASE) to "Court",
+    Regex("\\bPkwy\\b", RegexOption.IGNORE_CASE) to "Parkway",
+    Regex("\\bHwy\\b", RegexOption.IGNORE_CASE) to "Highway",
+    Regex("\\bPl\\b", RegexOption.IGNORE_CASE) to "Place",
+    Regex("\\bTer\\b", RegexOption.IGNORE_CASE) to "Terrace",
+    Regex("\\bCir\\b", RegexOption.IGNORE_CASE) to "Circle",
+    Regex("\\bSq\\b", RegexOption.IGNORE_CASE) to "Square",
+    Regex("\\bTrl\\b", RegexOption.IGNORE_CASE) to "Trail",
+    Regex("\\bExpy\\b", RegexOption.IGNORE_CASE) to "Expressway",
+    Regex("\\bFwy\\b", RegexOption.IGNORE_CASE) to "Freeway",
+    Regex("\\bNE\\b") to "Northeast",
+    Regex("\\bNW\\b") to "Northwest",
+    Regex("\\bSE\\b") to "Southeast",
+    Regex("\\bSW\\b") to "Southwest",
+    Regex("\\bN\\b") to "North",
+    Regex("\\bS\\b") to "South",
+    Regex("\\bE\\b") to "East",
+    Regex("\\bW\\b") to "West",
+)
+
+/**
+ * French — the first non-English NavStrings, proving the per-language-template design (note the word
+ * order: "à gauche **sur** X", the modifier folded into the verb phrase, roundabout ordinals "2e
+ * sortie"). Road/dest names are passed through untranslated.
+ */
+object FrNavStrings : NavStrings {
+    override val locale: Locale = Locale.FRANCE
+
+    private fun modWord(mod: String?): String = when ((mod ?: "").trim().lowercase()) {
+        "left" -> "à gauche"
+        "right" -> "à droite"
+        "slight left" -> "légèrement à gauche"
+        "slight right" -> "légèrement à droite"
+        "sharp left" -> "franchement à gauche"
+        "sharp right" -> "franchement à droite"
+        "straight" -> "tout droit"
+        "uturn" -> "demi-tour"
+        else -> ""
+    }
+
+    override fun phrase(type: String, mod: String?, road: String?, dest: String?, exitNo: String?, rbExit: Int?): String {
+        val sur = if (road != null) " sur $road" else ""
+        val vers = when {
+            dest != null -> " vers $dest"
+            road != null -> " sur $road"
+            else -> ""
+        }
+        val m = modWord(mod)
+        return when (type) {
+            "depart" -> if (road != null) "Prenez $road" else "Démarrez votre itinéraire"
+            "arrive" -> "Vous êtes arrivé à destination"
+            "turn", "end of road" -> ("Tournez $m").trim() + sur
+            "continue", "new name" -> if (m.isNotBlank() && m != "tout droit") ("Serrez $m").trim() + sur else "Continuez$sur"
+            "merge" -> "Insérez-vous$vers"
+            "on ramp", "ramp" -> when {
+                mod?.contains("right") == true -> "Prenez la bretelle à droite$vers"
+                mod?.contains("left") == true -> "Prenez la bretelle à gauche$vers"
+                else -> "Prenez la bretelle$vers"
+            }
+            "off ramp" -> if (exitNo != null) "Prenez la sortie $exitNo$vers" else "Prenez la sortie$vers"
+            "fork" -> ("Restez $m").trim() + vers
+            "roundabout", "rotary", "exit roundabout", "exit rotary" -> if (rbExit != null) "Au rond-point, prenez la ${rbExit}e sortie$sur" else "Engagez-vous sur le rond-point$sur"
+            "roundabout turn" -> ("Au rond-point, tournez $m").trim() + sur
+            "uturn" -> "Faites demi-tour$sur"
+            else -> if (m.isNotBlank()) ("Tournez $m").trim() + sur else "Continuez$sur"
+        }
+    }
+
+    // France is metric; the imperial branch is kept for parity. French uses a decimal COMMA ("1,2 km").
+    override fun spokenDistance(meters: Double, imperial: Boolean): String = if (imperial) {
+        val feet = meters * 3.28084
+        if (feet < 800) "${(if (feet < 100) maxOf(10, (feet / 10).roundToInt() * 10) else (feet / 50).roundToInt() * 50)} pieds"
+        else {
+            val miles = (meters / 1609.34 * 10).roundToInt() / 10.0
+            if (miles == 1.0) "1 mile" else "${frNum(miles)} miles"
+        }
+    } else {
+        if (meters < 950) "${(meters / 10).roundToInt() * 10} mètres"
+        else {
+            val km = (meters / 100).roundToInt() / 10.0
+            if (km == 1.0) "1 kilomètre" else "${frNum(km)} kilomètres"
+        }
+    }
+
+    override fun inThen(distancePhrase: String, instruction: String): String = "Dans $distancePhrase, $instruction"
+
+    override fun arrived(): String = "Vous êtes arrivé"
+
+    override fun destinationSide(left: Boolean): String = if (left) "Votre destination est à gauche" else "Votre destination est à droite"
+
+    override fun startNav(firstInstruction: String): String = "Démarrage de la navigation. $firstInstruction"
+
+    override fun reachedStop(label: String): String =
+        if (label.isNotBlank()) "Vous êtes arrivé à $label" else "Vous êtes arrivé à votre étape"
+
+    override fun stopAhead(label: String, left: Boolean?): String {
+        val who = label.ifBlank { "Votre étape" }
+        return when (left) { true -> "$who sera sur votre gauche"; false -> "$who sera sur votre droite"; null -> "$who sera devant vous" }
+    }
+
+    override fun thenStop(instruction: String, label: String, left: Boolean?): String =
+        "$instruction, puis " + stopAhead(label.ifBlank { "votre étape" }, left)
+
+    override fun intoLot(turnLeft: Boolean): String = "Tournez à ${if (turnLeft) "gauche" else "droite"} dans le parking"
+
+    override fun thenNext(instruction: String, next: String): String = "$instruction, puis " + next.replaceFirstChar { it.lowercase() }
+
+    override fun intoLotThen(turnLeft: Boolean, label: String, left: Boolean?): String {
+        val where = when (left) { true -> "est sur votre gauche"; false -> "est sur votre droite"; null -> "est devant vous" }
+        return "Tournez à ${if (turnLeft) "gauche" else "droite"} dans le parking, puis ${label.ifBlank { "votre étape" }} $where"
+    }
+
+    override fun fasterRoute(firstInstruction: String): String = "Itinéraire plus rapide. $firstInstruction"
+    override fun rerouting(): String = "Recalcul de l'itinéraire"
+    override fun fasterRouteAvailable(minutes: Int): String =
+        if (minutes == 1) "Itinéraire plus rapide disponible, environ une minute de gagnée"
+        else "Itinéraire plus rapide disponible, environ $minutes minutes de gagnées"
+    override fun stopsNotIncluded(): String = "Impossible d'inclure vos étapes dans cet itinéraire. Je continue d'essayer."
+    override fun leftYourRoute(): String = "Vous avez quitté votre itinéraire. Je prends le chemin le plus rapide."
+    override fun destinationAhead(): String = "Votre destination sera devant vous"
+
+    override fun voiceTest(): String = "Le guidage vocal est activé. Tournez à droite dans 400 mètres."
+
+    override fun useLanes(side: LaneSide, count: Int): String {
+        val sideWord = when (side) { LaneSide.LEFT -> "de gauche"; LaneSide.RIGHT -> "de droite"; LaneSide.CENTER -> "du milieu" }
+        return if (count > 1) "Empruntez les $count voies $sideWord" else "Empruntez la voie $sideWord"
+    }
+
+    // expandForSpeech is left as the interface default (identity) — French road names are read natively.
+
+    private fun frNum(x: Double): String = x.toString().replace('.', ',')
+}
+
+object DeNavStrings : NavStrings {
+    override val locale: Locale = Locale.GERMANY
+
+    private fun modWord(mod: String?): String = when ((mod ?: "").trim().lowercase()) {
+        "left" -> "links"
+        "right" -> "rechts"
+        "slight left" -> "leicht links"
+        "slight right" -> "leicht rechts"
+        "sharp left" -> "scharf links"
+        "sharp right" -> "scharf rechts"
+        "straight" -> "geradeaus"
+        "uturn" -> "wenden"
+        else -> ""
+    }
+
+    override fun phrase(type: String, mod: String?, road: String?, dest: String?, exitNo: String?, rbExit: Int?): String {
+        val auf = if (road != null) " auf $road" else ""
+        val richtung = when {
+            dest != null -> " Richtung $dest"
+            road != null -> " auf $road"
+            else -> ""
+        }
+        val m = modWord(mod)
+        return when (type) {
+            "depart" -> if (road != null) "Fahren Sie los auf $road" else "Fahren Sie los"
+            "arrive" -> "Sie haben Ihr Ziel erreicht"
+            "turn", "end of road" -> if (m.isNotBlank()) "Biegen Sie $m ab$auf" else "Biegen Sie ab$auf"
+            "continue", "new name" -> if (m.isNotBlank() && m != "geradeaus") "Halten Sie sich $m$auf" else "Fahren Sie geradeaus weiter$auf"
+            "merge" -> "Fädeln Sie sich ein$richtung"
+            "on ramp", "ramp" -> when {
+                mod?.contains("right") == true -> "Nehmen Sie die Auffahrt rechts$richtung"
+                mod?.contains("left") == true -> "Nehmen Sie die Auffahrt links$richtung"
+                else -> "Nehmen Sie die Auffahrt$richtung"
+            }
+            "off ramp" -> if (exitNo != null) "Nehmen Sie die Ausfahrt $exitNo$richtung" else "Nehmen Sie die Ausfahrt$richtung"
+            "fork" -> ("Halten Sie sich $m").trim() + richtung
+            "roundabout", "rotary", "exit roundabout", "exit rotary" -> if (rbExit != null) "Nehmen Sie im Kreisverkehr die ${deOrd(rbExit)} Ausfahrt$auf" else "Fahren Sie in den Kreisverkehr ein$auf"
+            "roundabout turn" -> if (m.isNotBlank()) "Biegen Sie im Kreisverkehr $m ab$auf" else "Fahren Sie im Kreisverkehr$auf"
+            "uturn" -> "Bitte wenden$auf"
+            else -> if (m.isNotBlank()) "Biegen Sie $m ab$auf" else "Fahren Sie geradeaus weiter$auf"
+        }
+    }
+
+    // Germany is metric; the imperial branch is kept for parity. German uses a decimal COMMA ("1,2 km").
+    // Unit words are DATIVE, because the phrase is almost always spoken inside inThen ("In 400 Metern, …").
+    override fun spokenDistance(meters: Double, imperial: Boolean): String = if (imperial) {
+        val feet = meters * 3.28084
+        if (feet < 800) "${(if (feet < 100) maxOf(10, (feet / 10).roundToInt() * 10) else (feet / 50).roundToInt() * 50)} Fuß"
+        else {
+            val miles = (meters / 1609.34 * 10).roundToInt() / 10.0
+            if (miles == 1.0) "1 Meile" else "${deNum(miles)} Meilen"
+        }
+    } else {
+        if (meters < 950) "${(meters / 10).roundToInt() * 10} Metern"
+        else {
+            val km = (meters / 100).roundToInt() / 10.0
+            if (km == 1.0) "1 Kilometer" else "${deNum(km)} Kilometern"
+        }
+    }
+
+    override fun inThen(distancePhrase: String, instruction: String): String = "In $distancePhrase, $instruction"
+
+    override fun arrived(): String = "Sie haben Ihr Ziel erreicht"
+
+    override fun destinationSide(left: Boolean): String = if (left) "Ihr Ziel befindet sich links" else "Ihr Ziel befindet sich rechts"
+
+    override fun startNav(firstInstruction: String): String = "Navigation wird gestartet. $firstInstruction"
+
+    override fun reachedStop(label: String): String =
+        if (label.isNotBlank()) "Sie haben $label erreicht" else "Sie haben Ihren Zwischenstopp erreicht"
+
+    private fun deStopSide(left: Boolean?) = when (left) { true -> "links"; false -> "rechts"; null -> "voraus" }
+
+    override fun stopAhead(label: String, left: Boolean?): String =
+        "${label.ifBlank { "Ihr Zwischenstopp" }} liegt ${deStopSide(left)}"
+
+    override fun thenStop(instruction: String, label: String, left: Boolean?): String =
+        "$instruction, dann liegt ${label.ifBlank { "Ihr Zwischenstopp" }} ${deStopSide(left)}"
+
+    override fun intoLot(turnLeft: Boolean): String = "Biegen Sie ${if (turnLeft) "links" else "rechts"} auf den Parkplatz ab"
+
+    override fun thenNext(instruction: String, next: String): String = "$instruction, dann " + next.replaceFirstChar { it.lowercase() }
+
+    override fun intoLotThen(turnLeft: Boolean, label: String, left: Boolean?): String =
+        "Biegen Sie ${if (turnLeft) "links" else "rechts"} auf den Parkplatz ab, dann liegt ${label.ifBlank { "Ihr Zwischenstopp" }} ${deStopSide(left)}"
+
+    override fun fasterRoute(firstInstruction: String): String = "Schnellere Route wird genommen. $firstInstruction"
+    override fun rerouting(): String = "Route wird neu berechnet"
+    override fun fasterRouteAvailable(minutes: Int): String =
+        if (minutes == 1) "Schnellere Route verfügbar, spart etwa eine Minute"
+        else "Schnellere Route verfügbar, spart etwa $minutes Minuten"
+    override fun stopsNotIncluded(): String = "Ihre Zwischenstopps konnten nicht aufgenommen werden. Ich versuche es weiter."
+    override fun leftYourRoute(): String = "Sie haben Ihre Route verlassen. Ich nehme den schnellsten Weg."
+    override fun destinationAhead(): String = "Ihr Ziel liegt voraus"
+
+    override fun voiceTest(): String = "Die Sprachausgabe ist aktiviert. Biegen Sie in 400 Metern rechts ab."
+
+    override fun useLanes(side: LaneSide, count: Int): String {
+        return if (count > 1) {
+            val sideWordPl = when (side) { LaneSide.LEFT -> "linken"; LaneSide.RIGHT -> "rechten"; LaneSide.CENTER -> "mittleren" }
+            "Benutzen Sie die $count $sideWordPl Spuren"
+        } else {
+            val sideWord = when (side) { LaneSide.LEFT -> "linke"; LaneSide.RIGHT -> "rechte"; LaneSide.CENTER -> "mittlere" }
+            "Benutzen Sie die $sideWord Spur"
+        }
+    }
+
+    // expandForSpeech is left as the interface default (identity) — German road names are read natively.
+
+    private fun deNum(x: Double): String = x.toString().replace('.', ',')
+
+    // Roundabout exit ordinal — feminine, agreeing with "die … Ausfahrt"; spelled out for the common
+    // low counts a native driver hears, "N." otherwise.
+    private fun deOrd(n: Int): String = when (n) {
+        1 -> "erste"
+        2 -> "zweite"
+        3 -> "dritte"
+        4 -> "vierte"
+        5 -> "fünfte"
+        6 -> "sechste"
+        7 -> "siebte"
+        8 -> "achte"
+        9 -> "neunte"
+        else -> "$n."
+    }
+}
+
+object EsNavStrings : NavStrings {
+    override val locale: Locale = Locale("es", "ES")
+
+    private fun modWord(mod: String?): String = when ((mod ?: "").trim().lowercase()) {
+        "left" -> "a la izquierda"
+        "right" -> "a la derecha"
+        "slight left" -> "ligeramente a la izquierda"
+        "slight right" -> "ligeramente a la derecha"
+        "sharp left" -> "cerrado a la izquierda"
+        "sharp right" -> "cerrado a la derecha"
+        "straight" -> "recto"
+        "uturn" -> "cambio de sentido"
+        else -> ""
+    }
+
+    override fun phrase(type: String, mod: String?, road: String?, dest: String?, exitNo: String?, rbExit: Int?): String {
+        val por = if (road != null) " por $road" else ""
+        val hacia = when {
+            dest != null -> " hacia $dest"
+            road != null -> " por $road"
+            else -> ""
+        }
+        // Merges/incorporations take "a"/"en dirección a", never "hacia".
+        val incorp = when {
+            dest != null -> " en dirección a $dest"
+            road != null -> " a $road"
+            else -> ""
+        }
+        val m = modWord(mod)
+        return when (type) {
+            "depart" -> if (road != null) "Circule por $road" else "Inicie su ruta"
+            "arrive" -> "Ha llegado a su destino"
+            "turn", "end of road" -> ("Gire $m").trim() + por
+            "continue", "new name" -> if (m.isNotBlank() && m != "recto") ("Manténgase $m").trim() + por else "Continúe$por"
+            "merge" -> "Incorpórese$incorp"
+            "on ramp", "ramp" -> when {
+                mod?.contains("right") == true -> "Tome el acceso a la derecha$hacia"
+                mod?.contains("left") == true -> "Tome el acceso a la izquierda$hacia"
+                else -> "Tome el acceso$hacia"
+            }
+            "off ramp" -> if (exitNo != null) "Tome la salida $exitNo$hacia" else "Tome la salida$hacia"
+            "fork" -> ("Manténgase $m").trim() + hacia
+            "roundabout", "rotary", "exit roundabout", "exit rotary" -> if (rbExit != null) "En la rotonda, tome la $rbExit.ª salida$por" else "Incorpórese a la rotonda$por"
+            "roundabout turn" -> ("En la rotonda, gire $m").trim() + por
+            "uturn" -> "Haga un cambio de sentido$por"
+            else -> if (m.isNotBlank()) ("Gire $m").trim() + por else "Continúe$por"
+        }
+    }
+
+    // Spain is metric; the imperial branch is kept for parity. Spanish uses a decimal COMMA ("1,2 km").
+    override fun spokenDistance(meters: Double, imperial: Boolean): String = if (imperial) {
+        val feet = meters * 3.28084
+        if (feet < 800) "${(if (feet < 100) maxOf(10, (feet / 10).roundToInt() * 10) else (feet / 50).roundToInt() * 50)} pies"
+        else {
+            val miles = (meters / 1609.34 * 10).roundToInt() / 10.0
+            if (miles == 1.0) "1 milla" else "${esNum(miles)} millas"
+        }
+    } else {
+        if (meters < 950) "${(meters / 10).roundToInt() * 10} metros"
+        else {
+            val km = (meters / 100).roundToInt() / 10.0
+            if (km == 1.0) "1 kilómetro" else "${esNum(km)} kilómetros"
+        }
+    }
+
+    override fun inThen(distancePhrase: String, instruction: String): String = "En $distancePhrase, $instruction"
+
+    override fun arrived(): String = "Ha llegado"
+
+    override fun destinationSide(left: Boolean): String = if (left) "Su destino está a la izquierda" else "Su destino está a la derecha"
+
+    override fun startNav(firstInstruction: String): String = "Iniciando la navegación. $firstInstruction"
+
+    override fun reachedStop(label: String): String =
+        if (label.isNotBlank()) "Ha llegado a $label" else "Ha llegado a su parada"
+
+    private fun esStopSide(left: Boolean?) = when (left) { true -> "a su izquierda"; false -> "a su derecha"; null -> "más adelante" }
+
+    override fun stopAhead(label: String, left: Boolean?): String =
+        "${label.ifBlank { "Su parada" }} estará ${esStopSide(left)}"
+
+    override fun thenStop(instruction: String, label: String, left: Boolean?): String =
+        "$instruction, y luego " + stopAhead(label.ifBlank { "su parada" }, left)
+
+    override fun intoLot(turnLeft: Boolean): String = "Gire a la ${if (turnLeft) "izquierda" else "derecha"} hacia el aparcamiento"
+
+    override fun thenNext(instruction: String, next: String): String = "$instruction, y luego " + next.replaceFirstChar { it.lowercase() }
+
+    override fun intoLotThen(turnLeft: Boolean, label: String, left: Boolean?): String =
+        "Gire a la ${if (turnLeft) "izquierda" else "derecha"} hacia el aparcamiento, y luego ${label.ifBlank { "su parada" }} está ${esStopSide(left)}"
+
+    override fun fasterRoute(firstInstruction: String): String = "Tomando la ruta más rápida. $firstInstruction"
+    override fun rerouting(): String = "Recalculando la ruta"
+    override fun fasterRouteAvailable(minutes: Int): String =
+        if (minutes == 1) "Ruta más rápida disponible, ahorra alrededor de un minuto"
+        else "Ruta más rápida disponible, ahorra unos $minutes minutos"
+    override fun stopsNotIncluded(): String = "No se pudieron incluir tus paradas en esta ruta. Seguiré intentándolo."
+    override fun leftYourRoute(): String = "Has dejado tu ruta. Tomo el camino más rápido."
+    override fun destinationAhead(): String = "Tu destino estará más adelante"
+
+    override fun voiceTest(): String = "La guía por voz está activada. Dentro de 400 metros, gire a la derecha."
+
+    override fun useLanes(side: LaneSide, count: Int): String {
+        val sideWord = when (side) { LaneSide.LEFT -> "de la izquierda"; LaneSide.RIGHT -> "de la derecha"; LaneSide.CENTER -> "del centro" }
+        return if (count > 1) "Use los $count carriles $sideWord" else "Use el carril $sideWord"
+    }
+
+    // expandForSpeech is left as the interface default (identity) — Spanish road names are read natively.
+
+    private fun esNum(x: Double): String = x.toString().replace('.', ',')
+}
+
+object ItNavStrings : NavStrings {
+    override val locale: Locale = Locale.ITALY
+
+    private fun modWord(mod: String?): String = when ((mod ?: "").trim().lowercase()) {
+        "left" -> "a sinistra"
+        "right" -> "a destra"
+        "slight left" -> "leggermente a sinistra"
+        "slight right" -> "leggermente a destra"
+        "sharp left" -> "a gomito a sinistra"
+        "sharp right" -> "a gomito a destra"
+        "straight" -> "dritto"
+        "uturn" -> "inversione a U"
+        else -> ""
+    }
+
+    // The bare feminine side NOUN ("la sinistra"/"la destra") for the keep/bear/fork frames,
+    // where modWord's full adverbial ("a sinistra") would produce broken "Tieni la a sinistra".
+    private fun sideNoun(mod: String?): String = when ((mod ?: "").trim().lowercase()) {
+        "left", "slight left", "sharp left" -> "sinistra"
+        "right", "slight right", "sharp right" -> "destra"
+        else -> ""
+    }
+
+    override fun phrase(type: String, mod: String?, road: String?, dest: String?, exitNo: String?, rbExit: Int?): String {
+        val su = if (road != null) " su $road" else ""
+        val verso = when {
+            dest != null -> " verso $dest"
+            road != null -> " su $road"
+            else -> ""
+        }
+        val m = modWord(mod)
+        val side = sideNoun(mod)
+        return when (type) {
+            "depart" -> if (road != null) "Parti su $road" else "Avvia il percorso"
+            "arrive" -> "Sei arrivato a destinazione"
+            "turn", "end of road" -> ("Svolta $m").trim() + su
+            "continue", "new name" -> if (side.isNotBlank()) "Tieni la $side$su" else "Prosegui$su"
+            "merge" -> "Immettiti$verso"
+            "on ramp", "ramp" -> when {
+                mod?.contains("right") == true -> "Prendi la rampa a destra$verso"
+                mod?.contains("left") == true -> "Prendi la rampa a sinistra$verso"
+                else -> "Prendi la rampa$verso"
+            }
+            "off ramp" -> if (exitNo != null) "Prendi l'uscita $exitNo$verso" else "Prendi l'uscita$verso"
+            "fork" -> if (side.isNotBlank()) "Tieni la $side$verso" else "Prosegui$verso"
+            "roundabout", "rotary", "exit roundabout", "exit rotary" -> if (rbExit != null) "Alla rotatoria, prendi la ${rbExit}ª uscita$su" else "Immettiti nella rotatoria$su"
+            "roundabout turn" -> ("Alla rotatoria, svolta $m").trim() + su
+            "uturn" -> "Fai inversione a U$su"
+            else -> if (m.isNotBlank()) ("Svolta $m").trim() + su else "Prosegui$su"
+        }
+    }
+
+    // Italy is metric; the imperial branch is kept for parity. Italian uses a decimal COMMA ("1,2 km").
+    override fun spokenDistance(meters: Double, imperial: Boolean): String = if (imperial) {
+        val feet = meters * 3.28084
+        if (feet < 800) "${(if (feet < 100) maxOf(10, (feet / 10).roundToInt() * 10) else (feet / 50).roundToInt() * 50)} piedi"
+        else {
+            val miles = (meters / 1609.34 * 10).roundToInt() / 10.0
+            if (miles == 1.0) "1 miglio" else "${itNum(miles)} miglia"
+        }
+    } else {
+        if (meters < 950) "${(meters / 10).roundToInt() * 10} metri"
+        else {
+            val km = (meters / 100).roundToInt() / 10.0
+            if (km == 1.0) "1 chilometro" else "${itNum(km)} chilometri"
+        }
+    }
+
+    override fun inThen(distancePhrase: String, instruction: String): String = "Tra $distancePhrase, $instruction"
+
+    override fun arrived(): String = "Sei arrivato"
+
+    override fun destinationSide(left: Boolean): String = if (left) "La tua destinazione è a sinistra" else "La tua destinazione è a destra"
+
+    override fun startNav(firstInstruction: String): String = "Avvio della navigazione. $firstInstruction"
+
+    override fun reachedStop(label: String): String =
+        if (label.isNotBlank()) "Sei arrivato a $label" else "Sei arrivato alla tua tappa"
+
+    private fun itStopSide(left: Boolean?) = when (left) { true -> "sulla tua sinistra"; false -> "sulla tua destra"; null -> "più avanti" }
+
+    override fun stopAhead(label: String, left: Boolean?): String =
+        "${label.ifBlank { "La tua tappa" }} sarà ${itStopSide(left)}"
+
+    override fun thenStop(instruction: String, label: String, left: Boolean?): String =
+        "$instruction, poi " + stopAhead(label.ifBlank { "la tua tappa" }, left)
+
+    override fun intoLot(turnLeft: Boolean): String = "Svolta a ${if (turnLeft) "sinistra" else "destra"} nel parcheggio"
+
+    override fun thenNext(instruction: String, next: String): String = "$instruction, poi " + next.replaceFirstChar { it.lowercase() }
+
+    override fun intoLotThen(turnLeft: Boolean, label: String, left: Boolean?): String =
+        "Svolta a ${if (turnLeft) "sinistra" else "destra"} nel parcheggio, poi ${label.ifBlank { "la tua tappa" }} è ${itStopSide(left)}"
+
+    override fun fasterRoute(firstInstruction: String): String = "Percorso più veloce. $firstInstruction"
+    override fun rerouting(): String = "Ricalcolo del percorso"
+    override fun fasterRouteAvailable(minutes: Int): String =
+        if (minutes == 1) "Percorso più veloce disponibile, risparmi circa un minuto"
+        else "Percorso più veloce disponibile, risparmi circa $minutes minuti"
+    override fun stopsNotIncluded(): String = "Impossibile includere le tue tappe in questo percorso. Continuerò a provare."
+    override fun leftYourRoute(): String = "Hai lasciato il tuo percorso. Prendo la strada più veloce."
+    override fun destinationAhead(): String = "La tua destinazione sarà più avanti"
+
+    override fun voiceTest(): String = "La guida vocale è attiva. Tra 400 metri, svolta a destra."
+
+    override fun useLanes(side: LaneSide, count: Int): String {
+        val sideWord = when (side) { LaneSide.LEFT -> "di sinistra"; LaneSide.RIGHT -> "di destra"; LaneSide.CENTER -> "centrale" }
+        return if (count > 1) "Usa le $count corsie $sideWord" else "Usa la corsia $sideWord"
+    }
+
+    // expandForSpeech is left as the interface default (identity) — Italian road names are read natively.
+
+    private fun itNum(x: Double): String = x.toString().replace('.', ',')
+}
+
+/**
+ * Portuguese (Brazil) — mirrors [FrNavStrings] structurally (note the word order: "à esquerda **na**
+ * X", the modifier folded into the verb phrase, roundabout ordinals "2ª saída"). Road/dest names are
+ * passed through untranslated. Brazil is metric and uses a decimal COMMA ("1,2 km").
+ */
+object PtPtNavStrings : NavStrings {
+    override val locale: Locale = Locale("pt", "PT")
+
+    private fun modWord(mod: String?): String = when ((mod ?: "").trim().lowercase()) {
+        "left" -> "à esquerda"
+        "right" -> "à direita"
+        "slight left" -> "ligeiramente à esquerda"
+        "slight right" -> "ligeiramente à direita"
+        "sharp left" -> "acentuadamente à esquerda"
+        "sharp right" -> "acentuadamente à direita"
+        "straight" -> "em frente"
+        "uturn" -> "meia-volta"
+        else -> ""
+    }
+
+    override fun phrase(type: String, mod: String?, road: String?, dest: String?, exitNo: String?, rbExit: Int?): String {
+        val na = if (road != null) " na $road" else ""
+        val sentido = when {
+            dest != null -> " sentido $dest"
+            road != null -> " na $road"
+            else -> ""
+        }
+        val m = modWord(mod)
+        return when (type) {
+            "depart" -> if (road != null) "Siga pela $road" else "Inicie a sua rota"
+            "arrive" -> "Você chegou ao seu destino"
+            "turn", "end of road" -> ("Vire $m").trim() + na
+            "continue", "new name" -> if (m.isNotBlank() && m != "em frente") ("Mantenha-se $m").trim() + na else "Continue$na"
+            "merge" -> "Entre$sentido"
+            "on ramp", "ramp" -> when {
+                mod?.contains("right") == true -> "Siga pelo acesso à direita$sentido"
+                mod?.contains("left") == true -> "Siga pelo acesso à esquerda$sentido"
+                else -> "Siga no acesso$sentido"
+            }
+            "off ramp" -> if (exitNo != null) "Siga pela saída $exitNo$sentido" else "Siga pela saída$sentido"
+            "fork" -> ("Mantenha-se $m").trim() + sentido
+            "roundabout", "rotary", "exit roundabout", "exit rotary" -> if (rbExit != null) "Na rotunda, siga pela ${rbExit}ª saída$na" else "Entre na rotunda$na"
+            "roundabout turn" -> ("Na rotunda, vire $m").trim() + na
+            "uturn" -> "Faça a inversão de marcha$na"
+            else -> if (m.isNotBlank()) ("Vire $m").trim() + na else "Continue$na"
+        }
+    }
+
+    // Portugal is metric; the imperial branch is kept for parity. Portuguese uses a decimal COMMA ("1,2 km").
+    override fun spokenDistance(meters: Double, imperial: Boolean): String = if (imperial) {
+        val feet = meters * 3.28084
+        if (feet < 800) "${(if (feet < 100) maxOf(10, (feet / 10).roundToInt() * 10) else (feet / 50).roundToInt() * 50)} pés"
+        else {
+            val miles = (meters / 1609.34 * 10).roundToInt() / 10.0
+            if (miles == 1.0) "1 milha" else "${ptNum(miles)} milhas"
+        }
+    } else {
+        if (meters < 950) "${(meters / 10).roundToInt() * 10} metros"
+        else {
+            val km = (meters / 100).roundToInt() / 10.0
+            if (km == 1.0) "1 quilómetro" else "${ptNum(km)} quilómetros"
+        }
+    }
+
+    override fun inThen(distancePhrase: String, instruction: String): String = "Em $distancePhrase, $instruction"
+
+    override fun arrived(): String = "Você chegou"
+
+    override fun destinationSide(left: Boolean): String = if (left) "O seu destino fica à esquerda" else "O seu destino fica à direita"
+
+    override fun startNav(firstInstruction: String): String = "A iniciar a navegação. $firstInstruction"
+
+    override fun reachedStop(label: String): String =
+        if (label.isNotBlank()) "Você chegou a $label" else "Você chegou à sua paragem"
+
+    private fun ptStopSide(left: Boolean?) = when (left) { true -> "à sua esquerda"; false -> "à sua direita"; null -> "adiante" }
+
+    override fun stopAhead(label: String, left: Boolean?): String =
+        "${label.ifBlank { "A sua paragem" }} estará ${ptStopSide(left)}"
+
+    override fun thenStop(instruction: String, label: String, left: Boolean?): String =
+        "$instruction, depois " + stopAhead(label.ifBlank { "a sua paragem" }, left)
+
+    override fun intoLot(turnLeft: Boolean): String = "Vire à ${if (turnLeft) "esquerda" else "direita"} no estacionamento"
+
+    override fun thenNext(instruction: String, next: String): String = "$instruction, depois " + next.replaceFirstChar { it.lowercase() }
+
+    override fun intoLotThen(turnLeft: Boolean, label: String, left: Boolean?): String =
+        "Vire à ${if (turnLeft) "esquerda" else "direita"} no estacionamento, depois ${label.ifBlank { "a sua paragem" }} está ${ptStopSide(left)}"
+
+    override fun fasterRoute(firstInstruction: String): String = "A selecionar a rota mais rápida. $firstInstruction"
+    override fun rerouting(): String = "A recalcular a rota"
+    override fun fasterRouteAvailable(minutes: Int): String =
+        if (minutes == 1) "Rota mais rápida disponível, economiza cerca de um minuto"
+        else "Rota mais rápida disponível, economiza cerca de $minutes minutos"
+    override fun stopsNotIncluded(): String = "Não foi possível incluir as suas paragens nesta rota. Vou continuar a tentar."
+    override fun leftYourRoute(): String = "Você saiu da sua rota. Vou pelo caminho mais rápido."
+    override fun destinationAhead(): String = "O seu destino estará adiante"
+
+    override fun voiceTest(): String = "A orientação por voz está ativada. Em 400 metros, vire à direita."
+
+    override fun useLanes(side: LaneSide, count: Int): String {
+        val sideWord = when (side) { LaneSide.LEFT -> "à esquerda"; LaneSide.RIGHT -> "à direita"; LaneSide.CENTER -> "do meio" }
+        return if (count > 1) "Use as $count faixas $sideWord" else "Use a faixa $sideWord"
+    }
+
+    // expandForSpeech is left as the interface default (identity): Portuguese road names are read natively.
+
+    private fun ptNum(x: Double): String = x.toString().replace('.', ',')
+}
+
+object PtBrNavStrings : NavStrings {
+    override val locale: Locale = Locale("pt", "BR")
+
+    private fun modWord(mod: String?): String = when ((mod ?: "").trim().lowercase()) {
+        "left" -> "à esquerda"
+        "right" -> "à direita"
+        "slight left" -> "levemente à esquerda"
+        "slight right" -> "levemente à direita"
+        "sharp left" -> "acentuadamente à esquerda"
+        "sharp right" -> "acentuadamente à direita"
+        "straight" -> "em frente"
+        "uturn" -> "meia-volta"
+        else -> ""
+    }
+
+    override fun phrase(type: String, mod: String?, road: String?, dest: String?, exitNo: String?, rbExit: Int?): String {
+        val na = if (road != null) " na $road" else ""
+        val sentido = when {
+            dest != null -> " sentido $dest"
+            road != null -> " na $road"
+            else -> ""
+        }
+        val m = modWord(mod)
+        return when (type) {
+            "depart" -> if (road != null) "Siga pela $road" else "Inicie sua rota"
+            "arrive" -> "Você chegou ao seu destino"
+            "turn", "end of road" -> ("Vire $m").trim() + na
+            "continue", "new name" -> if (m.isNotBlank() && m != "em frente") ("Mantenha-se $m").trim() + na else "Continue$na"
+            "merge" -> "Entre$sentido"
+            "on ramp", "ramp" -> when {
+                mod?.contains("right") == true -> "Pegue o acesso à direita$sentido"
+                mod?.contains("left") == true -> "Pegue o acesso à esquerda$sentido"
+                else -> "Pegue o acesso$sentido"
+            }
+            "off ramp" -> if (exitNo != null) "Pegue a saída $exitNo$sentido" else "Pegue a saída$sentido"
+            "fork" -> ("Mantenha-se $m").trim() + sentido
+            "roundabout", "rotary", "exit roundabout", "exit rotary" -> if (rbExit != null) "Na rotatória, pegue a ${rbExit}ª saída$na" else "Entre na rotatória$na"
+            "roundabout turn" -> ("Na rotatória, vire $m").trim() + na
+            "uturn" -> "Faça o retorno$na"
+            else -> if (m.isNotBlank()) ("Vire $m").trim() + na else "Continue$na"
+        }
+    }
+
+    // Brazil is metric; the imperial branch is kept for parity. Portuguese uses a decimal COMMA ("1,2 km").
+    override fun spokenDistance(meters: Double, imperial: Boolean): String = if (imperial) {
+        val feet = meters * 3.28084
+        if (feet < 800) "${(if (feet < 100) maxOf(10, (feet / 10).roundToInt() * 10) else (feet / 50).roundToInt() * 50)} pés"
+        else {
+            val miles = (meters / 1609.34 * 10).roundToInt() / 10.0
+            if (miles == 1.0) "1 milha" else "${ptNum(miles)} milhas"
+        }
+    } else {
+        if (meters < 950) "${(meters / 10).roundToInt() * 10} metros"
+        else {
+            val km = (meters / 100).roundToInt() / 10.0
+            if (km == 1.0) "1 quilômetro" else "${ptNum(km)} quilômetros"
+        }
+    }
+
+    override fun inThen(distancePhrase: String, instruction: String): String = "Em $distancePhrase, $instruction"
+
+    override fun arrived(): String = "Você chegou"
+
+    override fun destinationSide(left: Boolean): String = if (left) "Seu destino está à esquerda" else "Seu destino está à direita"
+
+    override fun startNav(firstInstruction: String): String = "Iniciando a navegação. $firstInstruction"
+
+    override fun reachedStop(label: String): String =
+        if (label.isNotBlank()) "Você chegou a $label" else "Você chegou à sua parada"
+
+    private fun ptStopSide(left: Boolean?) = when (left) { true -> "à sua esquerda"; false -> "à sua direita"; null -> "adiante" }
+
+    override fun stopAhead(label: String, left: Boolean?): String =
+        "${label.ifBlank { "Sua parada" }} estará ${ptStopSide(left)}"
+
+    override fun thenStop(instruction: String, label: String, left: Boolean?): String =
+        "$instruction, depois " + stopAhead(label.ifBlank { "sua parada" }, left)
+
+    override fun intoLot(turnLeft: Boolean): String = "Vire à ${if (turnLeft) "esquerda" else "direita"} no estacionamento"
+
+    override fun thenNext(instruction: String, next: String): String = "$instruction, depois " + next.replaceFirstChar { it.lowercase() }
+
+    override fun intoLotThen(turnLeft: Boolean, label: String, left: Boolean?): String =
+        "Vire à ${if (turnLeft) "esquerda" else "direita"} no estacionamento, depois ${label.ifBlank { "sua parada" }} está ${ptStopSide(left)}"
+
+    override fun fasterRoute(firstInstruction: String): String = "Pegando a rota mais rápida. $firstInstruction"
+    override fun rerouting(): String = "Recalculando a rota"
+    override fun fasterRouteAvailable(minutes: Int): String =
+        if (minutes == 1) "Rota mais rápida disponível, economiza cerca de um minuto"
+        else "Rota mais rápida disponível, economiza cerca de $minutes minutos"
+    override fun stopsNotIncluded(): String = "Não foi possível incluir suas paradas nesta rota. Vou continuar tentando."
+    override fun leftYourRoute(): String = "Você saiu da sua rota. Vou pelo caminho mais rápido."
+    override fun destinationAhead(): String = "Seu destino estará adiante"
+
+    override fun voiceTest(): String = "A orientação por voz está ativada. Em 400 metros, vire à direita."
+
+    override fun useLanes(side: LaneSide, count: Int): String {
+        val sideWord = when (side) { LaneSide.LEFT -> "à esquerda"; LaneSide.RIGHT -> "à direita"; LaneSide.CENTER -> "do meio" }
+        return if (count > 1) "Use as $count faixas $sideWord" else "Use a faixa $sideWord"
+    }
+
+    // expandForSpeech is left as the interface default (identity): Portuguese road names are read natively.
+
+    private fun ptNum(x: Double): String = x.toString().replace('.', ',')
+}
+
+object NlNavStrings : NavStrings {
+    override val locale: Locale = Locale("nl", "NL")
+
+    // Plain directional phrase — the verb is folded into each template (Dutch "afslaan" is separable),
+    // so modWord must NOT carry a verb. Mirrors the French approach.
+    private fun modWord(mod: String?): String = when ((mod ?: "").trim().lowercase()) {
+        "left" -> "links"
+        "right" -> "rechts"
+        "slight left" -> "schuin naar links"
+        "slight right" -> "schuin naar rechts"
+        "sharp left" -> "scherp naar links"
+        "sharp right" -> "scherp naar rechts"
+        "straight" -> "rechtdoor"
+        "uturn" -> "keer om"
+        else -> ""
+    }
+
+    override fun phrase(type: String, mod: String?, road: String?, dest: String?, exitNo: String?, rbExit: Int?): String {
+        // Turning ONTO a road reads "... de <road> op" in Dutch ("Sla linksaf de Hoofdstraat op").
+        val deOp = if (road != null) " de $road op" else ""
+        // Continue/depart use "op <road>" (staying on / setting off on a road).
+        val op = if (road != null) " op $road" else ""
+        val richting = when {
+            dest != null -> " richting $dest"
+            road != null -> " op $road"
+            else -> ""
+        }
+        val m = modWord(mod)
+        return when (type) {
+            "depart" -> if (road != null) "Vertrek op $road" else "Start uw route"
+            "arrive" -> "U bent op uw bestemming aangekomen"
+            "turn", "end of road" -> when (m) {
+                "links" -> "Sla linksaf$deOp"
+                "rechts" -> "Sla rechtsaf$deOp"
+                "rechtdoor", "" -> "Ga rechtdoor$op"
+                else -> "Ga $m$deOp"
+            }
+            "continue", "new name" -> when {
+                m == "links" || m == "rechts" -> "Houd $m aan$op"
+                m.isNotBlank() && m != "rechtdoor" -> "Ga $m$op"
+                else -> "Ga rechtdoor$op"
+            }
+            "merge" -> "Voeg in$richting"
+            "on ramp", "ramp" -> when {
+                mod?.contains("right") == true -> "Neem de oprit rechts$richting"
+                mod?.contains("left") == true -> "Neem de oprit links$richting"
+                else -> "Neem de oprit$richting"
+            }
+            "off ramp" -> if (exitNo != null) "Neem afrit $exitNo$richting" else "Neem de afrit$richting"
+            // Derive the SIDE from the full modWord — OSRM forks are almost always "slight left"/
+            // "slight right" (→ "schuin naar links/rechts"), which the old exact match on
+            // "links"/"rechts" missed, falling to a hardcoded "Houd links aan" — KEEP-LEFT guidance
+            // at a keep-RIGHT freeway split (audit 2026-07-06, safety bug). endsWith covers the
+            // plain/schuin/scherp forms; a straight fork says "Ga rechtdoor" instead of a made-up left.
+            "fork" -> when {
+                m.endsWith("links") -> "Houd links aan$richting"
+                m.endsWith("rechts") -> "Houd rechts aan$richting"
+                m == "rechtdoor" -> "Ga rechtdoor$richting"
+                else -> "Houd links aan$richting"
+            }
+            "roundabout", "rotary", "exit roundabout", "exit rotary" -> if (rbExit != null) "Neem op de rotonde de ${rbExit}e afslag$op" else "Ga de rotonde op$op"
+            "roundabout turn" -> when (m) {
+                "links" -> "Sla op de rotonde linksaf$deOp"
+                "rechts" -> "Sla op de rotonde rechtsaf$deOp"
+                else -> if (m.isNotBlank()) "Ga op de rotonde $m$deOp" else "Ga de rotonde op$op"
+            }
+            "uturn" -> "Keer om$op"
+            else -> when (m) {
+                "links" -> "Sla linksaf$deOp"
+                "rechts" -> "Sla rechtsaf$deOp"
+                "" , "rechtdoor" -> "Ga rechtdoor$op"
+                else -> "Ga $m$deOp"
+            }
+        }
+    }
+
+    // Nederland is metrisch; de imperiale tak blijft voor pariteit. Nederlands gebruikt een decimale KOMMA ("1,2 km").
+    override fun spokenDistance(meters: Double, imperial: Boolean): String = if (imperial) {
+        val feet = meters * 3.28084
+        if (feet < 800) "${(if (feet < 100) maxOf(10, (feet / 10).roundToInt() * 10) else (feet / 50).roundToInt() * 50)} voet"
+        else {
+            val miles = (meters / 1609.34 * 10).roundToInt() / 10.0
+            if (miles == 1.0) "1 mijl" else "${nlNum(miles)} mijl"
+        }
+    } else {
+        if (meters < 950) "${(meters / 10).roundToInt() * 10} meter"
+        else {
+            val km = (meters / 100).roundToInt() / 10.0
+            if (km == 1.0) "1 kilometer" else "${nlNum(km)} kilometer"
+        }
+    }
+
+    override fun inThen(distancePhrase: String, instruction: String): String = "Over $distancePhrase, $instruction"
+
+    override fun arrived(): String = "U bent aangekomen"
+
+    override fun destinationSide(left: Boolean): String = if (left) "Uw bestemming is aan de linkerkant" else "Uw bestemming is aan de rechterkant"
+
+    override fun startNav(firstInstruction: String): String = "Navigatie wordt gestart. $firstInstruction"
+
+    override fun reachedStop(label: String): String =
+        if (label.isNotBlank()) "U hebt $label bereikt" else "U hebt uw tussenstop bereikt"
+
+    private fun nlStopSide(left: Boolean?) = when (left) { true -> "aan de linkerkant"; false -> "aan de rechterkant"; null -> "verderop" }
+
+    override fun stopAhead(label: String, left: Boolean?): String =
+        "${label.ifBlank { "Uw tussenstop" }} ligt ${nlStopSide(left)}"
+
+    override fun thenStop(instruction: String, label: String, left: Boolean?): String =
+        "$instruction, daarna ligt ${label.ifBlank { "uw tussenstop" }} ${nlStopSide(left)}"
+
+    override fun intoLot(turnLeft: Boolean): String = "Sla ${if (turnLeft) "linksaf" else "rechtsaf"} de parkeerplaats op"
+
+    override fun intoLotThen(turnLeft: Boolean, label: String, left: Boolean?): String =
+        "Sla ${if (turnLeft) "linksaf" else "rechtsaf"} de parkeerplaats op, daarna ligt ${label.ifBlank { "uw tussenstop" }} ${nlStopSide(left)}"
+
+    override fun fasterRoute(firstInstruction: String): String = "Snellere route gekozen. $firstInstruction"
+    override fun rerouting(): String = "Route wordt opnieuw berekend"
+    override fun fasterRouteAvailable(minutes: Int): String =
+        if (minutes == 1) "Snellere route beschikbaar, bespaart ongeveer een minuut"
+        else "Snellere route beschikbaar, bespaart ongeveer $minutes minuten"
+    override fun stopsNotIncluded(): String = "Je tussenstops konden niet in deze route worden opgenomen. Ik blijf het proberen."
+    override fun leftYourRoute(): String = "Je hebt je route verlaten. Ik neem de snelste weg."
+    override fun destinationAhead(): String = "Je bestemming ligt verderop"
+
+    override fun voiceTest(): String = "Gesproken navigatie staat aan. Sla over 400 meter rechtsaf."
+
+    override fun useLanes(side: LaneSide, count: Int): String {
+        val sideWord = when (side) { LaneSide.LEFT -> "linker"; LaneSide.RIGHT -> "rechter"; LaneSide.CENTER -> "middelste" }
+        return if (count > 1) "Gebruik de $count ${sideWord}rijstroken" else "Gebruik de ${sideWord}rijstrook"
+    }
+
+    // expandForSpeech blijft de interface-standaard (identiteit) — Nederlandse straatnamen worden natief voorgelezen.
+
+    private fun nlNum(x: Double): String = x.toString().replace('.', ',')
+}
+
+object RuNavStrings : NavStrings {
+    override val locale: Locale = Locale("ru", "RU")
+
+    private fun modWord(mod: String?): String = when ((mod ?: "").trim().lowercase()) {
+        "left" -> "налево"
+        "right" -> "направо"
+        "slight left" -> "левее"
+        "slight right" -> "правее"
+        "sharp left" -> "резко налево"
+        "sharp right" -> "резко направо"
+        "straight" -> "прямо"
+        "uturn" -> "разворот"
+        else -> ""
+    }
+
+    override fun phrase(type: String, mod: String?, road: String?, dest: String?, exitNo: String?, rbExit: Int?): String {
+        val na = if (road != null) " на $road" else ""
+        val vStoronu = when {
+            dest != null -> " в сторону $dest"
+            road != null -> " на $road"
+            else -> ""
+        }
+        val m = modWord(mod)
+        return when (type) {
+            "depart" -> if (road != null) "Начните движение по $road" else "Начните движение"
+            "arrive" -> "Вы прибыли в пункт назначения"
+            "turn", "end of road" -> ("Поверните $m").trim() + na
+            "continue", "new name" -> if (m.isNotBlank() && m != "прямо") ("Держитесь $m").trim() + na else "Продолжайте движение$na"
+            "merge" -> "Перестройтесь$vStoronu"
+            "on ramp", "ramp" -> when {
+                mod?.contains("right") == true -> "Выезжайте на автомагистраль справа$vStoronu"
+                mod?.contains("left") == true -> "Выезжайте на автомагистраль слева$vStoronu"
+                else -> "Выезжайте на автомагистраль$vStoronu"
+            }
+            "off ramp" -> if (exitNo != null) "Съезжайте на съезде $exitNo$vStoronu" else "Уходите на съезд$vStoronu"
+            "fork" -> ("Держитесь $m").trim() + vStoronu
+            "roundabout", "rotary", "exit roundabout", "exit rotary" -> if (rbExit != null) "На кольце — ${rbOrdinal(rbExit)} съезд$na" else "Выезжайте на круговое движение$na"
+            "roundabout turn" -> ("На кольце поверните $m").trim() + na
+            "uturn" -> "Выполните разворот$na"
+            else -> if (m.isNotBlank()) ("Поверните $m").trim() + na else "Продолжайте движение$na"
+        }
+    }
+
+    // Russia is metric; the imperial branch is kept for parity. Russian uses a decimal COMMA ("1,2 км").
+    override fun spokenDistance(meters: Double, imperial: Boolean): String = if (imperial) {
+        val feet = meters * 3.28084
+        if (feet < 800) ruFeet((if (feet < 100) maxOf(10, (feet / 10).roundToInt() * 10) else (feet / 50).roundToInt() * 50))
+        else {
+            val miles = (meters / 1609.34 * 10).roundToInt() / 10.0
+            ruMiles(miles)
+        }
+    } else {
+        if (meters < 950) ruMeters((meters / 10).roundToInt() * 10)
+        else {
+            val km = (meters / 100).roundToInt() / 10.0
+            ruKm(km)
+        }
+    }
+
+    override fun inThen(distancePhrase: String, instruction: String): String = "Через $distancePhrase $instruction"
+
+    override fun arrived(): String = "Вы на месте"
+
+    override fun destinationSide(left: Boolean): String = if (left) "Пункт назначения слева" else "Пункт назначения справа"
+
+    override fun startNav(firstInstruction: String): String = "Начинаю навигацию. $firstInstruction"
+
+    override fun reachedStop(label: String): String =
+        if (label.isNotBlank()) "Вы прибыли в $label" else "Вы прибыли к остановке"
+
+    private fun ruStopSide(left: Boolean?) = when (left) { true -> "слева"; false -> "справа"; null -> "впереди" }
+
+    override fun stopAhead(label: String, left: Boolean?): String =
+        "${label.ifBlank { "Остановка" }} будет ${ruStopSide(left)}"
+
+    override fun thenStop(instruction: String, label: String, left: Boolean?): String =
+        "$instruction, затем " + stopAhead(label.ifBlank { "остановка" }, left)
+
+    override fun intoLot(turnLeft: Boolean): String = "Поверните ${if (turnLeft) "налево" else "направо"} на парковку"
+
+    override fun thenNext(instruction: String, next: String): String = "$instruction, затем " + next.replaceFirstChar { it.lowercase() }
+
+    override fun intoLotThen(turnLeft: Boolean, label: String, left: Boolean?): String =
+        "Поверните ${if (turnLeft) "налево" else "направо"} на парковку, затем ${label.ifBlank { "остановка" }} будет ${ruStopSide(left)}"
+
+    override fun fasterRoute(firstInstruction: String): String = "Перехожу на более быстрый маршрут. $firstInstruction"
+    override fun rerouting(): String = "Перестроение маршрута"
+    override fun fasterRouteAvailable(minutes: Int): String =
+        if (minutes == 1) "Доступен более быстрый маршрут, экономия около минуты"
+        else "Доступен более быстрый маршрут, экономия около $minutes минут"
+    override fun stopsNotIncluded(): String = "Не удалось включить остановки в маршрут. Продолжаю попытки."
+    override fun leftYourRoute(): String = "Вы съехали со своего маршрута. Веду самым быстрым путём."
+    override fun destinationAhead(): String = "Пункт назначения будет впереди"
+
+    override fun voiceTest(): String = "Голосовые подсказки включены. Через 400 метров поверните направо."
+
+    override fun useLanes(side: LaneSide, count: Int): String {
+        val sideWord = when (side) { LaneSide.LEFT -> "левую"; LaneSide.RIGHT -> "правую"; LaneSide.CENTER -> "центральную" }
+        return if (count > 1) {
+            val sideWordPl = when (side) { LaneSide.LEFT -> "левые"; LaneSide.RIGHT -> "правые"; LaneSide.CENTER -> "центральные" }
+            "Займите $count $sideWordPl ${lanePlural(count)}"
+        } else {
+            "Займите $sideWord полосу"
+        }
+    }
+
+    // expandForSpeech is left as the interface default (identity) — Russian road names are read natively.
+
+    // Russian ordinal for the roundabout exit, agreeing with masculine "съезд" ("первый/второй/…").
+    // Falls back to the numeric "N-й" form beyond the common range.
+    private fun rbOrdinal(n: Int): String = when (n) {
+        1 -> "первый"
+        2 -> "второй"
+        3 -> "третий"
+        4 -> "четвёртый"
+        5 -> "пятый"
+        6 -> "шестой"
+        7 -> "седьмой"
+        8 -> "восьмой"
+        9 -> "девятый"
+        10 -> "десятый"
+        11 -> "одиннадцатый"
+        12 -> "двенадцатый"
+        else -> "$n-й"
+    }
+
+    // Russian decimal comma with a bare-integer shortcut ("2.0" → "2", "1.2" → "1,2").
+    private fun ruNum(x: Double): String {
+        val s = x.toString().replace('.', ',')
+        return if (s.endsWith(",0")) s.dropLast(2) else s
+    }
+
+    // Russian noun pluralization: one / few (2-4) / many (0, 5-20, …).
+    private fun pluralForm(n: Int): Int {
+        val mod100 = n % 100
+        val mod10 = n % 10
+        return when {
+            mod100 in 11..14 -> 2
+            mod10 == 1 -> 0
+            mod10 in 2..4 -> 1
+            else -> 2
+        }
+    }
+
+    private fun ruMeters(n: Int): String {
+        val unit = when (pluralForm(n)) { 0 -> "метр"; 1 -> "метра"; else -> "метров" }
+        return "$n $unit"
+    }
+
+    private fun ruFeet(n: Int): String {
+        val unit = when (pluralForm(n)) { 0 -> "фут"; 1 -> "фута"; else -> "футов" }
+        return "$n $unit"
+    }
+
+    // Whole km take full noun agreement; fractional km read genitive-singular ("1,2 километра").
+    private fun ruKm(x: Double): String {
+        val whole = x % 1.0 == 0.0
+        return if (whole) {
+            val n = x.toInt()
+            val unit = when (pluralForm(n)) { 0 -> "километр"; 1 -> "километра"; else -> "километров" }
+            "$n $unit"
+        } else {
+            "${ruNum(x)} километра"
+        }
+    }
+
+    private fun ruMiles(x: Double): String {
+        val whole = x % 1.0 == 0.0
+        return if (whole) {
+            val n = x.toInt()
+            val unit = when (pluralForm(n)) { 0 -> "миля"; 1 -> "мили"; else -> "миль" }
+            "$n $unit"
+        } else {
+            "${ruNum(x)} мили"
+        }
+    }
+
+    private fun lanePlural(n: Int): String = when (pluralForm(n)) { 0 -> "полосу"; 1 -> "полосы"; else -> "полос" }
+}
+
+/**
+ * Polish — mirrors [FrNavStrings] structurally. The modifier folds into the imperative verb
+ * ("Skręć w lewo w X"); roundabout ordinals are "1. zjazdem / 2. zjazdem" (instrumental of "zjazd").
+ * Road/dest names are passed through untranslated. Register is the Google-Maps-PL informal
+ * 2nd-person imperative ("Skręć", "Jedź"). Number-noun agreement follows Polish rules (see [plUnit]).
+ */
+object PlNavStrings : NavStrings {
+    override val locale: Locale = Locale("pl", "PL")
+
+    private fun modWord(mod: String?): String = when ((mod ?: "").trim().lowercase()) {
+        "left" -> "w lewo"
+        "right" -> "w prawo"
+        "slight left" -> "lekko w lewo"
+        "slight right" -> "lekko w prawo"
+        "sharp left" -> "ostro w lewo"
+        "sharp right" -> "ostro w prawo"
+        "straight" -> "prosto"
+        "uturn" -> "zawróć"
+        else -> ""
+    }
+
+    override fun phrase(type: String, mod: String?, road: String?, dest: String?, exitNo: String?, rbExit: Int?): String {
+        val w = if (road != null) " w $road" else ""
+        val ku = when {
+            dest != null -> " w kierunku $dest"
+            road != null -> " w $road"
+            else -> ""
+        }
+        val m = modWord(mod)
+        return when (type) {
+            "depart" -> if (road != null) "Jedź drogą $road" else "Rozpocznij trasę"
+            "arrive" -> "Dojazd do celu"
+            "turn", "end of road" -> ("Skręć $m").trim() + w
+            "continue", "new name" -> if (m.isNotBlank() && m != "prosto") ("Trzymaj się $m").trim() + w else "Jedź dalej$w"
+            "merge" -> "Włącz się do ruchu$ku"
+            "on ramp", "ramp" -> when {
+                mod?.contains("right") == true -> "Wjedź na łącznicę po prawej$ku"
+                mod?.contains("left") == true -> "Wjedź na łącznicę po lewej$ku"
+                else -> "Wjedź na łącznicę$ku"
+            }
+            "off ramp" -> if (exitNo != null) "Zjedź zjazdem $exitNo$ku" else "Zjedź zjazdem$ku"
+            "fork" -> ("Trzymaj się $m").trim() + ku
+            "roundabout", "rotary", "exit roundabout", "exit rotary" -> if (rbExit != null) "Na rondzie zjedź ${rbExit}. zjazdem$w" else "Wjedź na rondo$w"
+            "roundabout turn" -> ("Na rondzie skręć $m").trim() + w
+            "uturn" -> "Zawróć$w"
+            else -> if (m.isNotBlank()) ("Skręć $m").trim() + w else "Jedź dalej$w"
+        }
+    }
+
+    // Poland is metric; the imperial branch is kept for parity. Polish uses a decimal COMMA ("1,2 km").
+    override fun spokenDistance(meters: Double, imperial: Boolean): String = if (imperial) {
+        val feet = meters * 3.28084
+        if (feet < 800) "${(if (feet < 100) maxOf(10, (feet / 10).roundToInt() * 10) else (feet / 50).roundToInt() * 50)} stóp"
+        else {
+            val miles = (meters / 1609.34 * 10).roundToInt() / 10.0
+            if (miles == 1.0) "1 mila" else "${plNum(miles)} ${plUnit(miles, "mila", "mile", "mil", "mili")}"
+        }
+    } else {
+        if (meters < 950) "${(meters / 10).roundToInt() * 10} metrów"
+        else {
+            val km = (meters / 100).roundToInt() / 10.0
+            if (km == 1.0) "1 kilometr" else "${plNum(km)} ${plUnit(km, "kilometr", "kilometry", "kilometrów", "kilometra")}"
+        }
+    }
+
+    override fun inThen(distancePhrase: String, instruction: String): String = "Za $distancePhrase $instruction"
+
+    override fun arrived(): String = "Dotarłeś do celu"
+
+    override fun destinationSide(left: Boolean): String = if (left) "Cel znajduje się po lewej stronie" else "Cel znajduje się po prawej stronie"
+
+    override fun startNav(firstInstruction: String): String = "Rozpoczynam nawigację. $firstInstruction"
+
+    override fun reachedStop(label: String): String =
+        if (label.isNotBlank()) "Dotarłeś do $label" else "Dotarłeś do przystanku"
+
+    private fun plStopSide(left: Boolean?) = when (left) { true -> "po lewej stronie"; false -> "po prawej stronie"; null -> "przed tobą" }
+
+    override fun stopAhead(label: String, left: Boolean?): String =
+        "${label.ifBlank { "Przystanek" }} będzie ${plStopSide(left)}"
+
+    override fun thenStop(instruction: String, label: String, left: Boolean?): String =
+        "$instruction, a potem " + stopAhead(label.ifBlank { "przystanek" }, left)
+
+    override fun intoLot(turnLeft: Boolean): String = "Skręć ${if (turnLeft) "w lewo" else "w prawo"} na parking"
+
+    override fun thenNext(instruction: String, next: String): String = "$instruction, a potem " + next.replaceFirstChar { it.lowercase() }
+
+    override fun intoLotThen(turnLeft: Boolean, label: String, left: Boolean?): String =
+        "Skręć ${if (turnLeft) "w lewo" else "w prawo"} na parking, a potem ${label.ifBlank { "przystanek" }} będzie ${plStopSide(left)}"
+
+    override fun fasterRoute(firstInstruction: String): String = "Wybieram szybszą trasę. $firstInstruction"
+    override fun rerouting(): String = "Przeliczanie trasy"
+    override fun fasterRouteAvailable(minutes: Int): String =
+        if (minutes == 1) "Dostępna szybsza trasa, oszczędność około minuty"
+        else "Dostępna szybsza trasa, oszczędność około $minutes minut"
+    override fun stopsNotIncluded(): String = "Nie udało się uwzględnić przystanków na tej trasie. Będę próbować dalej."
+    override fun leftYourRoute(): String = "Opuszczono twoją trasę. Wybieram najszybszą drogę."
+    override fun destinationAhead(): String = "Cel podróży będzie przed tobą"
+
+    override fun voiceTest(): String = "Nawigacja głosowa jest włączona. Za 400 metrów skręć w prawo."
+
+    override fun useLanes(side: LaneSide, count: Int): String {
+        val laneInst = when (side) { LaneSide.LEFT -> "lewym"; LaneSide.RIGHT -> "prawym"; LaneSide.CENTER -> "środkowym" }
+        val lanesInst = when (side) { LaneSide.LEFT -> "lewymi"; LaneSide.RIGHT -> "prawymi"; LaneSide.CENTER -> "środkowymi" }
+        return if (count > 1) "Jedź $count $lanesInst pasami" else "Jedź $laneInst pasem"
+    }
+
+    // expandForSpeech is left as the interface default (identity) — Polish road names are read natively.
+
+    private fun plNum(x: Double): String = x.toString().replace('.', ',')
+
+    /**
+     * Polish quantity agreement. A decimal (fractional part ≠ 0) always takes the genitive-singular
+     * [gsg] ("1,2 kilometra", "2,5 mili"). Whole numbers: 1 → [one]; 2–4 (but not 12–14) → [few];
+     * everything else → [many] (genitive plural).
+     */
+    private fun plUnit(x: Double, one: String, few: String, many: String, gsg: String): String {
+        if (x != kotlin.math.floor(x)) return gsg
+        val n = x.toInt()
+        val u = n % 10
+        val t = n % 100
+        return when {
+            n == 1 -> one
+            u in 2..4 && t !in 12..14 -> few
+            else -> many
+        }
+    }
+}
+
+object SvNavStrings : NavStrings {
+    override val locale: Locale = Locale("sv", "SE")
+
+    private fun modWord(mod: String?): String = when ((mod ?: "").trim().lowercase()) {
+        "left" -> "vänster"
+        "right" -> "höger"
+        "slight left" -> "svagt vänster"
+        "slight right" -> "svagt höger"
+        "sharp left" -> "skarpt vänster"
+        "sharp right" -> "skarpt höger"
+        "straight" -> "rakt fram"
+        "uturn" -> "U-sväng"
+        else -> ""
+    }
+
+    // Swedish ordinals: 1:a, 2:a, 3:e, 4:e … — Google Maps Sweden speaks them out
+    // ("ta första/andra/tredje avfarten"), so give the small counts their word forms
+    // and fall back to the "N:a/N:e" digit-ordinal for larger exit numbers.
+    private fun svOrd(n: Int): String = when (n) {
+        1 -> "första"
+        2 -> "andra"
+        3 -> "tredje"
+        4 -> "fjärde"
+        5 -> "femte"
+        6 -> "sjätte"
+        7 -> "sjunde"
+        8 -> "åttonde"
+        9 -> "nionde"
+        10 -> "tionde"
+        else -> if (n % 100 in 1..2) "$n:a" else "$n:e"
+    }
+
+    override fun phrase(type: String, mod: String?, road: String?, dest: String?, exitNo: String?, rbExit: Int?): String {
+        val pa = if (road != null) " in på $road" else ""
+        val mot = when {
+            dest != null -> " mot $dest"
+            road != null -> " in på $road"
+            else -> ""
+        }
+        // A merge/ramp connects TO a road or heads TOWARD a sign — "till"/"mot", never "in på".
+        val till = when {
+            dest != null -> " mot $dest"
+            road != null -> " till $road"
+            else -> ""
+        }
+        val m = modWord(mod)
+        return when (type) {
+            "depart" -> if (road != null) "Kör ut på $road" else "Starta rutten"
+            "arrive" -> "Du är framme vid din destination"
+            "turn", "end of road" -> ("Sväng $m").trim() + pa
+            "continue", "new name" -> if (m.isNotBlank() && m != "rakt fram") ("Håll $m").trim() + pa else "Fortsätt$pa"
+            "merge" -> "Anslut$till"
+            "on ramp", "ramp" -> when {
+                mod?.contains("right") == true -> "Ta påfarten till höger$till"
+                mod?.contains("left") == true -> "Ta påfarten till vänster$till"
+                else -> "Ta påfarten$till"
+            }
+            "off ramp" -> if (exitNo != null) "Ta avfart $exitNo$mot" else "Ta avfarten$mot"
+            "fork" -> ("Håll $m").trim() + mot
+            "roundabout", "rotary", "exit roundabout", "exit rotary" -> if (rbExit != null) "Ta ${svOrd(rbExit)} avfarten i rondellen$pa" else "Kör in i rondellen$pa"
+            "roundabout turn" -> ("Sväng $m i rondellen").trim() + pa
+            "uturn" -> "Gör en U-sväng$pa"
+            else -> if (m.isNotBlank()) ("Sväng $m").trim() + pa else "Fortsätt$pa"
+        }
+    }
+
+    // Sweden is metric; the imperial branch is kept for parity. Swedish uses a decimal COMMA ("1,2 km").
+    // NB "mil" in Swedish is the 10 km Scandinavian mile, so an English mile is disambiguated as
+    // "engelsk mil"; "mil" is invariant in the plural ("två engelska mil").
+    override fun spokenDistance(meters: Double, imperial: Boolean): String = if (imperial) {
+        val feet = meters * 3.28084
+        if (feet < 800) "${(if (feet < 100) maxOf(10, (feet / 10).roundToInt() * 10) else (feet / 50).roundToInt() * 50)} fot"
+        else {
+            val miles = (meters / 1609.34 * 10).roundToInt() / 10.0
+            if (miles == 1.0) "1 engelsk mil" else "${svNum(miles)} engelska mil"
+        }
+    } else {
+        if (meters < 950) "${(meters / 10).roundToInt() * 10} meter"
+        else {
+            val km = (meters / 100).roundToInt() / 10.0
+            if (km == 1.0) "1 kilometer" else "${svNum(km)} kilometer"
+        }
+    }
+
+    override fun inThen(distancePhrase: String, instruction: String): String = "Om $distancePhrase, $instruction"
+
+    override fun arrived(): String = "Du är framme"
+
+    override fun destinationSide(left: Boolean): String = if (left) "Din destination är till vänster" else "Din destination är till höger"
+
+    override fun startNav(firstInstruction: String): String = "Startar navigeringen. $firstInstruction"
+
+    override fun reachedStop(label: String): String =
+        if (label.isNotBlank()) "Du är framme vid $label" else "Du är framme vid ditt stopp"
+
+    private fun svStopSide(left: Boolean?) = when (left) { true -> "till vänster"; false -> "till höger"; null -> "framför dig" }
+
+    override fun stopAhead(label: String, left: Boolean?): String =
+        "${label.ifBlank { "Ditt stopp" }} ligger ${svStopSide(left)}"
+
+    override fun thenStop(instruction: String, label: String, left: Boolean?): String =
+        "$instruction, sedan ligger ${label.ifBlank { "ditt stopp" }} ${svStopSide(left)}"
+
+    override fun intoLot(turnLeft: Boolean): String = "Sväng ${if (turnLeft) "vänster" else "höger"} in på parkeringen"
+
+    override fun intoLotThen(turnLeft: Boolean, label: String, left: Boolean?): String =
+        "Sväng ${if (turnLeft) "vänster" else "höger"} in på parkeringen, sedan ligger ${label.ifBlank { "ditt stopp" }} ${svStopSide(left)}"
+
+    override fun fasterRoute(firstInstruction: String): String = "Byter till en snabbare rutt. $firstInstruction"
+    override fun rerouting(): String = "Räknar om rutten"
+    override fun fasterRouteAvailable(minutes: Int): String =
+        if (minutes == 1) "Snabbare rutt tillgänglig, sparar cirka en minut"
+        else "Snabbare rutt tillgänglig, sparar cirka $minutes minuter"
+    override fun stopsNotIncluded(): String = "Kunde inte ta med dina stopp på denna rutt. Jag fortsätter försöka."
+    override fun leftYourRoute(): String = "Du har lämnat din rutt. Jag tar den snabbaste vägen."
+    override fun destinationAhead(): String = "Din destination ligger framför dig"
+
+    override fun voiceTest(): String = "Röstvägledningen är på. Om 400 meter, sväng höger."
+
+    override fun useLanes(side: LaneSide, count: Int): String {
+        val sideWord = when (side) { LaneSide.LEFT -> "vänstra"; LaneSide.RIGHT -> "högra"; LaneSide.CENTER -> "mittersta" }
+        return if (count > 1) "Använd de $count $sideWord filerna" else "Använd den $sideWord filen"
+    }
+
+    // expandForSpeech is left as the interface default (identity) — Swedish road names are read natively.
+
+    private fun svNum(x: Double): String = x.toString().replace('.', ',')
+}
+
+object UkNavStrings : NavStrings {
+    override val locale: Locale = Locale("uk", "UA")
+
+    private fun modWord(mod: String?): String = when ((mod ?: "").trim().lowercase()) {
+        "left" -> "ліворуч"
+        "right" -> "праворуч"
+        "slight left" -> "трохи ліворуч"
+        "slight right" -> "трохи праворуч"
+        "sharp left" -> "різко ліворуч"
+        "sharp right" -> "різко праворуч"
+        "straight" -> "прямо"
+        "uturn" -> "у зворотному напрямку"
+        else -> ""
+    }
+
+    // For "keep"/"bear" maneuvers Ukrainian nav uses comparative forms: правіше/лівіше.
+    private fun keepWord(mod: String?): String = when ((mod ?: "").trim().lowercase()) {
+        "left", "slight left", "sharp left" -> "ліворуч"
+        "right", "slight right", "sharp right" -> "праворуч"
+        else -> ""
+    }
+
+    override fun phrase(type: String, mod: String?, road: String?, dest: String?, exitNo: String?, rbExit: Int?): String {
+        val na = if (road != null) " на $road" else ""
+        val vers = when {
+            dest != null -> " у напрямку $dest"
+            road != null -> " на $road"
+            else -> ""
+        }
+        val m = modWord(mod)
+        val keep = keepWord(mod)
+        return when (type) {
+            "depart" -> if (road != null) "Рушайте по $road" else "Почніть маршрут"
+            "arrive" -> "Ви прибули до пункту призначення"
+            "turn", "end of road" -> ("Поверніть $m").trim() + na
+            "continue", "new name" -> if (keep.isNotBlank()) "Тримайтеся $keep$na" else "Продовжуйте рух$na"
+            "merge" -> "Приєднайтеся до потоку$vers"
+            "on ramp", "ramp" -> when {
+                mod?.contains("right") == true -> "Виїжджайте на з'їзд праворуч$vers"
+                mod?.contains("left") == true -> "Виїжджайте на з'їзд ліворуч$vers"
+                else -> "Виїжджайте на з'їзд$vers"
+            }
+            "off ramp" -> if (exitNo != null) "З'їжджайте на з'їзд $exitNo$vers" else "З'їжджайте зі з'їзду$vers"
+            "fork" -> if (keep.isNotBlank()) "Тримайтеся $keep$vers" else "Продовжуйте рух$vers"
+            "roundabout", "rotary", "exit roundabout", "exit rotary" -> if (rbExit != null) "На кільцевій розв'язці зверніть на ${rbExit}-й з'їзд$na" else "В'їжджайте на кільцеву розв'язку$na"
+            "roundabout turn" -> ("На кільцевій розв'язці поверніть $m").trim() + na
+            "uturn" -> "Розверніться$na"
+            else -> if (m.isNotBlank()) ("Поверніть $m").trim() + na else "Продовжуйте рух$na"
+        }
+    }
+
+    // Ukraine is metric; the imperial branch is kept for parity. Ukrainian uses a decimal COMMA ("1,2 км").
+    override fun spokenDistance(meters: Double, imperial: Boolean): String = if (imperial) {
+        val feet = meters * 3.28084
+        if (feet < 800) "${(if (feet < 100) maxOf(10, (feet / 10).roundToInt() * 10) else (feet / 50).roundToInt() * 50)} футів"
+        else {
+            val miles = (meters / 1609.34 * 10).roundToInt() / 10.0
+            "${ukNum(miles)} ${ukPlural(miles, "миля", "милі", "миль", "милі")}"
+        }
+    } else {
+        if (meters < 950) "${(meters / 10).roundToInt() * 10} метрів"
+        else {
+            val km = (meters / 100).roundToInt() / 10.0
+            "${ukNum(km)} ${ukPlural(km, "кілометр", "кілометри", "кілометрів", "кілометра")}"
+        }
+    }
+
+    override fun inThen(distancePhrase: String, instruction: String): String = "Через $distancePhrase $instruction"
+
+    override fun arrived(): String = "Ви прибули"
+
+    override fun destinationSide(left: Boolean): String = if (left) "Пункт призначення ліворуч" else "Пункт призначення праворуч"
+
+    override fun startNav(firstInstruction: String): String = "Починаємо навігацію. $firstInstruction"
+
+    override fun reachedStop(label: String): String =
+        if (label.isNotBlank()) "Ви прибули до $label" else "Ви прибули до зупинки"
+
+    private fun ukStopSide(left: Boolean?) = when (left) { true -> "ліворуч"; false -> "праворуч"; null -> "попереду" }
+
+    override fun stopAhead(label: String, left: Boolean?): String =
+        "${label.ifBlank { "Зупинка" }} буде ${ukStopSide(left)}"
+
+    override fun thenStop(instruction: String, label: String, left: Boolean?): String =
+        "$instruction, потім " + stopAhead(label.ifBlank { "зупинка" }, left)
+
+    override fun intoLot(turnLeft: Boolean): String = "Поверніть ${if (turnLeft) "ліворуч" else "праворуч"} на парковку"
+
+    override fun thenNext(instruction: String, next: String): String = "$instruction, потім " + next.replaceFirstChar { it.lowercase() }
+
+    override fun intoLotThen(turnLeft: Boolean, label: String, left: Boolean?): String =
+        "Поверніть ${if (turnLeft) "ліворуч" else "праворуч"} на парковку, потім ${label.ifBlank { "зупинка" }} буде ${ukStopSide(left)}"
+
+    override fun fasterRoute(firstInstruction: String): String = "Переходимо на швидший маршрут. $firstInstruction"
+    override fun rerouting(): String = "Перебудова маршруту"
+    override fun fasterRouteAvailable(minutes: Int): String =
+        if (minutes == 1) "Доступний швидший маршрут, економія близько хвилини"
+        else "Доступний швидший маршрут, економія близько $minutes хвилин"
+    override fun stopsNotIncluded(): String = "Не вдалося включити зупинки в маршрут. Продовжую спроби."
+    override fun leftYourRoute(): String = "Ви з'їхали зі свого маршруту. Веду найшвидшим шляхом."
+    override fun destinationAhead(): String = "Пункт призначення буде попереду"
+
+    override fun voiceTest(): String = "Голосові підказки увімкнено. Через 400 метрів поверніть праворуч."
+
+    override fun useLanes(side: LaneSide, count: Int): String {
+        val sideWord = when (side) { LaneSide.LEFT -> "лівою"; LaneSide.RIGHT -> "правою"; LaneSide.CENTER -> "центральною" }
+        val sideWordPl = when (side) { LaneSide.LEFT -> "лівими"; LaneSide.RIGHT -> "правими"; LaneSide.CENTER -> "центральними" }
+        return if (count > 1) "Рухайтеся $count $sideWordPl смугами" else "Рухайтеся $sideWord смугою"
+    }
+
+    // expandForSpeech is left as the interface default (identity) — Ukrainian road names are read natively.
+
+    private fun ukNum(x: Double): String {
+        val s = if (x == x.toLong().toDouble()) x.toLong().toString() else x.toString()
+        return s.replace('.', ',')
+    }
+
+    // Ukrainian 3-form plural: one / few (2-4) / many (0, 5-20, …). Non-integers (decimals) take
+    // the genitive-singular "few" form — spoken "1,2 кілометра", "5,5 милі".
+    // 4th param = the GENITIVE-SINGULAR form for fractional values ("1,2 кілометрА"), the same
+    // 4-form shape as plUnit — the old 3-form version returned the nominative-plural `few`
+    // ("кілометри") for decimals, which is wrong Ukrainian (audit 2026-07-06; RU/PL had it right).
+    private fun ukPlural(x: Double, one: String, few: String, many: String, gsg: String): String {
+        if (x != x.toLong().toDouble()) return gsg
+        val n = x.toLong()
+        val mod100 = (n % 100).toInt()
+        val mod10 = (n % 10).toInt()
+        return when {
+            mod100 in 11..14 -> many
+            mod10 == 1 -> one
+            mod10 in 2..4 -> few
+            else -> many
+        }
+    }
+}
+
+
+/**
+ * Simplified Chinese (Mandarin) — phrasing follows Google Maps' zh-CN guidance style
+ * ("500 米后，向左转，进入中山路"). Road/dest names pass through untranslated.
+ */
+object ZhNavStrings : NavStrings {
+    override val locale: Locale = Locale.SIMPLIFIED_CHINESE
+
+    private fun modWord(mod: String?): String = when ((mod ?: "").trim().lowercase()) {
+        "left" -> "向左转"
+        "right" -> "向右转"
+        "slight left" -> "稍向左转"
+        "slight right" -> "稍向右转"
+        "sharp left" -> "向左急转"
+        "sharp right" -> "向右急转"
+        "straight" -> "直行"
+        "uturn" -> "掉头"
+        else -> ""
+    }
+
+    private fun sideWord(mod: String?): String = when {
+        (mod ?: "").contains("left") -> "靠左"
+        (mod ?: "").contains("right") -> "靠右"
+        else -> ""
+    }
+
+    override fun phrase(type: String, mod: String?, road: String?, dest: String?, exitNo: String?, rbExit: Int?): String {
+        val onto = if (road != null) "，进入$road" else ""
+        val toward = when {
+            dest != null -> "，前往$dest"
+            road != null -> "，进入$road"
+            else -> ""
+        }
+        val m = modWord(mod)
+        val side = sideWord(mod)
+        return when (type) {
+            "depart" -> if (road != null) "沿${road}出发" else "开始行程"
+            "arrive" -> "到达目的地"
+            "turn", "end of road" -> (m.ifBlank { "转弯" }) + onto
+            "continue", "new name" -> if (side.isNotBlank() && m != "直行") "${side}行驶$onto" else "继续直行$onto"
+            "merge" -> "并入道路$toward"
+            "on ramp", "ramp" -> when {
+                mod?.contains("right") == true -> "靠右走匝道$toward"
+                mod?.contains("left") == true -> "靠左走匝道$toward"
+                else -> "走匝道$toward"
+            }
+            "off ramp" -> if (exitNo != null) "从 $exitNo 号出口驶出$toward" else "从出口驶出$toward"
+            "fork" -> "在岔路口${side.ifBlank { "直行" }}$toward"
+            "roundabout", "rotary", "exit roundabout", "exit rotary" ->
+                if (rbExit != null) "进入环岛，从第 $rbExit 个出口驶出$onto" else "进入环岛$onto"
+            "roundabout turn" -> "在环岛${m.ifBlank { "转弯" }}$onto"
+            "uturn" -> "掉头$onto"
+            else -> if (m.isNotBlank()) m + onto else "继续直行$onto"
+        }
+    }
+
+    override fun spokenDistance(meters: Double, imperial: Boolean): String = if (imperial) {
+        val feet = meters * 3.28084
+        if (feet < 800) "${(if (feet < 100) maxOf(10, (feet / 10).roundToInt() * 10) else (feet / 50).roundToInt() * 50)} 英尺"
+        else {
+            val miles = (meters / 1609.34 * 10).roundToInt() / 10.0
+            if (miles == 1.0) "1 英里" else "$miles 英里"
+        }
+    } else {
+        if (meters < 950) "${(meters / 10).roundToInt() * 10} 米"
+        else {
+            val km = (meters / 100).roundToInt() / 10.0
+            if (km == 1.0) "1 公里" else "$km 公里"
+        }
+    }
+
+    override fun inThen(distancePhrase: String, instruction: String): String = "${distancePhrase}后，$instruction"
+
+    override fun arrived(): String = "您已到达目的地"
+
+    override fun destinationSide(left: Boolean): String = if (left) "目的地在左侧" else "目的地在右侧"
+
+    override fun startNav(firstInstruction: String): String = "开始导航。$firstInstruction"
+
+    override fun reachedStop(label: String): String =
+        if (label.isNotBlank()) "已到达$label" else "已到达途经点"
+
+    override fun stopAhead(label: String, left: Boolean?): String {
+        val who = label.ifBlank { "途经点" }
+        return when (left) { true -> "${who}在左侧"; false -> "${who}在右侧"; null -> "${who}就在前方" }
+    }
+
+    override fun thenStop(instruction: String, label: String, left: Boolean?): String =
+        "${instruction}，然后" + stopAhead(label, left)
+
+    override fun intoLot(turnLeft: Boolean): String = "${if (turnLeft) "向左转" else "向右转"}进入停车场"
+
+    override fun thenNext(instruction: String, next: String): String = "$instruction，然后" + next.replaceFirstChar { it.lowercase() }
+
+    override fun intoLotThen(turnLeft: Boolean, label: String, left: Boolean?): String =
+        "${if (turnLeft) "向左转" else "向右转"}进入停车场，然后" + stopAhead(label, left)
+
+    override fun fasterRoute(firstInstruction: String): String = "已切换到更快的路线。$firstInstruction"
+    override fun rerouting(): String = "正在重新规划路线"
+    override fun fasterRouteAvailable(minutes: Int): String = "发现更快的路线，约可节省 $minutes 分钟"
+    override fun stopsNotIncluded(): String = "无法在此路线中包含您的途经点，将继续尝试。"
+    override fun leftYourRoute(): String = "您已离开自己的路线，将按最快路线行驶。"
+    override fun destinationAhead(): String = "目的地就在前方"
+
+    override fun voiceTest(): String = "语音导航已开启。400 米后，向右转。"
+
+    override fun useLanes(side: LaneSide, count: Int): String {
+        val sideWord = when (side) { LaneSide.LEFT -> "左侧"; LaneSide.RIGHT -> "右侧"; LaneSide.CENTER -> "中间" }
+        return if (count > 1) "请走$sideWord $count 条车道" else "请走${sideWord}车道"
+    }
+
+    override fun useLanesToDo(side: LaneSide, count: Int, instruction: String): String =
+        useLanes(side, count) + "，" + instruction
+
+    // expandForSpeech stays the interface default (identity) — road names are read natively.
+}
+
+/**
+ * Traditional Chinese, Taiwan wording (issue #55) — 迴轉 not 掉頭-北方 mixes, 公尺 not 米,
+ * 圓環 not 环岛. Shares the "zh" spoken-voice pairing with [ZhNavStrings] (a Mandarin voice
+ * reads both scripts). Road/dest names pass through untranslated.
+ */
+object ZhTwNavStrings : NavStrings {
+    override val locale: Locale = Locale.TAIWAN
+
+    private fun modWord(mod: String?): String = when ((mod ?: "").trim().lowercase()) {
+        "left" -> "向左轉"
+        "right" -> "向右轉"
+        "slight left" -> "稍向左轉"
+        "slight right" -> "稍向右轉"
+        "sharp left" -> "向左急轉"
+        "sharp right" -> "向右急轉"
+        "straight" -> "直行"
+        "uturn" -> "迴轉"
+        else -> ""
+    }
+
+    private fun sideWord(mod: String?): String = when {
+        (mod ?: "").contains("left") -> "靠左"
+        (mod ?: "").contains("right") -> "靠右"
+        else -> ""
+    }
+
+    override fun phrase(type: String, mod: String?, road: String?, dest: String?, exitNo: String?, rbExit: Int?): String {
+        val onto = if (road != null) "，進入$road" else ""
+        val toward = when {
+            dest != null -> "，前往$dest"
+            road != null -> "，進入$road"
+            else -> ""
+        }
+        val m = modWord(mod)
+        val side = sideWord(mod)
+        return when (type) {
+            "depart" -> if (road != null) "沿${road}出發" else "開始行程"
+            "arrive" -> "到達目的地"
+            "turn", "end of road" -> (m.ifBlank { "轉彎" }) + onto
+            "continue", "new name" -> if (side.isNotBlank() && m != "直行") "${side}行駛$onto" else "繼續直行$onto"
+            "merge" -> "匯入道路$toward"
+            "on ramp", "ramp" -> when {
+                mod?.contains("right") == true -> "靠右走匝道$toward"
+                mod?.contains("left") == true -> "靠左走匝道$toward"
+                else -> "走匝道$toward"
+            }
+            "off ramp" -> if (exitNo != null) "從 $exitNo 號出口駛出$toward" else "從出口駛出$toward"
+            "fork" -> "在岔路口${side.ifBlank { "直行" }}$toward"
+            "roundabout", "rotary", "exit roundabout", "exit rotary" ->
+                if (rbExit != null) "進入圓環，從第 $rbExit 個出口駛出$onto" else "進入圓環$onto"
+            "roundabout turn" -> "在圓環${m.ifBlank { "轉彎" }}$onto"
+            "uturn" -> "迴轉$onto"
+            else -> if (m.isNotBlank()) m + onto else "繼續直行$onto"
+        }
+    }
+
+    override fun spokenDistance(meters: Double, imperial: Boolean): String = if (imperial) {
+        val feet = meters * 3.28084
+        if (feet < 800) "${(if (feet < 100) maxOf(10, (feet / 10).roundToInt() * 10) else (feet / 50).roundToInt() * 50)} 英尺"
+        else {
+            val miles = (meters / 1609.34 * 10).roundToInt() / 10.0
+            if (miles == 1.0) "1 英里" else "$miles 英里"
+        }
+    } else {
+        if (meters < 950) "${(meters / 10).roundToInt() * 10} 公尺"
+        else {
+            val km = (meters / 100).roundToInt() / 10.0
+            if (km == 1.0) "1 公里" else "$km 公里"
+        }
+    }
+
+    override fun inThen(distancePhrase: String, instruction: String): String = "${distancePhrase}後，$instruction"
+
+    override fun arrived(): String = "您已到達目的地"
+
+    override fun destinationSide(left: Boolean): String = if (left) "目的地在左側" else "目的地在右側"
+
+    override fun startNav(firstInstruction: String): String = "開始導航。$firstInstruction"
+
+    override fun reachedStop(label: String): String =
+        if (label.isNotBlank()) "已到達$label" else "已到達途經點"
+
+    override fun stopAhead(label: String, left: Boolean?): String {
+        val who = label.ifBlank { "途經點" }
+        return when (left) { true -> "${who}在左側"; false -> "${who}在右側"; null -> "${who}就在前方" }
+    }
+
+    override fun thenStop(instruction: String, label: String, left: Boolean?): String =
+        "${instruction}，然後" + stopAhead(label, left)
+
+    override fun intoLot(turnLeft: Boolean): String = "${if (turnLeft) "向左轉" else "向右轉"}進入停車場"
+
+    override fun thenNext(instruction: String, next: String): String = "$instruction，然後" + next.replaceFirstChar { it.lowercase() }
+
+    override fun intoLotThen(turnLeft: Boolean, label: String, left: Boolean?): String =
+        "${if (turnLeft) "向左轉" else "向右轉"}進入停車場，然後" + stopAhead(label, left)
+
+    override fun fasterRoute(firstInstruction: String): String = "已切換到更快的路線。$firstInstruction"
+    override fun rerouting(): String = "正在重新規劃路線"
+    override fun fasterRouteAvailable(minutes: Int): String = "找到更快的路線，約可節省 $minutes 分鐘"
+    override fun stopsNotIncluded(): String = "無法在此路線中包含您的途經點，將繼續嘗試。"
+    override fun leftYourRoute(): String = "您已離開自己的路線，將按最快路線行駛。"
+    override fun destinationAhead(): String = "目的地就在前方"
+
+    override fun voiceTest(): String = "語音導航已開啟。400 公尺後，向右轉。"
+
+    override fun useLanes(side: LaneSide, count: Int): String {
+        val sideWord = when (side) { LaneSide.LEFT -> "左側"; LaneSide.RIGHT -> "右側"; LaneSide.CENTER -> "中間" }
+        return if (count > 1) "請走$sideWord $count 條車道" else "請走${sideWord}車道"
+    }
+
+    override fun useLanesToDo(side: LaneSide, count: Int, instruction: String): String =
+        useLanes(side, count) + "，" + instruction
+
+    // expandForSpeech stays the interface default (identity) — road names are read natively.
+}
+
+/**
+ * Japanese — Google-Maps-style guidance ("500 メートル先、左方向です" register, imperative-neutral
+ * です/ます). No Piper voice exists for Japanese yet, so spoken guidance routes through the
+ * system TTS fallback in VoiceGuide; these strings also feed the banner. Road/dest names pass
+ * through untranslated.
+ */
+object JaNavStrings : NavStrings {
+    override val locale: Locale = Locale.JAPAN
+
+    private fun modWord(mod: String?): String = when ((mod ?: "").trim().lowercase()) {
+        "left" -> "左"
+        "right" -> "右"
+        "slight left" -> "斜め左"
+        "slight right" -> "斜め右"
+        "sharp left" -> "大きく左"
+        "sharp right" -> "大きく右"
+        "straight" -> "直進"
+        "uturn" -> "Uターン"
+        else -> ""
+    }
+
+    override fun phrase(type: String, mod: String?, road: String?, dest: String?, exitNo: String?, rbExit: Int?): String {
+        val onto = if (road != null) "、$road に入ります" else ""
+        val toward = when {
+            dest != null -> "、$dest 方面へ進みます"
+            road != null -> "、$road に入ります"
+            else -> ""
+        }
+        val m = modWord(mod)
+        return when (type) {
+            "depart" -> if (road != null) "$road から出発します" else "ルートを開始します"
+            "arrive" -> "目的地に到着"
+            "turn", "end of road" -> if (m.isNotBlank() && m != "直進") "${m}に曲がります$onto" else "直進します$onto"
+            "continue", "new name" -> if (m.isNotBlank() && m != "直進") "${m}方向に進みます$onto" else if (road != null) "$road を直進します" else "直進します"
+            "merge" -> "合流します$toward"
+            "on ramp", "ramp" -> when {
+                mod?.contains("right") == true -> "右側のランプに入ります$toward"
+                mod?.contains("left") == true -> "左側のランプに入ります$toward"
+                else -> "ランプに入ります$toward"
+            }
+            "off ramp" -> if (exitNo != null) "出口 $exitNo を出ます$toward" else "出口を出ます$toward"
+            "fork" -> if (m.isNotBlank()) "分岐を${m}方向へ進みます$toward" else "分岐を直進します$toward"
+            "roundabout", "rotary", "exit roundabout", "exit rotary" ->
+                if (rbExit != null) "ラウンドアバウトで $rbExit 番目の出口を出ます$onto" else "ラウンドアバウトに入ります$onto"
+            "roundabout turn" -> if (m.isNotBlank()) "ラウンドアバウトで${m}に曲がります$onto" else "ラウンドアバウトを直進します$onto"
+            "uturn" -> "Uターンします$onto"
+            else -> if (m.isNotBlank()) "${m}に曲がります$onto" else "直進します$onto"
+        }
+    }
+
+    override fun spokenDistance(meters: Double, imperial: Boolean): String = if (imperial) {
+        val feet = meters * 3.28084
+        if (feet < 800) "${(if (feet < 100) maxOf(10, (feet / 10).roundToInt() * 10) else (feet / 50).roundToInt() * 50)} フィート"
+        else {
+            val miles = (meters / 1609.34 * 10).roundToInt() / 10.0
+            if (miles == 1.0) "1 マイル" else "$miles マイル"
+        }
+    } else {
+        if (meters < 950) "${(meters / 10).roundToInt() * 10} メートル"
+        else {
+            val km = (meters / 100).roundToInt() / 10.0
+            if (km == 1.0) "1 キロメートル" else "$km キロメートル"
+        }
+    }
+
+    override fun inThen(distancePhrase: String, instruction: String): String = "${distancePhrase}先、$instruction"
+
+    override fun arrived(): String = "目的地に到着しました"
+
+    override fun destinationSide(left: Boolean): String = if (left) "目的地は左側です" else "目的地は右側です"
+
+    override fun startNav(firstInstruction: String): String = "ナビを開始します。$firstInstruction"
+
+    override fun reachedStop(label: String): String =
+        if (label.isNotBlank()) "$label に到着しました" else "経由地に到着しました"
+
+    override fun stopAhead(label: String, left: Boolean?): String {
+        val who = label.ifBlank { "経由地" }
+        return when (left) { true -> "${who}は左側です"; false -> "${who}は右側です"; null -> "${who}はこの先です" }
+    }
+
+    override fun thenStop(instruction: String, label: String, left: Boolean?): String =
+        "${instruction}。その先、" + stopAhead(label, left)
+
+    override fun intoLot(turnLeft: Boolean): String = "${if (turnLeft) "左" else "右"}に曲がって駐車場に入ります"
+
+    override fun intoLotThen(turnLeft: Boolean, label: String, left: Boolean?): String =
+        "${if (turnLeft) "左" else "右"}に曲がって駐車場に入ると、" + stopAhead(label, left)
+
+    override fun fasterRoute(firstInstruction: String): String = "より速いルートに切り替えます。$firstInstruction"
+    override fun rerouting(): String = "ルートを再検索しています"
+    override fun fasterRouteAvailable(minutes: Int): String = "より速いルートが見つかりました。約 $minutes 分短縮できます"
+    override fun stopsNotIncluded(): String = "このルートに経由地を含められませんでした。引き続き試します。"
+    override fun leftYourRoute(): String = "保存したルートを外れました。最速のルートで案内します。"
+    override fun destinationAhead(): String = "この先に目的地があります"
+
+    override fun voiceTest(): String = "音声案内が有効です。400 メートル先、右方向です。"
+
+    override fun useLanes(side: LaneSide, count: Int): String {
+        val sideWord = when (side) { LaneSide.LEFT -> "左側"; LaneSide.RIGHT -> "右側"; LaneSide.CENTER -> "中央" }
+        return if (count > 1) "${sideWord}の $count 車線を進んでください" else "${sideWord}の車線を進んでください"
+    }
+
+    override fun useLanesToDo(side: LaneSide, count: Int, instruction: String): String =
+        useLanes(side, count) + "。" + instruction
+
+    // expandForSpeech stays the interface default (identity) — road names are read natively.
+}
+
+/**
+ * Hebrew (עברית) — RTL. Spoken/banner nav text uses masculine-singular imperatives, the register
+ * Israeli drivers hear from Waze/Google Maps ("פנה ימינה", "המשך ישר"). Road/dest NAMES are DATA and
+ * never translated; the templates only decide the word ORDER around them ("פנה שמאלה אל <רחוב>").
+ * Metric only in practice, but the imperial branch is kept for parity.
+ */
+object HeNavStrings : NavStrings {
+    override val locale: Locale = Locale("he", "IL")
+
+    private fun modWord(mod: String?): String = when ((mod ?: "").trim().lowercase()) {
+        "left" -> "שמאלה"
+        "right" -> "ימינה"
+        "slight left" -> "קלות שמאלה"
+        "slight right" -> "קלות ימינה"
+        "sharp left" -> "בחדות שמאלה"
+        "sharp right" -> "בחדות ימינה"
+        "straight" -> "ישר"
+        "uturn" -> "פניית פרסה"
+        else -> ""
+    }
+
+    // Feminine ordinals for roundabout exits ("ביציאה השלישית"); falls back to "ה-N".
+    private fun exitOrdinal(n: Int): String = when (n) {
+        1 -> "הראשונה"; 2 -> "השנייה"; 3 -> "השלישית"; 4 -> "הרביעית"
+        5 -> "החמישית"; 6 -> "השישית"; 7 -> "השביעית"; 8 -> "השמינית"
+        else -> "ה-$n"
+    }
+
+    override fun phrase(type: String, mod: String?, road: String?, dest: String?, exitNo: String?, rbExit: Int?): String {
+        val onto = if (road != null) " אל $road" else ""
+        val toward = when {
+            dest != null -> " לכיוון $dest"
+            road != null -> " אל $road"
+            else -> ""
+        }
+        val m = modWord(mod)
+        return when (type) {
+            "depart" -> if (road != null) "צא לדרך על $road" else "התחל את המסלול"
+            "arrive" -> "הגעת ליעד"
+            "turn", "end of road" -> ("פנה $m").trim() + onto
+            "continue", "new name" -> if (m.isNotBlank() && m != "ישר") ("סטה $m").trim() + onto else "המשך$onto"
+            "merge" -> "השתלב$toward"
+            "on ramp", "ramp" -> when {
+                mod?.contains("right") == true -> "עלה ברמפה מימין$toward"
+                mod?.contains("left") == true -> "עלה ברמפה משמאל$toward"
+                else -> "עלה ברמפה$toward"
+            }
+            "off ramp" -> if (exitNo != null) "צא ביציאה $exitNo$toward" else "צא ביציאה$toward"
+            "fork" -> ("היצמד $m").trim() + toward
+            "roundabout", "rotary", "exit roundabout", "exit rotary" -> if (rbExit != null) "בכיכר, צא ביציאה ${exitOrdinal(rbExit)}$onto" else "היכנס לכיכר$onto"
+            "roundabout turn" -> ("בכיכר, פנה $m").trim() + onto
+            "uturn" -> "בצע פניית פרסה$onto"
+            else -> if (m.isNotBlank()) ("פנה $m").trim() + onto else "המשך$onto"
+        }
+    }
+
+    // Israel is metric; the imperial branch is kept for parity. Colloquial nav register keeps the unit
+    // singular after a number ("300 מטר", "2 קילומטר"), as Waze/Google Maps Hebrew speak it.
+    override fun spokenDistance(meters: Double, imperial: Boolean): String = if (imperial) {
+        val feet = meters * 3.28084
+        if (feet < 800) "${(if (feet < 100) maxOf(10, (feet / 10).roundToInt() * 10) else (feet / 50).roundToInt() * 50)} רגל"
+        else {
+            val miles = (meters / 1609.34 * 10).roundToInt() / 10.0
+            if (miles == 1.0) "מייל" else "$miles מייל"
+        }
+    } else {
+        if (meters < 950) "${(meters / 10).roundToInt() * 10} מטר"
+        else {
+            val km = (meters / 100).roundToInt() / 10.0
+            if (km == 1.0) "קילומטר" else "$km קילומטר"
+        }
+    }
+
+    override fun inThen(distancePhrase: String, instruction: String): String = "בעוד $distancePhrase, $instruction"
+
+    override fun arrived(): String = "הגעת"
+
+    override fun destinationSide(left: Boolean): String = if (left) "היעד שלך מצד שמאל" else "היעד שלך מצד ימין"
+
+    override fun startNav(firstInstruction: String): String = "מתחיל ניווט. $firstInstruction"
+
+    override fun reachedStop(label: String): String =
+        if (label.isNotBlank()) "הגעת ל$label" else "הגעת לעצירה שלך"
+
+    override fun stopAhead(label: String, left: Boolean?): String {
+        val side = when (left) { true -> "מצד שמאל"; false -> "מצד ימין"; null -> "לפניך" }
+        return if (label.isNotBlank()) "$label יהיה $side" else "העצירה שלך תהיה $side"
+    }
+
+    override fun thenStop(instruction: String, label: String, left: Boolean?): String =
+        "$instruction, ואז " + stopAhead(label, left)
+
+    override fun intoLot(turnLeft: Boolean): String = "פנה ${if (turnLeft) "שמאלה" else "ימינה"} לחניון"
+
+    override fun thenNext(instruction: String, next: String): String = "$instruction, ואז " + next.replaceFirstChar { it.lowercase() }
+
+    override fun intoLotThen(turnLeft: Boolean, label: String, left: Boolean?): String =
+        "פנה ${if (turnLeft) "שמאלה" else "ימינה"} לחניון, ואז " + stopAhead(label, left)
+
+    override fun fasterRoute(firstInstruction: String): String = "עובר למסלול המהיר יותר. $firstInstruction"
+    override fun rerouting(): String = "מחשב מסלול מחדש"
+    override fun fasterRouteAvailable(minutes: Int): String =
+        if (minutes == 1) "מסלול מהיר יותר זמין, חוסך בערך דקה"
+        else "מסלול מהיר יותר זמין, חוסך בערך $minutes דקות"
+    override fun stopsNotIncluded(): String = "לא הצלחתי לכלול את העצירות שלך במסלול הזה. אמשיך לנסות."
+    override fun leftYourRoute(): String = "יצאת מהמסלול שלך. ממשיכים בדרך המהירה ביותר."
+    override fun destinationAhead(): String = "היעד שלך יהיה לפניך"
+
+    override fun voiceTest(): String = "ההנחיה הקולית מופעלת. פנה ימינה בעוד ארבע מאות מטר."
+
+    override fun useLanes(side: LaneSide, count: Int): String {
+        val one = when (side) { LaneSide.LEFT -> "השמאלי"; LaneSide.RIGHT -> "הימני"; LaneSide.CENTER -> "האמצעי" }
+        val many = when (side) { LaneSide.LEFT -> "השמאליים"; LaneSide.RIGHT -> "הימניים"; LaneSide.CENTER -> "האמצעיים" }
+        return if (count > 1) "השתמש ב-$count הנתיבים $many" else "השתמש בנתיב $one"
+    }
+
+    // expandForSpeech is left as the interface default (identity) — Hebrew road names are read natively.
+}
+
+/**
+ * Holds the active [NavStrings] for the process. Set explicitly from the resolved app locale on startup
+ * and on every language change — do NOT read `Locale.getDefault()` at the leaf, because nav/TTS text is
+ * assembled off the main thread. Defaults to [EnNavStrings] so nothing (and no test) depends on the
+ * device locale until a language is chosen.
+ */
+/** Hungarian (Magyar): contributed by Zsolt Laszlo Kaiser (kaiser-app fork), ported 2026-09-13. */
+object HuNavStrings : NavStrings {
+    override val locale: Locale = Locale("hu", "HU")
+
+    override fun passLights(count: Int): String =
+        if (count <= 1) "Menj el a közlekedési lámpa mellett" else "Menj el $count közlekedési lámpa mellett"
+    override fun lightThen(lead: String, instruction: String): String = "$lead, majd " + instruction.replaceFirstChar { it.lowercaseChar() }
+
+    private fun modWord(mod: String?): String = when ((mod ?: "").trim().lowercase()) {
+        "left" -> "balra"
+        "right" -> "jobbra"
+        "slight left" -> "enyhén balra"
+        "slight right" -> "enyhén jobbra"
+        "sharp left" -> "élesen balra"
+        "sharp right" -> "élesen jobbra"
+        "straight" -> "egyenesen"
+        "uturn" -> "fordulj vissza"
+        else -> ""
+    }
+
+    /** Hungarian definite article helper: "a" or "az" based on the first letter or number. */
+    private fun det(text: String?): String {
+        if (text == null || text.isBlank()) return ""
+        val trimmed = text.trim().lowercase()
+        val first = trimmed.firstOrNull() ?: return "a"
+
+        // Handle numbers (especially for roundabout exits)
+        if (first.isDigit()) {
+            // 1 (első), 5 (ötödik) start with vowels in Hungarian speech
+            return if (first == '1' || first == '5') "az $text" else "a $text"
+        }
+
+        return if (first in "aeiouáéíóöőúüű") "az $text" else "a $text"
+    }
+
+    /**
+     * Hungarian road name helper: handles suffixes like "utca", "út" to avoid "utca útra".
+     * [onto] = true for "onto <road>" (suffix -ra/-re/-ba/-be), false for "on <road>" (suffix -n/-on/-en/-ön).
+     */
+    private fun huRoad(road: String?, onto: Boolean): String {
+        if (road == null || road.isBlank()) return ""
+        val r = road.trim()
+        val low = r.lowercase()
+        return when {
+            low.endsWith(" utca") || low.endsWith("utca") -> if (onto) r.substring(0, r.length - 1) + "ára" else r.substring(0, r.length - 1) + "án"
+            low.endsWith(" u.") || low.endsWith("u.") -> {
+                val base = if (low.endsWith(" u.")) r.dropLast(3) else r.dropLast(2)
+                if (onto) base + "utcára" else base + "utcán"
+            }
+            low.endsWith(" út") || low.endsWith("út") -> if (onto) r + "ra" else r + "on"
+            low.endsWith(" útja") || low.endsWith("útja") -> if (onto) r.substring(0, r.length - 2) + "ára" else r.substring(0, r.length - 2) + "án"
+            low.endsWith(" tér") || low.endsWith("tér") -> if (onto) r + "re" else r + "en"
+            low.endsWith(" tere") || low.endsWith("tere") -> if (onto) r.substring(0, r.length - 1) + "ére" else r.substring(0, r.length - 1) + "én"
+            low.endsWith(" körút") || low.endsWith("körút") -> if (onto) r + "ra" else r + "on"
+            low.endsWith(" krt.") || low.endsWith("krt.") -> {
+                val base = if (low.endsWith(" krt.")) r.dropLast(4) else r.dropLast(3)
+                if (onto) base + "körútra" else base + "körúton"
+            }
+            low.endsWith(" sétány") || low.endsWith("sétány") -> if (onto) r + "ra" else r + "on"
+            low.endsWith(" köz") || low.endsWith("köz") -> if (onto) r + "be" else r + "ben"
+            low.endsWith(" rakpart") || low.endsWith("rakpart") -> if (onto) r + "ra" else r + "on"
+            low.endsWith(" dűlő") || low.endsWith("dűlő") -> if (onto) r + "re" else r + "n"
+            // Default: if it doesn't end with a known suffix, only THEN append "útra" / "úton"
+            else -> if (onto) "$r útra" else "$r úton"
+        }
+    }
+
+    override fun phrase(type: String, mod: String?, road: String?, dest: String?, exitNo: String?, rbExit: Int?): String {
+        val onto = if (road != null) " ${det(huRoad(road, onto = true))}" else ""
+        val onRoad = if (road != null) " ${det(huRoad(road, onto = false))}" else ""
+        val toward = when {
+            dest != null -> " $dest felé"
+            road != null -> " ${det(road)} irányába"
+            else -> ""
+        }
+        val m = modWord(mod)
+        return when (type) {
+            "depart" -> if (road != null) "Indulj el $onRoad" else "Kezdődik az útvonal"
+            "arrive" -> "Megérkeztél az úti célodhoz"
+            "turn", "end of road" -> ("Fordulj $m").trim() + onto
+            "continue", "new name" -> if (m.isNotBlank() && m != "egyenesen") ("Tarts $m").trim() + onto else "Haladj tovább$onRoad"
+            "merge" -> "Sorolj be$toward"
+            "on ramp", "ramp" -> when {
+                mod?.contains("right") == true -> "Hajts fel a pályára jobbra$toward"
+                mod?.contains("left") == true -> "Hajts fel a pályára balra$toward"
+                else -> "Hajts fel a pályára$toward"
+            }
+            "off ramp" -> if (exitNo != null) "Hajts ki ${det(exitNo)} kijáratnál$toward" else "Hajts ki a kijáratnál$toward"
+            "fork" -> ("Tarts $m").trim() + toward
+            "roundabout", "rotary", "exit roundabout", "exit rotary" -> if (rbExit != null) "A körforgalomnál hajts ki ${det(rbExit.toString() + ".")} kijáratnál$onto" else "Hajts be a körforgalomba$onto"
+            "roundabout turn" -> ("A körforgalomnál fordulj $m").trim() + onto
+            "uturn" -> "Fordulj vissza$onto"
+            else -> if (m.isNotBlank()) ("Fordulj $m").trim() + onto else "Haladj tovább$onRoad"
+        }
+    }
+
+    override fun spokenDistance(meters: Double, imperial: Boolean): String = if (imperial) {
+        val feet = meters * 3.28084
+        if (feet < 800) "${(if (feet < 100) maxOf(10, (feet / 10).roundToInt() * 10) else (feet / 50).roundToInt() * 50)} láb"
+        else {
+            val miles = (meters / 1609.34 * 10).roundToInt() / 10.0
+            if (miles == 1.0) "1 mérföld" else "${huNum(miles)} mérföld"
+        }
+    } else {
+        if (meters < 950) "${(meters / 10).roundToInt() * 10} méter"
+        else {
+            val km = (meters / 100).roundToInt() / 10.0
+            if (km == 1.0) "1 kilométer" else "${huNum(km)} kilométer"
+        }
+    }
+
+    override fun inThen(distancePhrase: String, instruction: String): String = "$distancePhrase múlva $instruction"
+
+    override fun arrived(): String = "Megérkeztél"
+
+    override fun destinationSide(left: Boolean): String = if (left) "Az úti célod a bal oldalon lesz" else "Az úti célod a jobb oldalon lesz"
+
+    override fun startNav(firstInstruction: String): String = "Navigáció indítása. $firstInstruction"
+
+    override fun reachedStop(label: String): String =
+        if (label.isNotBlank()) "Megérkeztél ide: $label" else "Megérkeztél a köztes megállóhoz"
+
+    private fun huStopSide(left: Boolean?) = when (left) { true -> "a bal oldalon"; false -> "a jobb oldalon"; null -> "előtted" }
+
+    override fun stopAhead(label: String, left: Boolean?): String =
+        "${label.ifBlank { "A köztes megálló" }} ${huStopSide(left)} lesz"
+
+    override fun thenStop(instruction: String, label: String, left: Boolean?): String =
+        "$instruction, majd " + stopAhead(label.ifBlank { "a köztes megálló" }, left)
+
+    override fun intoLot(turnLeft: Boolean): String = "Fordulj ${if (turnLeft) "balra" else "jobbra"} a parkolóba"
+
+    override fun thenNext(instruction: String, next: String): String = "$instruction, majd " + next.replaceFirstChar { it.lowercase() }
+
+    override fun intoLotThen(turnLeft: Boolean, label: String, left: Boolean?): String =
+        "Fordulj ${if (turnLeft) "balra" else "jobbra"} a parkolóba, majd " + stopAhead(label.ifBlank { "a köztes megálló" }, left)
+
+    override fun fasterRoute(firstInstruction: String): String = "Gyorsabb útvonalra váltás. $firstInstruction"
+    override fun rerouting(): String = "Újratervezés"
+    override fun fasterRouteAvailable(minutes: Int): String =
+        if (minutes == 1) "Gyorsabb útvonal érhető el, amivel körülbelül egy percet takaríthatsz meg"
+        else "Gyorsabb útvonal érhető el, amivel körülbelül $minutes percet takaríthatsz meg"
+    override fun stopsNotIncluded(): String = "Nem sikerült beilleszteni a megállóidat ebbe az útvonalba. Továbbra is próbálkozom."
+    override fun destinationAhead(): String = "Az úti célod előtted lesz"
+
+    override fun voiceTest(): String = "A hangos navigáció be van kapcsolva. Négyszáz méter múlva fordulj jobbra."
+
+    override fun useLanes(side: LaneSide, count: Int): String {
+        val sideWord = when (side) { LaneSide.LEFT -> "bal"; LaneSide.RIGHT -> "jobb"; LaneSide.CENTER -> "középső" }
+        return if (count > 1) "Használd a $sideWord $count sávot" else "Használd a $sideWord sávot"
+    }
+
+
+    private fun huNum(x: Double): String {
+        val s = x.toString().replace('.', ',')
+        return if (s.endsWith(",0")) s.dropLast(2) else s
+    }
+}
+
+/**
+ * Romanian (issue #759). The polite imperative Google uses ("Virați la dreapta pe Strada X"),
+ * "În 200 de metri" (a number from 20 up takes "de" before its noun), roundabout exits as feminine
+ * ordinals ("a doua ieșire"), sign destinations with "spre". Road names pass through untouched.
+ */
+object RoNavStrings : NavStrings {
+    override val locale: Locale = Locale("ro", "RO")
+
+    override fun passLights(count: Int): String = if (count <= 1) "Treceți de semafor" else "Treceți de $count semafoare"
+    override fun lightThen(lead: String, instruction: String): String = "$lead, apoi " + instruction.replaceFirstChar { it.lowercaseChar() }
+
+    private fun modWord(mod: String?): String = when ((mod ?: "").trim().lowercase()) {
+        "left" -> "la stânga"
+        "right" -> "la dreapta"
+        "slight left" -> "ușor la stânga"
+        "slight right" -> "ușor la dreapta"
+        "sharp left" -> "brusc la stânga"
+        "sharp right" -> "brusc la dreapta"
+        "straight" -> "înainte"
+        else -> ""
+    }
+
+    /** "prima", "a doua", "a treia" ... for "ieșire" (feminine). */
+    private fun roOrdinal(n: Int): String = when (n) {
+        1 -> "prima"
+        2 -> "a doua"
+        3 -> "a treia"
+        4 -> "a patra"
+        5 -> "a cincea"
+        6 -> "a șasea"
+        7 -> "a șaptea"
+        8 -> "a opta"
+        9 -> "a noua"
+        10 -> "a zecea"
+        else -> "a $n-a"
+    }
+
+    override fun phrase(type: String, mod: String?, road: String?, dest: String?, exitNo: String?, rbExit: Int?): String {
+        val onto = if (road != null) " pe $road" else ""
+        val toward = when {
+            dest != null -> " spre $dest"
+            road != null -> " pe $road"
+            else -> ""
+        }
+        val m = modWord(mod)
+        val uturn = (mod ?: "").trim().lowercase() == "uturn"
+        return when (type) {
+            "depart" -> if (road != null) "Porniți pe $road" else "Începeți traseul"
+            "arrive" -> "Ați ajuns la destinație"
+            "turn", "end of road" -> if (uturn) "Întoarceți-vă$onto" else ("Virați $m").trim() + onto
+            "continue", "new name" -> if (m.isNotBlank() && m != "înainte") ("Virați $m").trim() + onto else "Continuați$onto"
+            "merge" -> "Încadrați-vă$toward"
+            "on ramp", "ramp" -> when {
+                mod?.contains("right") == true -> "Luați rampa din dreapta$toward"
+                mod?.contains("left") == true -> "Luați rampa din stânga$toward"
+                else -> "Luați rampa$toward"
+            }
+            "off ramp" -> if (exitNo != null) "Luați ieșirea $exitNo$toward" else "Luați ieșirea$toward"
+            "fork" -> when {
+                mod?.contains("left") == true -> "Țineți stânga$toward"
+                mod?.contains("right") == true -> "Țineți dreapta$toward"
+                else -> "Continuați$toward"
+            }
+            "roundabout", "rotary", "exit roundabout", "exit rotary" -> when {
+                rbExit == null -> "Intrați în sensul giratoriu$onto"
+                mod == "straight" -> "La sensul giratoriu, mergeți înainte$onto, ${roOrdinal(rbExit)} ieșire"
+                else -> "La sensul giratoriu, luați ${roOrdinal(rbExit)} ieșire$onto"
+            }
+            "roundabout turn" -> ("La sensul giratoriu, virați $m").trim() + onto
+            "uturn" -> "Întoarceți-vă$onto"
+            else -> if (uturn) "Întoarceți-vă$onto" else if (m.isNotBlank()) ("Virați $m").trim() + onto else "Continuați$onto"
+        }
+    }
+
+    /** Romanian puts "de" between a number of 20 or more and its noun ("200 de metri", "15 metri"),
+     *  except a number whose last two digits are 1 to 19 ("110 metri", "1.015 metri"). */
+    private fun de(n: Double): String {
+        if (n < 20.0) return ""
+        val whole = n.toLong()
+        val isWhole = n == whole.toDouble()
+        return if (isWhole && (whole % 100) in 1..19) "" else "de "
+    }
+
+    override fun spokenDistance(meters: Double, imperial: Boolean): String = if (imperial) {
+        val feet = meters * 3.28084
+        if (feet < 800) {
+            val n = if (feet < 100) maxOf(10, (feet / 10).roundToInt() * 10) else (feet / 50).roundToInt() * 50
+            "$n ${de(n.toDouble())}picioare"
+        } else when ((meters / 402.336).roundToInt().coerceAtLeast(1)) {
+            1 -> "un sfert de milă"
+            2 -> "o jumătate de milă"
+            3 -> "trei sferturi de milă"
+            else -> {
+                val miles = (meters / 1609.34 * 10).roundToInt() / 10.0
+                if (miles == 1.0) "o milă" else "${roNum(miles)} ${de(miles)}mile"
+            }
+        }
+    } else {
+        if (meters < 950) {
+            val n = (meters / 10).roundToInt() * 10
+            "$n ${de(n.toDouble())}metri"
+        } else {
+            val km = (meters / 100).roundToInt() / 10.0
+            if (km == 1.0) "un kilometru" else "${roNum(km)} ${de(km)}kilometri"
+        }
+    }
+
+    override fun inThen(distancePhrase: String, instruction: String): String = "În $distancePhrase, $instruction"
+
+    override fun arrived(): String = "Ați ajuns la destinație"
+
+    override fun destinationSide(left: Boolean): String = if (left) "Destinația este pe stânga" else "Destinația este pe dreapta"
+
+    override fun startNav(firstInstruction: String): String = "Începe navigarea. $firstInstruction"
+
+    override fun reachedStop(label: String): String =
+        if (label.isNotBlank()) "Ați ajuns la $label" else "Ați ajuns la oprire"
+
+    private fun roSide(left: Boolean?) = when (left) { true -> "pe stânga"; false -> "pe dreapta"; null -> "în față" }
+
+    override fun stopAhead(label: String, left: Boolean?): String = "${label.ifBlank { "Oprirea" }} va fi ${roSide(left)}"
+
+    override fun thenStop(instruction: String, label: String, left: Boolean?): String =
+        "$instruction, apoi " + stopAhead(label.ifBlank { "oprirea" }, left)
+
+    override fun intoLot(turnLeft: Boolean): String = "Virați ${if (turnLeft) "la stânga" else "la dreapta"} în parcare"
+
+    override fun thenNext(instruction: String, next: String): String = "$instruction, apoi " + next.replaceFirstChar { it.lowercase() }
+
+    override fun intoLotThen(turnLeft: Boolean, label: String, left: Boolean?): String =
+        "Virați ${if (turnLeft) "la stânga" else "la dreapta"} în parcare, apoi ${label.ifBlank { "oprirea" }} este ${roSide(left)}"
+
+    override fun fasterRoute(firstInstruction: String): String = "Trecem pe traseul mai rapid. $firstInstruction"
+    override fun rerouting(): String = "Se recalculează traseul"
+    override fun fasterRouteAvailable(minutes: Int): String =
+        if (minutes == 1) "Este disponibil un traseu mai rapid, cu aproximativ un minut mai scurt"
+        else "Este disponibil un traseu mai rapid, cu aproximativ $minutes ${de(minutes.toDouble())}minute mai scurt"
+    override fun stopsNotIncluded(): String = "Nu am putut include opririle în acest traseu. Voi încerca în continuare."
+    override fun leftYourRoute(): String = "Ați părăsit traseul. Mergem pe drumul cel mai rapid."
+    override fun destinationAhead(): String = "Destinația va fi în față"
+
+    override fun voiceTest(): String = "Ghidarea vocală este activată. În 400 de metri, virați la dreapta."
+
+    override fun useLanes(side: LaneSide, count: Int): String {
+        val sideWord = when (side) { LaneSide.LEFT -> "din stânga"; LaneSide.RIGHT -> "din dreapta"; LaneSide.CENTER -> "din mijloc" }
+        return if (count > 1) "Folosiți cele $count benzi $sideWord" else "Folosiți banda $sideWord"
+    }
+
+    // " spre " is the sign marker phrase() emits, so the secondary destinations after a colon and
+    // the whole sign tail can be dropped the way English does.
+    override fun spokenSign(instruction: String): String {
+        val t = instruction.indexOf(" spre ")
+        if (t < 0) return instruction
+        val colon = instruction.indexOf(':', startIndex = t)
+        return if (colon > 0) instruction.substring(0, colon) else instruction
+    }
+
+    override fun repeatShort(instruction: String): String = instruction.substringBefore(" spre ")
+
+    private fun roNum(x: Double): String {
+        val s = x.toString().replace('.', ',')
+        return if (s.endsWith(",0")) s.dropLast(2) else s
+    }
+}
+
+object NavStringsRegistry {
+    @Volatile
+    private var active: NavStrings = EnNavStrings
+
+    fun current(): NavStrings = active
+
+    fun setLocale(locale: Locale) { active = forLanguage(tagOf(locale)) }
+
+    /** Language key for a locale — plain language code, except Chinese where the SCRIPT matters:
+     *  Traditional-script regions (TW/HK/MO, or an explicit Hant script) map to "zh-tw", and
+     *  Portuguese, where Brazil ("pt-br") has its own guidance beside Portugal's ("pt"). */
+    fun tagOf(locale: Locale): String {
+        val lang = locale.language.lowercase()
+        if (lang == "pt") return if (locale.country.equals("BR", ignoreCase = true)) "pt-br" else "pt"
+        if (lang != "zh") return lang
+        val hant = locale.script.equals("Hant", ignoreCase = true) ||
+            locale.country.uppercase() in setOf("TW", "HK", "MO")
+        return if (hant) "zh-tw" else "zh"
+    }
+
+    /** The NavStrings for a language code ("fr", "en", …); English for anything not yet translated. */
+    fun forLanguage(language: String): NavStrings = when (language.lowercase()) {
+        "fr" -> FrNavStrings
+        "de" -> DeNavStrings
+        "es" -> EsNavStrings
+        "it" -> ItNavStrings
+        "pt","pt-pt" -> PtPtNavStrings
+        "pt-br" -> PtBrNavStrings
+        "nl" -> NlNavStrings
+        "ru" -> RuNavStrings
+        "pl" -> PlNavStrings
+        "sv" -> SvNavStrings
+        "uk" -> UkNavStrings
+        "hu" -> HuNavStrings
+        "ro" -> RoNavStrings
+        "zh" -> ZhNavStrings
+        "zh-tw" -> ZhTwNavStrings
+        "ja" -> JaNavStrings
+        "he", "iw" -> HeNavStrings // JDK 17+ normalizes the old code "iw" → "he"; accept both
+        else -> EnNavStrings
+    }
+}

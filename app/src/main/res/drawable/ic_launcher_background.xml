@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AutoMap icon background: map-land tone sampled from the icon crop's edge
+     (only visible where the foreground is transparent; the foreground is full-bleed). -->
+<color xmlns:android="http://schemas.android.com/apk/res/android" android:color="#D2D4C2" />

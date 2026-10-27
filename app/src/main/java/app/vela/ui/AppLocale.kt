@@ -1,0 +1,145 @@
+package app.vela.ui
+
+import android.content.Context
+import android.content.res.Configuration
+import androidx.compose.runtime.mutableStateOf
+import app.vela.core.i18n.NavStringsRegistry
+import java.util.Locale
+
+/**
+ * App language preference — **follow the system locale by default, or override to a specific language**
+ * (like Google Maps' in-app language setting). A process-wide reactive holder + persisted pref, mirroring
+ * [app.vela.ui.theme.AppTheme] / [Units]. Setting it drives everything Vela renders in the user's
+ * language: the `strings.xml` UI chrome, the scrape locale (hl/gl), and the GENERATED nav text (via
+ * [NavStringsRegistry]) unless [directions] picks another language for it. Resolved to an actual
+ * [Locale] by [effective] and [directionsEffective].
+ *
+ * Set EXPLICITLY here (main thread, startup + on change) and read from the registry at the leaf, rather
+ * than calling `Locale.getDefault()` deep in the nav/TTS code (which runs off the main thread).
+ */
+object AppLocale {
+    /** "" = follow the system; otherwise a language code ("en", "fr", "de", …). */
+    val language = mutableStateOf("")
+
+    /** The directions language: "" = the same as the app; otherwise a code from [SUPPORTED].
+     *  It drives the generated nav text and the voice, so the menus can stay in one language
+     *  while turns are shown and spoken in another (issue 701). */
+    val directions = mutableStateOf("")
+
+    /** The languages Vela's generated nav voice is translated into (and, rolling out, the UI chrome).
+     *  This is the source of truth for the in-app language picker — keep it in sync with the NavStrings
+     *  table in :core. */
+    // "he" is the modern Hebrew code the picker + NavStrings use; the Android RESOURCES live in the
+    // legacy-qualifier folder res/values-iw (AAPT's Hebrew qualifier), and the platform maps a "he"
+    // locale onto values-iw, so the two agree. (Same legacy-pair handling as id/in, yi/ji.)
+    val SUPPORTED = listOf("en", "fr", "de", "es", "it", "pt", "pt-BR", "nl", "ru", "pl", "sv", "uk", "hu", "ro", "et", "zh", "zh-TW", "ja", "he")
+
+    private val ENDONYMS = mapOf(
+        "en" to "English", "fr" to "Français", "de" to "Deutsch", "es" to "Español",
+        "it" to "Italiano", "pt" to "Português (Portugal)", "pt-BR" to "Português (Brasil)", "nl" to "Nederlands", "ru" to "Русский",
+        "pl" to "Polski", "sv" to "Svenska", "uk" to "Українська", "hu" to "Magyar", "ro" to "Română", "et" to "Eesti",
+        "zh" to "简体中文", "zh-TW" to "繁體中文（台灣）", "ja" to "日本語", "he" to "עברית",
+    )
+
+    /** The language's own name (endonym) — what a speaker of it expects to see in a language list. */
+    fun endonym(code: String): String = ENDONYMS[code] ?: code.replaceFirstChar { it.uppercase() }
+
+    /** The supported language closest to the device/system locale. Used when the user turns OFF
+     *  "follow system language" so the revealed picker starts on a sensible current choice instead
+     *  of nothing; falls back to English when the system language isn't one Vela ships. */
+    fun deviceDefaultSupported(): String {
+        val sys = Locale.getDefault()
+        // Chinese needs the script split: Traditional regions/scripts map to the zh-TW entry.
+        if (sys.language == "zh") {
+            return if (NavStringsRegistry.tagOf(sys) == "zh-tw") "zh-TW" else "zh"
+        }
+        // Portuguese splits by country: values-pt is European, values-pt-rBR Brazilian.
+        if (sys.language == "pt") return if (sys.country == "BR") "pt-BR" else "pt"
+        return sys.language.takeIf { it in SUPPORTED } ?: "en"
+    }
+
+    fun init(context: Context) {
+        language.value = prefs(context).getString(KEY, "") ?: ""
+        directions.value = prefs(context).getString(KEY_DIRECTIONS, "") ?: ""
+        apply()
+    }
+
+    /** Set by the hosting Activity so a language change can re-create it (to re-read localized
+     *  resources). Null until an Activity registers it. */
+    var onLocaleChanged: (() -> Unit)? = null
+
+    fun set(context: Context, langCode: String) {
+        val changed = langCode != language.value
+        language.value = langCode
+        prefs(context).edit().putString(KEY, langCode).apply()
+        apply()
+        // Re-create the Activity so `stringResource`/`getString` re-resolve in the new language
+        // (the nav voice already switched via apply()); no-op when nothing actually changed.
+        if (changed) onLocaleChanged?.invoke()
+    }
+
+    /** Set the directions language ("" = the same as the app). Only the nav text and the voice
+     *  read it, so no Activity re-create is needed. */
+    fun setDirections(context: Context, langCode: String) {
+        directions.value = langCode
+        prefs(context).edit().putString(KEY_DIRECTIONS, langCode).apply()
+        apply()
+    }
+
+    /** The resolved directions locale: the override when set, else [effective]. */
+    fun directionsEffective(): Locale = directions.value.takeIf { it.isNotBlank() }
+        ?.let { Locale.forLanguageTag(it) } ?: effective()
+
+    /** The resolved locale — the system default when following the system, else the override.
+     *  Hyphenated codes ("zh-TW") need [Locale.forLanguageTag]; `Locale("zh-TW")` would create a
+     *  bogus lowercase "zh-tw" LANGUAGE and match nothing. */
+    fun effective(): Locale = language.value.takeIf { it.isNotBlank() }
+        ?.let { Locale.forLanguageTag(it) } ?: Locale.getDefault()
+
+    /** The device's own locale, captured on the first [wrap] BEFORE any override touches the JVM
+     *  default - the value to restore when the user goes back to following the system. */
+    private var systemDefault: Locale? = null
+
+    /** Wrap a base [Context] with the chosen language so `stringResource`/`getString` resolve to it.
+     *  Reads the pref directly (it runs from `attachBaseContext`, before [init]). When FOLLOWING the
+     *  system it also RESTORES `Locale.getDefault()`: `setDefault` is process-global and survived the
+     *  activity re-create, so after switching Russian back to English the parking-history dates kept
+     *  printing Russian months and the place scrape kept fetching hl=ru until the process died
+     *  (user 2026-07-10). */
+    fun wrap(base: Context): Context {
+        if (systemDefault == null) systemDefault = Locale.getDefault()
+        val lang = prefs(base).getString(KEY, "").orEmpty()
+        if (lang.isBlank()) {
+            systemDefault?.let { if (Locale.getDefault() != it) Locale.setDefault(it) }
+            syncAcceptLanguage()
+            return base
+        }
+        val locale = Locale.forLanguageTag(lang) // handles hyphenated tags like zh-TW
+        Locale.setDefault(locale)
+        syncAcceptLanguage()
+        val config = Configuration(base.resources.configuration)
+        config.setLocale(locale)
+        // Force the RTL/LTR direction from the chosen locale. setLocale only auto-updates
+        // layoutDirection when the config's direction wasn't already set, but AdaptiveDensity.wrap
+        // runs first and hands over a config with an explicit (LTR) direction, so Hebrew never
+        // flipped the layout without this (found + fixed in the vela-dpad fork).
+        config.setLayoutDirection(locale)
+        return base.createConfigurationContext(config)
+    }
+
+    /** Native Google requests name the same languages the WebViews do: both read the default locale
+     *  list (the picked language first, then the system's), through Chrome's own expansion. */
+    private fun syncAcceptLanguage() {
+        app.vela.core.data.google.BrowserHeaders.acceptLanguage = app.vela.core.data.google.BrowserHeaders
+            .acceptLanguageFor(android.os.LocaleList.getDefault().toLanguageTags().split(','))
+    }
+
+    /** Push the resolved locale into the app's locale-aware subsystems. */
+    private fun apply() {
+        NavStringsRegistry.setLocale(directionsEffective())
+    }
+
+    private fun prefs(c: Context) = c.getSharedPreferences("vela_settings", Context.MODE_PRIVATE)
+    private const val KEY = "app_language"
+    private const val KEY_DIRECTIONS = "directions_language"
+}

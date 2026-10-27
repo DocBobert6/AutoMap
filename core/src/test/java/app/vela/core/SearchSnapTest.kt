@@ -1,0 +1,179 @@
+package app.vela.core
+
+import app.vela.core.config.Calibration
+import app.vela.core.data.google.parse.PopularTimesParser
+import app.vela.core.data.google.parse.SearchParser
+import kotlinx.serialization.json.Json
+import org.junit.Assert.assertEquals
+import org.junit.Test
+
+class SearchSnapTest {
+
+    /** A JSON array literal of [size] nulls with the given index → raw-JSON overrides. */
+    private fun arr(size: Int, vararg at: Pair<Int, String>): String {
+        val m = at.toMap()
+        return (0 until size).joinToString(",", "[", "]") { m[it] ?: "null" }
+    }
+
+    /** Searching a bare address that's a business must snap to the business listed
+     *  "at this place" (`[0][1][0][14][68][i][0]`), not return the geocoded address. */
+    @Test fun addressSnapsToTheBusinessAtThisPlace() {
+        // place node: name [11], lat/lng at [9][2]/[9][3] — the minimum toPlace needs.
+        val place = arr(12, 9 to "[null,null,38.54,-121.73]", 11 to "\"In-N-Out Burger\"")
+        val node14 = arr(69, 68 to "[[$place]]") // [68] = at-this-place list = [[placeNode]]
+        val z = arr(15, 14 to node14) // [14] = the geocoded node
+        val y = "[$z]" // [0] = z
+        val x = arr(2, 1 to y) // [1] = y
+        val root = "[$x]" // length 1 → no [64] results list, so the snap path runs
+
+        val result = SearchParser.parse("1020 Olive Dr Davis", Json.parseToJsonElement(root))
+        assertEquals(1, result.places.size)
+        assertEquals("In-N-Out Burger", result.places[0].name)
+        assertEquals(38.54, result.places[0].location.lat, 1e-9)
+    }
+
+    /** Wheelchair accessibility rides the search response's attribute block ([1][100][1],
+     *  groups of [id, label, ...] entries) keyed on the LANGUAGE-NEUTRAL attribute id — the
+     *  labels arrive localized, so only the id can drive the filter. */
+    @Test fun parsesWheelchairAccessibility() {
+        fun place(name: String, about: String?) = "[null," + arr(
+            101,
+            9 to "[null,null,38.55,-121.74]",
+            11 to "\"$name\"",
+            100 to (about ?: "null"),
+        ) + "]"
+        val acc = """[null,[[null,"Accessibility",[["/geo/type/establishment_poi/has_wheelchair_accessible_entrance","Wheelchair accessible entrance"]]]]]"""
+        val root = arr(65, 64 to "[" + place("Accessible Cafe", acc) + "," + place("Unknown Cafe", null) + "]")
+        val places = SearchParser.parse("cafes", Json.parseToJsonElement(root)).places
+        assertEquals(true, places[0].wheelchairAccessible)
+        assertEquals(false, places[1].wheelchairAccessible)
+    }
+
+    /** Gas stations: the live fuel price rides the place node at [88][0] ("$5.34/Regular",
+     *  pinned from a live capture 2026-07-10). A digit-less string there (a shape drift putting
+     *  a label where the price was) must be rejected, not shown as a price. */
+    @Test fun parsesFuelPriceAndRejectsDigitless() {
+        fun station(name: String, p88: String) = "[null," + arr(
+            89,
+            9 to "[null,null,38.55,-121.74]",
+            11 to "\"$name\"",
+            88 to p88,
+        ) + "]"
+        val root = arr(
+            65,
+            64 to "[" + station("ARCO", "[\"${'$'}5.34/Regular\"]") + "," +
+                station("Chevron", "[\"SearchResult.TYPE_GAS_STATION\"]") + "]",
+        )
+        val places = SearchParser.parse("gas stations", Json.parseToJsonElement(root)).places
+        assertEquals(2, places.size)
+        assertEquals("${'$'}5.34/Regular", places[0].fuelPrice)
+        assertEquals(null, places[1].fuelPrice)
+    }
+
+    /** The same [88] block carries Google's language-independent type at [1] and the place's
+     *  country at [2][1] (SPEC 5.8). The nodes are trimmed from a London petrol-station search
+     *  and a bike-shop search; in the UK [88][0] is a fuel label, which the digit gate keeps out
+     *  of fuelPrice. Coordinates are London's. */
+    @Test fun parsesPlaceTypeAndCountry() {
+        fun place(name: String, lng: String, p88: String) = "[null," + arr(
+            89,
+            9 to "[null,null,51.5074,$lng]",
+            11 to "\"$name\"",
+            13 to "[\"Petrol Station\"]",
+            88 to p88,
+        ) + "]"
+        val gb = """["Diesel fuel","SearchResult.TYPE_GAS_STATION",["SearchResult.TYPE_GAS_STATION","GB",69,84,85,151],"Esso",[null,null,201,202,1196,570]]"""
+        val shop = """[null,"SearchResult.TYPE_SPORTING_GOODS",["SearchResult.TYPE_SPORTING_GOODS","FR",73,84,85,151],"Bikes",[null,null,273,274,1231,585]]"""
+        val bare = """[null,null,null,"Repairs",[null,null,188,187,1166,186]]"""
+        val root = arr(65, 64 to "[" + place("Esso", "-0.1278", gb) + "," + place("Bikes", "-0.1300", shop) + "," + place("Repairs", "-0.1320", bare) + "]")
+        val places = SearchParser.parse("petrol station", Json.parseToJsonElement(root)).places
+        assertEquals(3, places.size)
+        assertEquals("SearchResult.TYPE_GAS_STATION", places[0].placeType)
+        assertEquals("GB", places[0].countryCode)
+        assertEquals(null, places[0].fuelPrice) // "Diesel fuel" is a label, not a price
+        assertEquals("SearchResult.TYPE_SPORTING_GOODS", places[1].placeType)
+        assertEquals("FR", places[1].countryCode)
+        assertEquals(null, places[2].placeType)
+        assertEquals(null, places[2].countryCode)
+    }
+
+    /** The new paths are defaults a bundle may override, and the repo's own bundle (which does not
+     *  list them) still yields them through parseBundle's merge over DEFAULT_PATHS. */
+    @Test fun placeTypePathsReachTheBundle() {
+        val f = listOf(java.io.File("../calibration.json"), java.io.File("calibration.json")).first { it.exists() }
+        val cal = app.vela.core.config.CalibrationStore.parseBundle(f.readText())!!
+        assertEquals(listOf(1, 88, 1), cal.paths["placeType"])
+        assertEquals(listOf(1, 88, 2, 1), cal.paths["countryCode"])
+        val moved = app.vela.core.config.CalibrationStore.parseBundle("""{"version":99,"paths":{"countryCode":[1,89,2,1]}}""")!!
+        assertEquals(listOf(1, 89, 2, 1), moved.paths["countryCode"])
+        assertEquals(listOf(1, 88, 1), moved.paths["placeType"])
+    }
+
+    /** "People also search for": the focused result's sibling list at root[2][11][0], each
+     *  entry [featureId, name, [[_,_,lat,lng], …, rating@6]]. (Verified on-device against a
+     *  real response: 8 related salons for a focused nail-salon search.) */
+    @Test fun parsesPeopleAlsoSearchFor() {
+        val geo = arr(7, 0 to "[null,null,38.58,-121.49]", 6 to "4.7")     // [0]=coords, [6]=rating
+        val entry = arr(3, 0 to "\"0xAAA:0xBBB\"", 1 to "\"Glow Nails Spa\"", 2 to geo)
+        val node2 = arr(12, 11 to "[[$entry]]")                            // node[11][0] = [entry]
+        val root = arr(3, 2 to node2)                                      // root[2] = node2
+
+        val sims = SearchParser.parseSimilarPlaces(Json.parseToJsonElement(root), Calibration.DEFAULT_PATHS)
+        assertEquals(1, sims.size)
+        assertEquals("Glow Nails Spa", sims[0].name)
+        assertEquals("0xAAA:0xBBB", sims[0].featureId)
+        assertEquals(4.7, sims[0].rating!!, 1e-9)
+        assertEquals(38.58, sims[0].location.lat, 1e-9)
+        assertEquals(-121.49, sims[0].location.lng, 1e-9)
+    }
+
+    /** parse() attaches the similar list to the PRIMARY place (a focused single result). */
+    @Test fun attachesSimilarToPrimaryPlace() {
+        val place = arr(12, 9 to "[null,null,38.54,-121.73]", 11 to "\"Cuts Salon\"")
+        val z = arr(15, 14 to place)            // single result at [0][1][0][14]
+        val x = arr(2, 1 to "[$z]")             // [0][1] = [z]
+        val geo = arr(7, 0 to "[null,null,38.5,-121.7]", 6 to "4.5")
+        val entry = arr(3, 0 to "\"0xCCC:0xDDD\"", 1 to "\"Other Salon\"", 2 to geo)
+        val node2 = arr(12, 11 to "[[$entry]]")
+        val root = arr(3, 0 to x, 2 to node2) // [0]=focused branch, [2]=similar branch
+
+        val result = SearchParser.parse("cuts salon", Json.parseToJsonElement(root))
+        assertEquals(1, result.places.size)
+        assertEquals(1, result.places[0].similarPlaces.size)
+        assertEquals("Other Salon", result.places[0].similarPlaces[0].name)
+    }
+
+    /** The summary-node enrichment: PopularTimesParser lifts review count / address / rating
+     *  off the FULL focused node (feature-id-matched) into PlaceDetails, so a sparse snapped
+     *  place can be backfilled. Regression for "a salon showed 4.4 with no count". */
+    @Test fun enrichmentLiftsCountAddressRatingFromFocusedNode() {
+        val rating = arr(9, 7 to "4.5", 8 to "305")                 // [4][7]=rating, [4][8]=count
+        val geo = arr(4, 2 to "38.58", 3 to "-121.49")             // [9][2]/[9][3]=lat/lng
+        val place = arr(40, 4 to rating, 9 to geo, 10 to "\"0xAAA:0xBBB\"",
+            11 to "\"Test Spa\"", 39 to "\"123 Main St, Sacramento, CA\"")
+        val z = arr(15, 14 to place)                                // single result at [0][1][0][14]
+        val x = arr(2, 1 to "[$z]")
+        val body = ")]}'\n[$x]"
+
+        val d = PopularTimesParser.parse(body, "0xAAA:0xBBB")
+        assertEquals(305, d!!.reviewCount)
+        assertEquals("123 Main St, Sacramento, CA", d.address)
+        assertEquals(4.5, d.rating!!, 1e-9)
+    }
+
+    /** Action link (Book/Reserve/Order): label at [1][75][0][0][5][0], URL at
+     *  [1][75][0][0][5][1][2][0]. (Structure verified against a real "Book online" node.) */
+    @Test fun parsesActionLink() {
+        val urlNode = arr(3, 2 to "[\"https://book.example.com/x\"]")  // action[1]: [_,_,["url"]]
+        val action = arr(2, 0 to "\"Book online\"", 1 to urlNode)      // [0]=label, [1]=urlNode
+        val n75 = "[[${arr(6, 5 to action)}]]"                         // [75] → [0][0][5]=action
+        val place = arr(76, 9 to "[null,null,38.5,-121.7]", 11 to "\"Booky Spa\"", 75 to n75)
+        val z = arr(15, 14 to place)
+        val x = arr(2, 1 to "[$z]")
+
+        val result = SearchParser.parse("booky spa", Json.parseToJsonElement("[$x]"))
+        assertEquals(1, result.places.size)
+        assertEquals("Book online", result.places[0].actionLabel)
+        assertEquals("https://book.example.com/x", result.places[0].actionUrl)
+    }
+}

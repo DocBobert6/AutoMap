@@ -1,0 +1,145 @@
+package app.vela.ui
+
+import android.content.Context
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+
+/**
+ * Map-POI visibility + sizing preferences (user 2026-07-15). Same reactive-object pattern as
+ * [Buildings3d]: Compose state the map layer reads live, persisted in vela_settings.
+ *
+ * - [showPois]: master switch for EVERY business layer on the browse map: the ambient place
+ *   layer, the open (Overture) places layer, and the OSM fallback business POIs. It predates the
+ *   open layer, and forgetting to extend it there was issue #597 - once the open source became the
+ *   default, turning the switch off still left those places drawn.
+ *   Off = a clean basemap; searched results, transit stops and traffic controls still show
+ *   (they have their own switches/behavior).
+ * - [showTransit]: the canonical GTFS stop icons (and their per-viewport fetch).
+ * - [showCivic]: parks, schools and civic places inside the ambient pool - the "not really a
+ *   business" tier; off = the ambient layer shows businesses only.
+ * - [iconScale]: multiplies the POI icon/label sizes on the map. Exists for low-density screens
+ *   (a 1024x600 car head unit renders the fixed-px bitmaps physically huge); phones stay at 1.0.
+ */
+object MapPoiPrefs {
+    val showPois = mutableStateOf(true)
+    val showTransit = mutableStateOf(true)
+    val showCivic = mutableStateOf(true)
+    val iconScale = mutableFloatStateOf(1.0f)
+    /** Where the businesses on the browse map come from, one of [SOURCE_OPEN] (the Overture places
+     *  layer where a region file covers the view, Google only on tap, works offline), [SOURCE_GOOGLE]
+     *  (the ambient fan-out on every pan, nothing offline) or [SOURCE_BOTH] (the open layer draws the
+     *  map and one Google fetch per settled view fills in what it lacks). Outside any region file all
+     *  three behave like Google. The user picks; each option's costs are stated in Settings. */
+    val placesSource = mutableStateOf(SOURCE_OPEN)
+    /** The user's own pick, or null while they have never touched the picker (the fleet default,
+     *  `Calibration.defaultPlacesSource`, applies then and can be flipped remotely). */
+    private var explicitSource: String? = null
+    private var remoteDefault: String = SOURCE_OPEN
+    /** The open places layer is on the map (open data or both). */
+    val openPlaces: Boolean get() = placesSource.value != SOURCE_GOOGLE
+    /** The open places layer alone owns the map's businesses where it covers the view. */
+    val openPlacesOnly: Boolean get() = placesSource.value == SOURCE_OPEN
+    /** A region download also pulls the Vela places archive covering it (on by default), so the
+     *  map's businesses draw offline. Off keeps places streaming-only, which is free when online. */
+    val placesWithDownloads = mutableStateOf(true)
+    /** Tapping a place on the Vela data layer looks its listing up on Google (hours, reviews, photos).
+     *  Off: the sheet shows only what the tile carries and nothing about the tap reaches Google, for
+     *  people who want Google kept to search and directions. */
+    val lookupTappedPlaces = mutableStateOf(true)
+    /** Vela data mode: also draw the shops, restaurants and other businesses mapped in
+     *  OpenStreetMap (they are already in the streamed basemap tiles, hidden by default because
+     *  the baked places cover businesses better). Doubles of a Vela place are dropped by name.
+     *  ON by default since 2026-09-17: what OSM adds is what nothing else has, and a double is
+     *  dropped anyway, so the only cost is OSM's own stale rows. */
+    val osmBusinesses = mutableStateOf(true) // no longer a setting (2026-09-23): always on for older archives
+
+    fun init(context: Context) {
+        val p = prefs(context)
+        showPois.value = p.getBoolean(KEY_POIS, true)
+        showTransit.value = p.getBoolean(KEY_TRANSIT, true)
+        showCivic.value = p.getBoolean(KEY_CIVIC, true)
+        iconScale.floatValue = p.getFloat(KEY_SCALE, 1.0f)
+        explicitSource = p.getString(KEY_PLACES_SOURCE, null)
+        placesSource.value = explicitSource ?: remoteDefault
+        placesWithDownloads.value = p.getBoolean(KEY_PLACES_WITH_DOWNLOADS, true)
+        lookupTappedPlaces.value = p.getBoolean(KEY_LOOKUP_TAPPED, true)
+        navTapPlaces.value = p.getBoolean(KEY_NAV_TAP_PLACES, false)
+    }
+
+    fun setLookupTappedPlaces(context: Context, value: Boolean) {
+        lookupTappedPlaces.value = value
+        prefs(context).edit().putBoolean(KEY_LOOKUP_TAPPED, value).apply()
+    }
+
+    /** Drive navigation: show the places you would divert for (fuel, food, coffee, charging) and let
+     *  a tap on one offer it as a stop. Off by default - nav hides places on purpose, both for the
+     *  frame rate and for a readable map. Turning it on needs the master places switch, so it turns
+     *  that on too and remembers it did, and putting it back off undoes exactly that. */
+    val navTapPlaces = mutableStateOf(false)
+
+    fun setNavTapPlaces(context: Context, value: Boolean) {
+        navTapPlaces.value = value
+        val p = prefs(context)
+        val e = p.edit().putBoolean(KEY_NAV_TAP_PLACES, value)
+        if (value && !showPois.value) {
+            showPois.value = true
+            e.putBoolean(KEY_POIS, true).putBoolean(KEY_NAV_TAP_FORCED_POIS, true)
+        } else if (!value && p.getBoolean(KEY_NAV_TAP_FORCED_POIS, false)) {
+            showPois.value = false
+            e.putBoolean(KEY_POIS, false).putBoolean(KEY_NAV_TAP_FORCED_POIS, false)
+        }
+        e.apply()
+    }
+
+    fun setPlacesWithDownloads(context: Context, value: Boolean) {
+        placesWithDownloads.value = value
+        prefs(context).edit().putBoolean(KEY_PLACES_WITH_DOWNLOADS, value).apply()
+    }
+
+    fun setPlacesSource(context: Context, value: String) {
+        explicitSource = value
+        placesSource.value = value
+        prefs(context).edit().putString(KEY_PLACES_SOURCE, value).apply()
+    }
+
+    /** The signed bundle's fleet default (MapViewModel pushes it at init and after each refresh);
+     *  takes effect only for people who never made their own pick. */
+    fun setRemoteDefault(value: String) {
+        remoteDefault = value
+        if (explicitSource == null) placesSource.value = value
+    }
+
+    fun setShowPois(context: Context, value: Boolean) {
+        showPois.value = value
+        prefs(context).edit().putBoolean(KEY_POIS, value).apply()
+    }
+
+    fun setShowTransit(context: Context, value: Boolean) {
+        showTransit.value = value
+        prefs(context).edit().putBoolean(KEY_TRANSIT, value).apply()
+    }
+
+    fun setShowCivic(context: Context, value: Boolean) {
+        showCivic.value = value
+        prefs(context).edit().putBoolean(KEY_CIVIC, value).apply()
+    }
+
+    fun setIconScale(context: Context, value: Float) {
+        iconScale.floatValue = value
+        prefs(context).edit().putFloat(KEY_SCALE, value).apply()
+    }
+
+    private fun prefs(c: Context) = c.getSharedPreferences("vela_settings", Context.MODE_PRIVATE)
+    private const val KEY_POIS = "map_show_pois"
+    private const val KEY_TRANSIT = "map_show_transit_stops"
+    private const val KEY_CIVIC = "map_show_civic_pois"
+    private const val KEY_SCALE = "map_poi_icon_scale"
+    private const val KEY_PLACES_SOURCE = "map_places_source"
+    private const val KEY_PLACES_WITH_DOWNLOADS = "offline_places_with_downloads"
+    private const val KEY_LOOKUP_TAPPED = "map_places_google_lookup"
+    private const val KEY_NAV_TAP_PLACES = "map_places_nav_tap"
+    private const val KEY_NAV_TAP_FORCED_POIS = "map_places_nav_tap_forced_pois"
+    const val SOURCE_OPEN = "open"
+    const val SOURCE_GOOGLE = "google"
+    const val SOURCE_BOTH = "both"
+}

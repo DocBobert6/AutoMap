@@ -1,0 +1,540 @@
+package app.vela.core.data
+
+import android.content.ContentValues
+import android.content.Context
+import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteOpenHelper
+import app.vela.core.model.LatLng
+import app.vela.core.model.Place
+import app.vela.core.model.distanceTo
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * On-device street-address index (SQLite), populated from OSM `addr:housenumber` points when a map
+ * region is downloaded ([OverpassPois.fetchAddresses]). This is the offline **forward geocoder**: it
+ * turns a typed address like "1451 W Covell Blvd" into a coordinate with no network, so you can route to
+ * an arbitrary address offline. Separate from [OfflinePoiStore] (that's named businesses); this is every
+ * addressed building OSM has in the downloaded area.
+ *
+ * Robustness comes from a normalized street form: both the stored street and the query are lowercased
+ * and their abbreviations expanded ("Pl" → "place", "SE" → "southeast", "Ave" → "avenue", …), then
+ * matched word-by-word. So "W Covell Blvd", "West Covell Blvd" and "West Covell Boulevard" all hit the same
+ * row. If the exact house number isn't mapped, it falls back to the street (nearest point on it).
+ */
+@Singleton
+class OfflineAddressStore @Inject constructor(
+    @ApplicationContext context: Context,
+) {
+    data class Addr(
+        val id: String,
+        val housenumber: String?,
+        val street: String?,
+        val city: String?,
+        val lat: Double,
+        val lng: Double,
+    )
+
+    /** One sampled point on a named road centerline (from [OverpassPois.fetchStreets]) — the data behind
+     *  the street-level geocoding fallback where OSM has the road but no house numbers on it. */
+    data class StreetPt(val street: String, val lat: Double, val lng: Double)
+
+    private val helper = object : SQLiteOpenHelper(context, "vela_offline_addr.db", null, 2) {
+        override fun onCreate(db: SQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE addr(id TEXT PRIMARY KEY, housenumber TEXT, street TEXT, " +
+                    "street_norm TEXT, city TEXT, lat REAL, lng REAL)",
+            )
+            db.execSQL("CREATE INDEX idx_addr_street ON addr(street_norm)")
+            db.execSQL("CREATE INDEX idx_addr_hn ON addr(housenumber)")
+            db.execSQL(
+                "CREATE TABLE street(id TEXT PRIMARY KEY, street TEXT, street_norm TEXT, lat REAL, lng REAL)",
+            )
+            db.execSQL("CREATE INDEX idx_street_norm ON street(street_norm)")
+        }
+        override fun onUpgrade(db: SQLiteDatabase, old: Int, new: Int) {
+            db.execSQL("DROP TABLE IF EXISTS addr")
+            db.execSQL("DROP TABLE IF EXISTS street")
+            onCreate(db)
+        }
+    }
+
+    fun add(addrs: List<Addr>) {
+        if (addrs.isEmpty()) return
+        val db = helper.writableDatabase
+        db.beginTransaction()
+        try {
+            for (a in addrs) {
+                db.insertWithOnConflict("addr", null, ContentValues().apply {
+                    put("id", a.id)
+                    put("housenumber", a.housenumber)
+                    put("street", a.street)
+                    put("street_norm", a.street?.let { normalizeStreet(it) })
+                    put("city", a.city)
+                    put("lat", a.lat); put("lng", a.lng)
+                }, SQLiteDatabase.CONFLICT_REPLACE)
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    fun addStreets(streets: List<StreetPt>) {
+        if (streets.isEmpty()) return
+        val db = helper.writableDatabase
+        db.beginTransaction()
+        try {
+            for (p in streets) {
+                db.insertWithOnConflict("street", null, ContentValues().apply {
+                    // id keys on street+rounded point so re-downloading an area doesn't pile up duplicates
+                    put("id", "${normalizeStreet(p.street)}@${"%.5f".format(p.lat)},${"%.5f".format(p.lng)}")
+                    put("street", p.street)
+                    put("street_norm", normalizeStreet(p.street))
+                    put("lat", p.lat); put("lng", p.lng)
+                }, SQLiteDatabase.CONFLICT_REPLACE)
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    /** Addresses known offline — this store's own index plus every installed region pack. */
+    fun count(): Int = helper.readableDatabase
+        .rawQuery("SELECT COUNT(*) FROM addr", null)
+        .use { if (it.moveToFirst()) it.getInt(0) else 0 } + OfflinePacks.count("addr")
+
+    /**
+     * Reverse-geocode a point to a display address, so an offline POI that OSM never tagged with an
+     * `addr:*` (most US chain locations) still shows *something* Google-like. Prefers the nearest mapped
+     * house within [REV_ADDR_M] (usually the POI's own building), else falls back to the nearest street
+     * name within [REV_STREET_M] ("on W Covell Blvd"), else null. Bounded by a small lat/lng box so it
+     * scans only nearby rows, not the whole index.
+     */
+    /**
+     * The "City, ST 12345" that the places around [loc] carry, from the downloaded packs
+     * (2026-09-23, user: offline results showed "123 Main St" with no city, state or ZIP). OSM
+     * tags many places with only the number and street, but a neighborhood's other places usually
+     * carry the rest; this votes among the nearest [LOCALITY_VOTERS] within ~650 m and prefers
+     * an answer with a postcode. Null when nothing nearby has one. Cached per ~550 m cell, so a
+     * results list costs one or two scans.
+     */
+    fun localityNear(loc: LatLng): String? {
+        val key = "${(loc.lat / LOCALITY_CELL_DEG).toInt()}:${(loc.lng / LOCALITY_CELL_DEG).toInt()}"
+        localityCache[key]?.let { return it.ifEmpty { null } }
+        val box = arrayOf(
+            (loc.lat - LOCALITY_BOX_DEG).toString(), (loc.lat + LOCALITY_BOX_DEG).toString(),
+            (loc.lng - LOCALITY_BOX_DEG).toString(), (loc.lng + LOCALITY_BOX_DEG).toString(),
+        )
+        val seen = ArrayList<Pair<Double, String>>()
+        for (pack in OfflinePacks.dbs) {
+            runCatching {
+                pack.rawQuery(
+                    "SELECT address, lat, lng FROM poi WHERE lat BETWEEN ? AND ? AND lng BETWEEN ? AND ? " +
+                        "AND address LIKE '%, %' LIMIT 400",
+                    box,
+                ).use { c ->
+                    while (c.moveToNext()) {
+                        val loc2 = localityOf(c.getString(0)) ?: continue
+                        seen += loc.distanceTo(LatLng(c.getDouble(1), c.getDouble(2))) to loc2
+                    }
+                }
+            }
+        }
+        val best = pickLocality(seen)
+        if (localityCache.size > 256) localityCache.clear()
+        localityCache[key] = best.orEmpty()
+        return best
+    }
+
+    private val localityCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /** [address] with the locality filled in from [localityNear] when it has none, or only a bare
+     *  city name the nearby answer extends ("Davis" -> "Davis, CA 95616"). Anything else as is. */
+    fun completeAddress(address: String?, loc: LatLng): String? {
+        if (address.isNullOrBlank() || !needsLocality(address)) return address
+        return withLocality(address, localityNear(loc))
+    }
+
+    fun reverseGeocode(loc: LatLng): String? {
+        val box = arrayOf(
+            (loc.lat - REV_BOX_DEG).toString(), (loc.lat + REV_BOX_DEG).toString(),
+            (loc.lng - REV_BOX_DEG).toString(), (loc.lng + REV_BOX_DEG).toString(),
+        )
+        var bestAddr: Pair<Double, String>? = null
+        fun considerAddr(hn: String?, street: String?, city: String?, lat: Double, lng: Double) {
+            val d = loc.distanceTo(LatLng(lat, lng))
+            if (d <= REV_ADDR_M && (bestAddr == null || d < bestAddr!!.first)) {
+                val label = listOfNotNull(
+                    listOfNotNull(hn, street).joinToString(" ").ifBlank { null },
+                    city,
+                ).joinToString(", ").ifBlank { null }
+                if (label != null) bestAddr = d to label
+            }
+        }
+        helper.readableDatabase.rawQuery(
+            "SELECT housenumber,street,city,lat,lng FROM addr WHERE lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?",
+            box,
+        ).use { c ->
+            while (c.moveToNext()) considerAddr(c.getString(0), c.getString(1), c.getString(2), c.getDouble(3), c.getDouble(4))
+        }
+        for (pack in OfflinePacks.dbs) {
+            runCatching {
+                pack.rawQuery(
+                    "SELECT a.hn,s.street,a.city,a.lat,a.lng FROM addr a JOIN streetname s ON a.sid=s.sid " +
+                        "WHERE a.lat BETWEEN ? AND ? AND a.lng BETWEEN ? AND ?",
+                    box,
+                ).use { c ->
+                    while (c.moveToNext()) considerAddr(c.getString(0), c.getString(1), c.getString(2), c.getDouble(3), c.getDouble(4))
+                }
+            }
+        }
+        bestAddr?.let { return it.second }
+        var bestStreet: Pair<Double, String>? = null
+        fun considerStreet(street: String?, lat: Double, lng: Double) {
+            val d = loc.distanceTo(LatLng(lat, lng))
+            if (d <= REV_STREET_M && (bestStreet == null || d < bestStreet!!.first)) {
+                street?.let { bestStreet = d to it }
+            }
+        }
+        helper.readableDatabase.rawQuery(
+            "SELECT street,lat,lng FROM street WHERE lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?",
+            box,
+        ).use { c ->
+            while (c.moveToNext()) considerStreet(c.getString(0), c.getDouble(1), c.getDouble(2))
+        }
+        for (pack in OfflinePacks.dbs) {
+            runCatching {
+                pack.rawQuery(
+                    "SELECT s.street,p.lat,p.lng FROM streetpt p JOIN streetname s ON p.sid=s.sid " +
+                        "WHERE p.lat BETWEEN ? AND ? AND p.lng BETWEEN ? AND ?",
+                    box,
+                ).use { c ->
+                    while (c.moveToNext()) considerStreet(c.getString(0), c.getDouble(1), c.getDouble(2))
+                }
+            }
+        }
+        return bestStreet?.second
+    }
+
+    fun streetCount(): Int = helper.readableDatabase
+        .rawQuery("SELECT COUNT(*) FROM street", null)
+        .use { if (it.moveToFirst()) it.getInt(0) else 0 } + OfflinePacks.count("streetpt")
+
+    /**
+     * Forward-geocode a typed address → matching Places (nearest first). Empty if nothing matches.
+     * Layered so an arbitrary address in a downloaded area resolves even where OSM is thin:
+     *  1. exact `housenumber` on the street,
+     *  2. interpolate the house's position between the two nearest mapped numbers on the street,
+     *  3. any mapped house on the street (routes you to the right block),
+     *  4. nearest point on the street's centerline geometry (works with zero mapped houses).
+     */
+    fun geocode(query: String, near: LatLng?, limit: Int = 20): List<Place> {
+        val m = HOUSE_STREET.find(query.trim())
+        val houseNo = m?.groupValues?.get(1)?.takeIf { it.isNotBlank() }
+        val streetPart = (m?.groupValues?.get(2) ?: query).substringBefore(',').trim()
+        // Every word has to be in the street's name, so a town or a half-typed last word matched
+        // nothing. The words are tried as typed, then with the last ones dropped (streetWordTries).
+        for (words in streetWordTries(streetPart)) {
+            val hits = geocodeWords(houseNo, words, streetPart, near, limit)
+            if (hits.isNotEmpty()) return hits
+        }
+        return emptyList()
+    }
+
+    /** [geocode]'s four layers for one set of street [words]. */
+    private fun geocodeWords(houseNo: String?, words: List<String>, streetPart: String, near: LatLng?, limit: Int): List<Place> {
+        // (1) exact house number on the street.
+        if (houseNo != null) {
+            val exact = run(houseNo, words, near, limit)
+            if (exact.isNotEmpty()) return exact
+        }
+        // Everything mapped on this street (ignoring house number), for interpolation + block fallback.
+        val onStreet = query(null, words)
+        if (onStreet.isNotEmpty()) {
+            // (2) interpolate between bracketing house numbers.
+            if (houseNo != null) {
+                interpolate(houseNo, onStreet)?.let { loc ->
+                    // An estimate, named with the street's own spelling (it used to echo the typed
+                    // text, lowercase and all, as if it were an address on record).
+                    val street = onStreet.firstOrNull { it.street != null }?.street ?: streetPart
+                    return listOf(placeAt(loc, "$houseNo $street", onStreet.firstOrNull()?.city, near, approximate = true))
+                }
+            }
+            // (3) nearest mapped house on the street.
+            return onStreet.map { placeAt(LatLng(it.lat, it.lng), addrLabel(it.hn, it.street), it.city, near) }
+                .distinctBy { it.name }
+                .sortedBy { it.distanceMeters ?: Double.MAX_VALUE }
+                .take(limit)
+        }
+        // (4) no mapped houses on the street → nearest point on the road centerline.
+        val onGeom = streetGeom(words)
+        if (onGeom.isNotEmpty()) {
+            val best = onGeom.minByOrNull { near?.distanceTo(LatLng(it.lat, it.lng)) ?: 0.0 } ?: onGeom.first()
+            val loc = LatLng(best.lat, best.lng)
+            val label = if (houseNo != null) "$houseNo ${best.street}" else best.street
+            return listOf(placeAt(loc, label, null, near, approximate = houseNo != null))
+        }
+        return emptyList()
+    }
+
+    private data class AddrRow(val hn: String?, val street: String?, val city: String?, val lat: Double, val lng: Double)
+
+    /** All addr rows matching the street words (no house-number filter) — own index + region packs. */
+    private fun query(houseNo: String?, words: List<String>): List<AddrRow> {
+        val clauses = ArrayList<String>()
+        val args = ArrayList<String>()
+        if (houseNo != null) { clauses.add("housenumber = ?"); args.add(houseNo) }
+        for (w in words) { clauses.add("street_norm LIKE ?"); args.add("%$w%") }
+        val rows = ArrayList<AddrRow>()
+        helper.readableDatabase.rawQuery(
+            "SELECT housenumber,street,city,lat,lng FROM addr WHERE ${clauses.joinToString(" AND ")} LIMIT 400",
+            args.toTypedArray(),
+        ).use { c ->
+            while (c.moveToNext()) {
+                rows.add(AddrRow(c.getString(0), c.getString(1), c.getString(2), c.getDouble(3), c.getDouble(4)))
+            }
+        }
+        for (pack in OfflinePacks.dbs) rows.addAll(packQuery(pack, houseNo, words))
+        return rows
+    }
+
+    // ---- Region-pack queries. Packs are state-scale, so their schema is NORMALIZED (see
+    // scripts/poipack_build.py): street names live once in `streetname(sid,street,street_norm)` and
+    // the millions of `addr(hn,sid,city,lat,lng)` / `streetpt(sid,lat,lng)` rows reference them by
+    // int. Matching street names first (a ~60k-row scan) keeps a whole-state query fast — the big
+    // tables are then hit through their sid/hn indexes, never LIKE-scanned.
+
+    /** sids (+ display name) of pack street names matching all [words]. A sid is a 63-bit hash of
+     *  the normalized name (scripts/poipack_build.py `stable_sid`, since 2026-07-07), so it is
+     *  read as a Long: read as an Int it was cut to its low 32 bits, matched no address or
+     *  centerline row, and every forward lookup in a downloaded region came back empty. */
+    private fun packSids(pack: SQLiteDatabase, words: List<String>): Map<Long, String> {
+        val clauses = words.map { "street_norm LIKE ?" }
+        val args = words.map { "%$it%" }
+        val out = LinkedHashMap<Long, String>()
+        runCatching {
+            pack.rawQuery(
+                "SELECT sid,street FROM streetname WHERE ${clauses.joinToString(" AND ")} LIMIT 200",
+                args.toTypedArray(),
+            ).use { c -> while (c.moveToNext()) out[c.getLong(0)] = c.getString(1) }
+        }
+        return out
+    }
+
+    private fun packQuery(pack: SQLiteDatabase, houseNo: String?, words: List<String>): List<AddrRow> {
+        val sids = packSids(pack, words)
+        if (sids.isEmpty()) return emptyList()
+        val inList = sids.keys.joinToString(",")
+        val rows = ArrayList<AddrRow>()
+        runCatching {
+            val sql = if (houseNo != null) {
+                "SELECT hn,sid,city,lat,lng FROM addr WHERE hn = ? AND sid IN ($inList) LIMIT 400"
+            } else {
+                "SELECT hn,sid,city,lat,lng FROM addr WHERE sid IN ($inList) LIMIT 400"
+            }
+            pack.rawQuery(sql, if (houseNo != null) arrayOf(houseNo) else null).use { c ->
+                while (c.moveToNext()) {
+                    rows.add(AddrRow(c.getString(0), sids[c.getLong(1)], c.getString(2), c.getDouble(3), c.getDouble(4)))
+                }
+            }
+        }
+        return rows
+    }
+
+    private fun packStreetGeom(pack: SQLiteDatabase, words: List<String>): List<StreetPt> {
+        val sids = packSids(pack, words)
+        if (sids.isEmpty()) return emptyList()
+        val rows = ArrayList<StreetPt>()
+        runCatching {
+            pack.rawQuery(
+                "SELECT sid,lat,lng FROM streetpt WHERE sid IN (${sids.keys.joinToString(",")}) LIMIT 4000",
+                null,
+            ).use { c ->
+                while (c.moveToNext()) {
+                    rows.add(StreetPt(sids[c.getLong(0)] ?: return@use, c.getDouble(1), c.getDouble(2)))
+                }
+            }
+        }
+        return rows
+    }
+
+    private fun run(houseNo: String?, words: List<String>, near: LatLng?, limit: Int): List<Place> =
+        query(houseNo, words)
+            .map { placeAt(LatLng(it.lat, it.lng), addrLabel(it.hn, it.street), it.city, near) }
+            .distinctBy { it.name }
+            .sortedBy { it.distanceMeters ?: Double.MAX_VALUE }
+            .take(limit)
+
+    /** Street centerline points matching the street words — own index + region packs. */
+    private fun streetGeom(words: List<String>): List<StreetPt> {
+        val clauses = words.map { "street_norm LIKE ?" }
+        val args = words.map { "%$it%" }
+        val rows = ArrayList<StreetPt>()
+        helper.readableDatabase.rawQuery(
+            "SELECT street,lat,lng FROM street WHERE ${clauses.joinToString(" AND ")} LIMIT 4000",
+            args.toTypedArray(),
+        ).use { c ->
+            while (c.moveToNext()) rows.add(StreetPt(c.getString(0), c.getDouble(1), c.getDouble(2)))
+        }
+        for (pack in OfflinePacks.dbs) rows.addAll(packStreetGeom(pack, words))
+        return rows
+    }
+
+    /** Lerp the target house's position between the two nearest bracketing mapped numbers on the street. */
+    private fun interpolate(houseNo: String, onStreet: List<AddrRow>): LatLng? {
+        val target = houseNo.takeWhile { it.isDigit() }.toIntOrNull() ?: return null
+        val numbered = onStreet.mapNotNull { r -> r.hn?.takeWhile { it.isDigit() }?.toIntOrNull()?.let { it to r } }
+        if (numbered.size < 2) return null
+        val below = numbered.filter { it.first <= target }.maxByOrNull { it.first }
+        val above = numbered.filter { it.first >= target }.minByOrNull { it.first }
+        return when {
+            // Two numbers far apart are usually two separate stretches of the street (across a park,
+            // a creek, a highway): a blend of them lands between, on neither. Take the nearer number.
+            below != null && above != null && above.first != below.first &&
+                LatLng(below.second.lat, below.second.lng).distanceTo(LatLng(above.second.lat, above.second.lng)) > INTERP_MAX_GAP_M ->
+                (if (target - below.first <= above.first - target) below else above).second.let { LatLng(it.lat, it.lng) }
+            below != null && above != null && above.first != below.first -> {
+                val t = (target - below.first).toDouble() / (above.first - below.first)
+                LatLng(
+                    below.second.lat + t * (above.second.lat - below.second.lat),
+                    below.second.lng + t * (above.second.lng - below.second.lng),
+                )
+            }
+            below != null -> LatLng(below.second.lat, below.second.lng)
+            above != null -> LatLng(above.second.lat, above.second.lng)
+            else -> null
+        }
+    }
+
+    private fun addrLabel(hn: String?, street: String?): String =
+        listOfNotNull(hn, street).joinToString(" ").ifBlank { street ?: "Address" }
+
+    private fun placeAt(loc: LatLng, name: String, city: String?, near: LatLng?, approximate: Boolean = false): Place =
+        Place(
+            id = (if (approximate) APPROX_PREFIX else "addr:") + "${loc.lat},${loc.lng}",
+            name = name,
+            location = loc,
+            category = "Address",
+            address = listOfNotNull(name, city).joinToString(", ").ifBlank { null },
+            distanceMeters = near?.distanceTo(loc),
+        )
+
+    companion object {
+        /** Id prefix of an ESTIMATED address (interpolated between house numbers, or a point on the
+         *  street with the number added): search drops it when any other result has the address. */
+        const val APPROX_PREFIX = "addr~"
+        fun isApproximate(p: Place): Boolean = p.id.startsWith(APPROX_PREFIX)
+        /** Bracketing house numbers farther apart than this are not blended (see interpolate). */
+        private const val INTERP_MAX_GAP_M = 300.0
+        private const val LOCALITY_BOX_DEG = 0.006  // ~650 m box the locality vote reads
+        private const val LOCALITY_CELL_DEG = 0.005 // cache cell, ~550 m
+        private const val LOCALITY_VOTERS = 7
+
+        /** The part of a formatted address after the street line ("Davis, CA 95616"), or null. */
+        fun localityOf(address: String?): String? =
+            address?.substringAfter(", ", "")?.trim()?.takeIf { it.isNotEmpty() }
+
+        /** True when [address] lacks a postcode-bearing locality: just a street line, or a street
+         *  line and a bare place name. */
+        fun needsLocality(address: String): Boolean {
+            val parts = address.split(", ")
+            return parts.size == 1 || (parts.size == 2 && parts[1].none { it.isDigit() })
+        }
+
+        /** The most common locality among the nearest voters, answers with a postcode first;
+         *  ties go to the nearest. */
+        fun pickLocality(seen: List<Pair<Double, String>>): String? {
+            if (seen.isEmpty()) return null
+            val withZip = seen.filter { (_, l) -> l.any { it.isDigit() } }
+            val pool = (withZip.ifEmpty { seen }).sortedBy { it.first }.take(LOCALITY_VOTERS)
+            val counts = pool.groupingBy { it.second }.eachCount()
+            val top = counts.values.maxOrNull() ?: return null
+            return pool.first { counts[it.second] == top }.second
+        }
+
+        /** Joins [address] and [locality] the way the packs format addresses. A bare trailing
+         *  place name is replaced only when the locality starts with it (never a different town). */
+        fun withLocality(address: String, locality: String?): String {
+            if (locality == null) return address
+            val parts = address.split(", ")
+            return when {
+                parts.size == 1 -> "$address, $locality"
+                parts.size == 2 && locality.startsWith(parts[1], ignoreCase = true) -> "${parts[0]}, $locality"
+                else -> address
+            }
+        }
+
+        private const val REV_BOX_DEG = 0.0016 // ~180 m lat/lng box for the reverse-geocode nearest scan
+        private const val REV_ADDR_M = 60.0    // accept a mapped house this close as the POI's address
+        private const val REV_STREET_M = 150.0 // else fall back to a street name this close
+
+        /**
+         * The street words [geocode] tries for [streetPart] (the text after the house number and
+         * before any comma), in order: all of them, then with the last word dropped, and so on,
+         * while a word that is neither a direction nor a street type is left. "Covell Bl" tries
+         * "covell bl", then "covell"; "Main Street Davis CA" ends at "main"; "North Street" is
+         * tried as typed and no shorter, since "north" alone names no street. Words under two
+         * letters are dropped, as before.
+         */
+        internal fun streetWordTries(streetPart: String): List<List<String>> {
+            val words = normalizeStreet(streetPart.substringBefore(',')).split(' ').filter { it.length >= 2 }
+            if (words.isEmpty()) return emptyList()
+            // The words as typed always go first: "North Street" is a street.
+            val out = arrayListOf(words)
+            var n = words.size - 1
+            while (n > 0) {
+                val w = words.subList(0, n)
+                if (w.none { it !in DIRECTION_WORDS && it !in FULL_STREET_TYPES }) break
+                out += w.toList()
+                n--
+            }
+            return out
+        }
+
+        private val DIRECTION_WORDS = setOf("north", "south", "east", "west", "northeast", "northwest", "southeast", "southwest")
+        private val FULL_STREET_TYPES = setOf(
+            "street", "avenue", "boulevard", "drive", "road", "lane", "court", "place", "square",
+            "terrace", "circle", "highway", "parkway", "trail", "way", "loop", "route",
+        )
+
+        // A query is address-like if it starts with a house number or names a street type. Used to decide
+        // whether to run the geocoder alongside the POI search (so "coffee" doesn't hit the address table).
+        fun looksLikeAddress(query: String): Boolean {
+            val q = query.trim().lowercase()
+            if (q.isEmpty()) return false
+            if (q.first().isDigit()) return true
+            return STREET_TYPE_WORDS.any { Regex("(^|\\s)$it(\\s|$)").containsMatchIn(q) }
+        }
+
+        private val HOUSE_STREET = Regex("^\\s*(\\d+[a-zA-Z]?)\\s+(.+)$")
+
+        private val ABBREV = mapOf(
+            "st" to "street", "str" to "street", "ave" to "avenue", "av" to "avenue",
+            "blvd" to "boulevard", "boul" to "boulevard", "dr" to "drive", "rd" to "road",
+            "ln" to "lane", "ct" to "court", "pl" to "place", "sq" to "square", "ter" to "terrace",
+            "cir" to "circle", "hwy" to "highway", "pkwy" to "parkway", "pky" to "parkway",
+            "trl" to "trail", "way" to "way", "loop" to "loop",
+            "n" to "north", "s" to "south", "e" to "east", "w" to "west",
+            "ne" to "northeast", "nw" to "northwest", "se" to "southeast", "sw" to "southwest",
+        )
+
+        private val STREET_TYPE_WORDS = setOf(
+            "street", "st", "avenue", "ave", "av", "boulevard", "blvd", "drive", "dr", "road", "rd",
+            "lane", "ln", "court", "ct", "place", "pl", "square", "sq", "terrace", "ter", "circle", "cir",
+            "highway", "hwy", "parkway", "pkwy", "trail", "trl", "way", "loop", "route",
+        )
+
+        /** Lowercase, strip punctuation, expand each abbreviation to its full form → space-joined words.
+         *  Applied identically to the stored street and the query so they line up regardless of how the
+         *  user abbreviated it. */
+        fun normalizeStreet(s: String): String =
+            s.lowercase()
+                .replace(Regex("[.,#]"), " ")
+                .split(Regex("\\s+"))
+                .filter { it.isNotBlank() }
+                .joinToString(" ") { ABBREV[it] ?: it }
+    }
+}

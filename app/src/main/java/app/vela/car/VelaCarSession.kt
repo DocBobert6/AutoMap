@@ -1,0 +1,168 @@
+package app.vela.car
+
+import android.content.Intent
+import android.net.Uri
+import androidx.car.app.CarContext
+import androidx.car.app.Screen
+import androidx.car.app.ScreenManager
+import androidx.car.app.CarToast
+import androidx.car.app.Session
+import app.vela.car.screen.ActiveNavCarScreen
+import app.vela.car.screen.RoutePreviewCarScreen
+import app.vela.car.screen.SearchCarScreen
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import app.vela.car.screen.CarDeps
+import app.vela.car.screen.MainCarScreen
+import app.vela.core.model.LatLng
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+
+/**
+ * One car projection session. Owns a location collector that feeds [app.vela.core.nav.NavSession]
+ * while the car UI is alive — so navigation runs off the car's own GPS feed, independent of the
+ * phone Activity/ViewModel (which is stopped during projection).
+ *
+ * Phase-1 minimal-arbiter note: the phone [app.vela.ui.map.MapViewModel] is the other feeder of the
+ * shared [NavSession] singleton. They don't run at once in projection (the phone UI is stopped), and
+ * `NavSession.onLocation`/`state.update` are atomic, so a stray double-feed can't crash — it's just
+ * redundant. A dedicated `NavCoordinator` arbiter (sole feeder/owner) is the clean follow-up.
+ */
+class VelaCarSession(private val deps: CarDeps) : Session(), DefaultLifecycleObserver {
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var feedJob: Job? = null
+
+    init {
+        lifecycle.addObserver(this)
+    }
+
+    override fun onCreate(owner: LifecycleOwner) {
+        // Feed live GPS into NavSession while the car session is alive. Mirrors the phone's fix gate:
+        // GPS fixes with accuracy ≤ 50 m drive guidance; coarser fixes are ignored for nav.
+        // Cancel any prior collector first so a re-delivered onCreate can't leak a second one.
+        feedJob?.cancel()
+        // Spoken alerts (cameras, speeding, closing soon) as a car toast too: a muted car heard
+        // nothing of them, and the toast is the template's one transient surface.
+        scope.launch {
+            CarBridge.toasts.collect { msg ->
+                runCatching { CarToast.makeText(carContext, msg, CarToast.LENGTH_LONG).show() }
+            }
+        }
+        // A drive started anywhere, on this screen or on the phone, opens the drive screen. This
+        // is the only place that pushes it.
+        scope.launch {
+            deps.navSession.state.map { it.navigating && !it.arrived }.distinctUntilChanged().collect { on ->
+                if (on) showDriveScreen()
+            }
+        }
+        CarLocationAccess.check(carContext)
+        feedJob = scope.launch {
+            // Wait for the permission: the landing screen asks for it when the car connected
+            // before Vela was set up on the phone.
+            CarLocationAccess.granted.first { it }
+            deps.locationProvider.updates().collect { loc ->
+                // The simulated position counts as a fix. A demo drive's fixes do not: the phone
+                // feeds those to the session itself.
+                val gps = loc.provider == android.location.LocationManager.GPS_PROVIDER ||
+                    loc.provider == app.vela.core.location.SIM_PROVIDER
+                if (gps && (!loc.hasAccuracy() || loc.accuracy <= 50f)) {
+                    val speed = if (loc.hasSpeed()) loc.speed.toDouble() else null
+                    deps.navSession.onLocation(LatLng(loc.latitude, loc.longitude), app.vela.ui.Units.imperial.value, speed)
+                }
+            }
+        }
+    }
+
+    override fun onDestroy(owner: LifecycleOwner) {
+        feedJob?.cancel()
+        scope.cancel()
+        deps.stopMapRenderer() // the shared map renderer lives for the session; stop its collector here
+    }
+
+    override fun onCreateScreen(intent: Intent): Screen {
+        // Launched via a navigation intent (assistant "navigate to X" / another app)? Go straight to
+        // the route preview for that destination; otherwise the normal landing screen.
+        parseNavDest(intent)?.let { (dest, name) ->
+            return RoutePreviewCarScreen(carContext, deps, name, dest)
+        }
+        val home = MainCarScreen(carContext, deps)
+        // A place name ("navigate to Starbucks") opens the search on it, with the landing screen under it.
+        parseNavQuery(intent)?.let { query ->
+            carContext.getCarService(ScreenManager::class.java).push(home)
+            return SearchCarScreen(carContext, deps, query)
+        }
+        // Connected in the middle of a drive: the drive screen, with the landing screen under it.
+        val nav = deps.navSession.state.value
+        if (nav.navigating && !nav.arrived) {
+            carContext.getCarService(ScreenManager::class.java).push(home)
+            return ActiveNavCarScreen(carContext, deps)
+        }
+        return home
+    }
+
+    private fun showDriveScreen() {
+        val screens = carContext.getCarService(ScreenManager::class.java)
+        // Before the first screen exists, onCreateScreen decides.
+        if (screens.stackSize == 0 || screens.top is ActiveNavCarScreen) return
+        screens.popToRoot()
+        screens.push(ActiveNavCarScreen(carContext, deps))
+    }
+
+    /** A navigation intent delivered while the app is already running (the host reuses the session). */
+    override fun onNewIntent(intent: Intent) {
+        val screens = carContext.getCarService(ScreenManager::class.java)
+        parseNavDest(intent)?.let { (dest, name) ->
+            screens.push(RoutePreviewCarScreen(carContext, deps, name, dest))
+            return
+        }
+        parseNavQuery(intent)?.let { screens.push(SearchCarScreen(carContext, deps, it)) }
+    }
+
+    /** Parse an `androidx.car.app.action.NAVIGATE` intent's `geo:` URI into a destination. Handles
+     *  `geo:lat,lng` and `geo:0,0?q=lat,lng(Label)`; a free-text `q=` (needs geocoding) returns null
+     *  (the app just opens normally). NB `geo:` URIs are OPAQUE (non-hierarchical), so `Uri
+     *  .getQueryParameter()` THROWS ("This isn't a hierarchical URI") — we parse the scheme-specific
+     *  part by hand instead. */
+    private fun parseNavDest(intent: Intent): Pair<LatLng, String>? {
+        if (intent.action != CarContext.ACTION_NAVIGATE) return null
+        val uri: Uri = intent.data ?: return null
+        val ssp = uri.schemeSpecificPart ?: return null
+        val coordRe = Regex("""(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*(?:\((.*)\))?""")
+        // Prefer a `q=` payload (geo:0,0?q=lat,lng(Label)); else the bare `geo:lat,lng` coords.
+        val qVal = ssp.substringAfter("q=", "").takeIf { it.isNotBlank() }
+        val target = qVal ?: ssp.substringBefore('?')
+        coordRe.find(target)?.let { m ->
+            val lat = m.groupValues[1].toDoubleOrNull(); val lng = m.groupValues[2].toDoubleOrNull()
+            // Reject the placeholder 0,0 only when it came from the bare coords (a real q= 0,0 is unheard of).
+            if (lat != null && lng != null && !(qVal == null && lat == 0.0 && lng == 0.0)) {
+                return LatLng(lat, lng) to m.groupValues[3].ifBlank { "Destination" }
+            }
+        }
+        return null
+    }
+
+    /** The free-text `q=` of a NAVIGATE intent (`geo:0,0?q=Starbucks`), which [parseNavDest]
+     *  leaves alone; null when there is none. The search runs near the car, like a typed one. */
+    private fun parseNavQuery(intent: Intent): String? {
+        if (intent.action != CarContext.ACTION_NAVIGATE) return null
+        if (parseNavDest(intent) != null) return null
+        return navQueryOf(intent.data?.schemeSpecificPart ?: return null)
+    }
+}
+
+/** The free-text `q=` of a `geo:` URI's scheme-specific part (`0,0?q=Pizza+place&z=10`), decoded
+ *  after the split (some senders percent-encode it); null when there is none. A coordinate `q=`
+ *  never reaches this: `parseNavDest` takes it first. */
+internal fun navQueryOf(schemeSpecificPart: String): String? {
+    val raw = schemeSpecificPart.substringAfter("q=", "").substringBefore('&').replace('+', ' ')
+    val query = runCatching { java.net.URLDecoder.decode(raw, "UTF-8") }.getOrDefault(raw)
+    return query.trim().takeIf { it.isNotEmpty() }
+}

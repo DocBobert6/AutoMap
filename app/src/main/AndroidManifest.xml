@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Location is AOSP-only (LocationManager); no Play Services needed. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- For the (future) foreground navigation service that keeps guidance
+         alive with the screen off. Declared now so the design is explicit. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <!-- Keeps voice/region/update downloads alive in the background (DownloadService, issue #212). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- The drive as an Android 16 live update: the status bar chip and the lock screen bar
+         (issue #595). Normal permission with an app op, so the user can turn the promotion off
+         in the app's notification settings and the drive falls back to an ordinary card. -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
+    <!-- Contacts-in-search (issue #243): OFF by default, asked at point of use (flipping the
+         Settings toggle on), matched entirely on-device. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+
+    <!-- Haptic turn cues during navigation (normal permission, auto-granted). -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Voice search, tier-1 ONLY: recording the mic for the on-device Whisper model. Requested
+         at point of use, and never needed for tier-2 (the RECOGNIZE_SPEECH provider records). -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Android Auto: navigation-category templates + drawing the map onto the
+         car screen's surface. Both are car-library permissions, not runtime ones. -->
+    <uses-permission android:name="androidx.car.app.NAVIGATION_TEMPLATES" />
+    <uses-permission android:name="androidx.car.app.ACCESS_SURFACE" />
+    <!-- AAOS vehicle info (the car's own speed via CarHardware). Declared but unused: nothing
+         reads CarHardware yet, so the speed shown is GPS-derived everywhere. -->
+    <uses-permission android:name="android.car.permission.CAR_INFO" />
+
+    <!-- So a phone with NO text-to-speech engine (common on degoogled ROMs) can be
+         offered a one-tap install of an open-source voice (eSpeak NG / RHVoice from
+         F-Droid). The user still confirms each install in the system dialog. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!-- GPS strongly preferred but don't hard-exclude tablets/AAOS units. -->
+    <uses-feature
+        android:name="android.hardware.location.gps"
+        android:required="false" />
+
+    <!-- Android 11+ package visibility: without this, TextToSpeech.getEngines()
+         returns nothing and the engine can't be bound, so spoken directions are
+         silent on a targetSdk-30+ build. Declares we need to see + use TTS engines
+         (the dialer/share/map intents resolve via startActivity, no query needed). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+        <!-- See whether any app can handle voice input (FUTO Voice Input, Sayboard, …) so the
+             search-bar mic can hand off to it. Package visibility on Android 11+ requires this. -->
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+    </queries>
+
+    <application
+        android:name=".VelaApp"
+        android:allowBackup="true"
+        android:enableOnBackInvokedCallback="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:largeHeap="true"
+        android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Vela">
+
+        <!-- Hands the downloaded voice-engine APK to the system installer via a
+             content:// URI (file:// is blocked for installs on modern Android). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/provider_paths" />
+        </provider>
+
+        <!-- The LAUNCHER entry lives on two aliases, not on MainActivity itself: Android can only
+             rename an app per COMPONENT, so the "call it just Maps" option (issue #226) swaps which
+             alias is enabled via PackageManager. MainActivity keeps every functional intent filter
+             (geo:, share, maps links) so deep links never depend on the cosmetic choice. NB the one-time
+             cost of moving the filter: pinned home-screen icons re-pin after this update. -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|uiMode"
+            android:supportsPictureInPicture="true"
+            android:theme="@style/Theme.Vela">
+            <!-- Android Automotive: a navigation app may stay on screen while the car moves. Without
+                 this the car greys Vela out of its app list the moment it is in gear (seen on the
+                 emulator); a production car also wants the app to come from a store it trusts. -->
+            <meta-data android:name="distractionOptimized" android:value="true" />
+
+            <!-- Share TO Vela: a Google Maps share link, a URL, or a plain address from any
+                 app's share sheet opens/imports/searches without the copy-paste dance. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+
+            <!-- geo: links from other apps → Vela can be your default maps handler. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="geo" />
+            </intent-filter>
+
+            <!-- google.navigation: is Google's own "navigate to" intent; apps that fire it open the
+                 route chooser on the destination (issue #632). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="google.navigation" />
+            </intent-filter>
+
+            <!-- Google-Maps web links → "open in maps" offers Vela too. One filter per path rule:
+                 Android matches every host in a filter against every path in it, so a shared
+                 filter held maps.app.goo.gl and maps.google.com to the /maps prefix (issue #614). -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:scheme="http" />
+                <data android:host="www.google.com" />
+                <data android:host="google.com" />
+                <data android:host="goo.gl" />
+                <data android:pathPrefix="/maps" />
+            </intent-filter>
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:scheme="http" />
+                <data android:host="maps.google.com" />
+                <data android:host="maps.app.goo.gl" />
+            </intent-filter>
+        </activity>
+
+        <activity-alias
+            android:name=".Launcher"
+            android:targetActivity=".MainActivity"
+            android:label="@string/app_name"
+            android:exported="true"
+            android:enabled="true">
+            <!-- Android Automotive: a navigation app may stay on screen while the car moves. Without
+                 this the car greys Vela out of its app list the moment it is in gear (seen on the
+                 emulator); a production car also wants the app to come from a store it trusts. -->
+            <meta-data android:name="distractionOptimized" android:value="true" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- "The maps app" to the system (issue #683): Android Automotive starts whatever
+                 answers MAIN + APP_MAPS in its map panel, and "open maps" requests resolve by it
+                 on a phone. A filter of its own WITH the DEFAULT category: the car launcher starts
+                 it by an implicit intent, which only matches a filter that declares DEFAULT (with
+                 the category on the launcher filter alone the start came back "not resolved"). -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.APP_MAPS" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".LauncherMaps"
+            android:targetActivity=".MainActivity"
+            android:label="@string/app_name_generic"
+            android:exported="true"
+            android:enabled="false">
+            <!-- Android Automotive: a navigation app may stay on screen while the car moves. Without
+                 this the car greys Vela out of its app list the moment it is in gear (seen on the
+                 emulator); a production car also wants the app to come from a store it trusts. -->
+            <meta-data android:name="distractionOptimized" android:value="true" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- "The maps app" to the system (issue #683): Android Automotive starts whatever
+                 answers MAIN + APP_MAPS in its map panel, and "open maps" requests resolve by it
+                 on a phone. A filter of its own WITH the DEFAULT category: the car launcher starts
+                 it by an implicit intent, which only matches a filter that declares DEFAULT (with
+                 the category on the launcher filter alone the start came back "not resolved"). -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.APP_MAPS" />
+            </intent-filter>
+        </activity-alias>
+
+        <service
+            android:name=".service.NavigationService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
+        <!-- Refcounted keeper that holds the process foreground-important while any long
+             download (voice model, region graph, place pack, update APK) is in flight, so
+             backgrounding or swiping the app away no longer kills it (issue #212). -->
+        <service
+            android:name=".download.DownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- Android Auto (projection). The desc XML marks Vela as a templated car
+             app; the service is what the car launcher starts. Works sideloaded once
+             AA developer settings enable "Unknown sources". -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+        <meta-data
+            android:name="androidx.car.app.minCarApiLevel"
+            android:value="1" />
+        <service
+            android:name=".car.VelaCarAppService"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="androidx.car.app.CarAppService" />
+                <category android:name="androidx.car.app.category.NAVIGATION" />
+                <!-- Render turn-by-turn on the instrument cluster too (fed by NavigationManager.updateTrip). -->
+                <category android:name="androidx.car.app.category.FEATURE_CLUSTER" />
+            </intent-filter>
+            <!-- Accept a navigation intent (assistant "navigate to X" / another app's geo: URI) and go
+                 straight to the route preview. Handled in VelaCarSession.onNewIntent. -->
+            <intent-filter>
+                <action android:name="androidx.car.app.action.NAVIGATE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="geo" />
+            </intent-filter>
+        </service>
+        <!-- Marks Vela as optimized for constrained satellite data (issue #235): carriers that
+             gate satellite cell service to approved apps (Rogers, AT&T, KDDI) allow its traffic.
+             Everything heavy is already optional/deferrable, so the label is honest. -->
+        <meta-data
+            android:name="android.telephony.PROPERTY_SATELLITE_DATA_OPTIMIZED"
+            android:value="${applicationId}" />
+
+    </application>
+
+</manifest>

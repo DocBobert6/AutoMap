@@ -1,0 +1,349 @@
+package app.vela.core.config
+
+import app.vela.core.data.google.DirectionsPb
+import app.vela.core.data.google.SearchPb
+
+/**
+ * Remotely-updatable scraper calibration — the brittle bits that drift when
+ * Google reshapes things: the `pb` templates and the endpoint URLs. Ships as
+ * [DEFAULT]; [CalibrationStore] fetches a newer version from the public repo at
+ * runtime so a fix lands without an app update ("push out the scraping").
+ *
+ * Phase 1 covers pb templates + endpoints; Phase 2 externalized the positional field-index paths
+ * the parsers read (the `paths` object — `[1][39]`, `[1][10]`, …), so a moved field is also just an
+ * edit + version bump. Genuinely new parsing *logic* still needs an app release (or a signed
+ * transforms.js, phase 3); this fixes path/pb/endpoint drift.
+ */
+data class Calibration(
+    val version: Int,
+    val searchEndpoint: String,
+    val searchPb: String,
+    val directionsEndpoint: String,
+    val directionsPb: String,
+    val reviewsEndpoint: String,
+    val reviewsPb: String,
+    val sessionWarmUrl: String,
+    // Full place gallery: the batchexecute `hspqX` (/MapsPhotoService.ListEntityPhotos)
+    // POST — keyless (no `at` token, just the warmed session cookies). `{FID}` is the
+    // place feature id, `{COUNT}` the page size. Returns ~40+ photos vs the search
+    // preview's ~10. (Calibrated live 2026-06-17.)
+    val photosEndpoint: String = DEFAULT_PHOTOS_ENDPOINT,
+    val photosProto: String = DEFAULT_PHOTOS_PROTO,
+    // The ONE header Google's Maps web app sends on its batchexecute RPCs that a bare request
+    // lacked (found 2026-09-23): without `x-maps-diversion-context-bin` the review feed answers
+    // empty and the photo RPC answers zero photos; with it both answer a plain request, no page,
+    // no BotGuard token. Blank = don't send. Remote so a changed value is a config push.
+    val rpcContext: String = DEFAULT_RPC_CONTEXT,
+    /** The review feed (`qv9Egd`) inner proto: {FID} the feature id, {TOKEN} the page token. */
+    val reviewFeedProto: String = DEFAULT_REVIEW_FEED_PROTO,
+    // Street View metadata: the keyless `GeoPhotoService.SingleImageSearch` the JS Maps API uses
+    // (no API key - authorized by referer, like the rest of the scrape). `{LAT}`/`{LNG}` are the
+    // query point; the response carries the nearest pano's id, tile pyramid, and true heading.
+    // The equirect TILES come from a fixed template (streetviewpixels-pa) that needs no calibration.
+    val streetViewMetaUrl: String = DEFAULT_STREETVIEW_META,
+    // Since 2026-10-05 Google answers that URL "decommissioned and turned off". The lookup its own
+    // web library makes now is a POST of this JSON body ({LAT}/{LNG} the point, {RADIUS} meters)
+    // to [STREETVIEW_SEARCH_URL]; the reply is the same pano node with no callback wrapper. It asks
+    // for Google's own imagery only ([2,1,2]): with user photo spheres allowed ([10,1,2]) the nearest
+    // answer beside a store was often one of those, which the tile loader cannot show.
+    val streetViewSearchBody: String = DEFAULT_STREETVIEW_SEARCH_BODY,
+    // Street View metadata BY PANO ID (walking to a neighbor / a historical capture): the
+    // consumer photometa/v1 RPC, keyless. `{PANOID}` is the target pano; returns the SAME node
+    // shape as the lat/lng search (nested one level deeper, )]}' guarded - the parser handles both).
+    val streetViewPanoUrl: String = DEFAULT_STREETVIEW_PANO,
+    // Phase 2: the positional field-index paths the search parser reads. A missing
+    // key falls back to [DEFAULT_PATHS], so a remote file can override just the one
+    // that drifted. Paths are relative to a result entry (whose place node is [1]),
+    // except `results`/`single` which are relative to the response root.
+    val paths: Map<String, List<Int>> = DEFAULT_PATHS,
+    // Phase 3: user-facing notices pushed through the same signed channel (alerts
+    // like "search is down, fix coming"), and an optional JavaScript bundle of
+    // parse-transform overrides ([transformsJs]) run in a sandbox when a response
+    // reshape needs new *logic*, not just a moved field — compiled Kotlin is the
+    // fallback. Both arrive only on a signature-verified bundle.
+    val notices: List<Notice> = emptyList(),
+    val transformsJs: String? = null,
+    // Default speaker number for the multi-speaker neural voice (libritts_r has 904 voices), used
+    // until the user picks one in Settings → Voice. Remotely pushable via the signed bundle, so a
+    // good-sounding speaker can be set as the default without an app release. A user's explicit pick
+    // (the `voice_speaker` pref) always wins over this.
+    val defaultVoiceSpeaker: Int = DEFAULT_VOICE_SPEAKER,
+    // Default spoken-directions speed multiplier (1.0 = normal, <1 = slower/clearer, >1 = faster),
+    // used until the user adjusts it in Settings → Voice. Also remote-pushable; a user's explicit
+    // `voice_speed` pref wins. 0.8 is the user's preferred nav cadence. Settings slider goes to 0.5.
+    val defaultVoiceSpeed: Float = DEFAULT_VOICE_SPEED,
+    // The fleet default neural voice id (a Piper voice from PiperCatalog) — what onboarding downloads
+    // and a fresh install activates. Remote-pushable via the signed bundle so a favorite voice can be
+    // made everyone's default without an app release; a user's own pick (voice_model) always wins.
+    val defaultVoiceId: String = DEFAULT_VOICE_ID,
+    // The fleet default map color set ("modern" = the Google-sampled palette, "classic" = the
+    // archived pre-sample look; the app ships both compiled). Remote-pushable so the default can
+    // flip without an app release; a user's explicit pick (map_palette pref) always wins.
+    val defaultMapPalette: String = "modern",
+    // The fleet default for Settings > Data source & privacy > "Places come from": "open" (Vela
+    // data alone, nothing about browsing reaches Google), "both" (the open layer plus one Google
+    // request per settled view for what it lacks) or "google". Remote-pushable so the default can
+    // flip without an app release (the user wanted the call kept on the signed channel,
+    // 2026-09-16); a user's explicit pick (map_places_source pref) always wins.
+    val defaultPlacesSource: String = "open",
+    // Fleet switch for the route picker (Settings > Navigation). The Google-style picker is the
+    // default; flipping this true in the signed bundle puts everyone who never touched the toggle
+    // back on the classic panel, without an app release (their own choice always wins).
+    val classicRoutePicker: Boolean = false,
+    // Fleet-tunable NUMBERS: a flat name -> value map so a new dial is a config edit, never a
+    // schema change. Read through [tune]; a missing key means the compiled default passed at the
+    // call site, so an old bundle can never break a new app (and vice versa). Current dials:
+    // browseZoom (the ~1000 ft standard fly-to), browseZoomWide (plain recenter, no sheet),
+    // browseZoomFocus (recenter with a place sheet up), overlayCoverFrac (the MS-building-overlay
+    // hide threshold), ambientFanoutPermits (parallel scrape parses; restart-applied),
+    // ambientCapMin / ambientCapMax (the zoom-tiered on-screen POI cap).
+    val tuning: Map<String, Double> = emptyMap(),
+    // Remote overrides for the LANGUAGE-KEYWORD tables - the one part of the localized scrape that
+    // reads localized TEXT to make a decision, so a bad or missing word in some language is exactly
+    // the kind of thing that should be a config edit, not an app release (the transit gate had no
+    // Hebrew at all until issue #71). Null = the compiled tables; a present map/list REPLACES the
+    // compiled one wholesale (per language for the status maps).
+    val statusClosedWords: Map<String, List<String>>? = null,
+    val statusOpenWords: Map<String, List<String>>? = null,
+    // Alternation terms for the transit-category gate (each becomes part of one case-insensitive
+    // regex; plain words or small regex fragments both work).
+    val transitCategoryWords: List<String>? = null,
+    // Positional anchors of the Google-page departure-board parse (the transit fallback where
+    // Transitous has no coverage) - the ONE scrape that had no remote-repair handle. Keys the
+    // parser reads: "node" (the transit node's index in the place array, compiled 62), "groups",
+    // "entries", "name". Null/missing keys = compiled defaults; the parser's shape search still
+    // runs after the anchor, so this only needs pushing when BOTH drift.
+    val stopBoardIndices: Map<String, Int>? = null,
+    // Categories the transit gate must REJECT even when a word above matches - "Gas station"
+    // contains "station", and boards now fetch by proximity, so a fuel stop next to a bus stop
+    // showed that stop's departures (device report 2026-07-13). Multilingual like the gate itself.
+    val transitExcludeWords: List<String>? = null,
+    // Field-index paths of the DIRECTIONS response (2026-09-13): the route list, the per-route
+    // summary and its distance / typical / in-traffic / typical-range / endpoint fields, and
+    // the congestion spans. Remote keys merge over [DEFAULT_DIRECTIONS_PATHS] one at a time, like
+    // [paths] does for search, so a moved traffic field is a config edit, not an app release.
+    val directionsPaths: Map<String, List<Int>> = DEFAULT_DIRECTIONS_PATHS,
+    // Google's search-as-you-type answer (2026-10-03; compiled-only from 2026-09-22): the endpoint
+    // (everything before `&pb=`), the pb template ({SPAN} {LNG} {LAT} {W} {H}) and the positions
+    // SuggestParser reads, relative to the response root for "rows" and to a row's content block
+    // for the rest. Remote paths merge over [DEFAULT_SUGGEST_PATHS] one key at a time.
+    val suggestEndpoint: String = DEFAULT_SUGGEST_ENDPOINT,
+    val suggestPb: String = DEFAULT_SUGGEST_PB,
+    val suggestPaths: Map<String, List<Int>> = DEFAULT_SUGGEST_PATHS,
+    // The review scrape's two levers that Google actually moves (2026-09-13): the WORD
+    // alternations that find the reviews tab ("review") and the more-reviews button ("more"),
+    // and the CSS SELECTORS of the review card and its parts ("card", "id", "moreToggle",
+    // "author", "text", "date"). Null / missing keys = the compiled values in ReviewWords and
+    // WebReviewsFetcher. Selectors are class names Google rotates; a rotation used to be an
+    // app release.
+    val reviewWords: Map<String, String>? = null,
+    val reviewSelectors: Map<String, String>? = null,
+    // The project's own addresses (repository, releases, site, this file), by the names
+    // `VelaLinks` knows, so a renamed account or a moved repository reaches installed apps
+    // through the signed channel. Https only; an unknown name or another scheme rejects the bundle.
+    val links: Map<String, String> = emptyMap(),
+    // The browser identity the keyless scrape presents (2026-09-14). Chrome ships a stable release
+    // every ~4 weeks, so a compiled constant is stale by construction - the shipped UA was Chrome
+    // 124 (April 2024) well into 2026. Stale is a CORRECTNESS risk before a fingerprinting one:
+    // Google serves different response shapes to different browser generations, so an old UA can
+    // pin the scrape to a legacy code path that gets retired with no warning, arriving as
+    // indistinguishable-from-ordinary calibration drift. [secChUa]'s major version MUST match
+    // [userAgent]'s - they are pushed together for that reason. Both are sanitized on parse
+    // (BrowserHeaders.sanitize): OkHttp throws on a control character inside a runCatching that
+    // swallows it, so one stray newline in a pushed bundle would silently kill every scrape.
+    val userAgent: String = DEFAULT_USER_AGENT,
+    val secChUa: String = DEFAULT_SEC_CH_UA,
+    /** Full Chrome build for the client hints; see VelaConfig.CHROME_FULL_VERSION. */
+    val chromeFullVersion: String = app.vela.core.VelaConfig.CHROME_FULL_VERSION,
+) {
+    /** A fleet tuning dial: the remote value when the bundle carries [key], else [def]. */
+    fun tune(key: String, def: Double): Double = tuning[key] ?: def
+
+    companion object {
+        // libritts_r speaker 14 — picked by ear as the clearest default (2026-07-02).
+        // Browser identity for the scrape. Mirrors VelaConfig's compiled fallback; the live value
+        // arrives in the signed bundle. Bump BOTH together - a hint advertising a different version
+        // than the UA string is worse than sending no hint.
+        const val DEFAULT_USER_AGENT = app.vela.core.VelaConfig.USER_AGENT
+        const val DEFAULT_SEC_CH_UA = app.vela.core.VelaConfig.SEC_CH_UA
+
+        const val DEFAULT_VOICE_SPEAKER = 14
+        // 0.8× — the user's preferred nav cadence. (Briefly 0.72 on 2026-07-06 for consonant clarity,
+        // reverted 2026-07-07 — the fragment-punctuation + 152nd fixes handle articulation directly.)
+        const val DEFAULT_VOICE_SPEED = 0.8f
+        // HFC Female — the user's pick for the fleet default voice (2026-07-03). Kept in sync with
+        // VelaPiper.DEFAULT_VOICE_ID (the compiled fallback used where calibration isn't handy).
+        const val DEFAULT_VOICE_ID = app.vela.core.voice.VelaPiper.DEFAULT_VOICE_ID
+        const val DEFAULT_PHOTOS_ENDPOINT =
+            "https://www.google.com/maps/_/MapsWizUi/data/batchexecute?rpcids=hspqX&source-path=/maps&hl=en&_reqid=1&rt=c"
+
+        // Street View nearest-pano search. The `pb` is the JS Maps API's own form (verified keyless
+        // 2026-07-15): !2m4!1m2!3d{LAT}!4d{LNG} is the query point, !2d50 the search radius (m).
+        const val STREETVIEW_SEARCH_URL =
+            "https://maps.googleapis.com/\$rpc/google.internal.maps.mapsjs.v1.MapsJsInternalService/SingleImageSearch"
+        const val DEFAULT_STREETVIEW_SEARCH_BODY =
+            "[[\"apiv3\",null,null,null,\"US\",null,null,null,null,null,[[0]]],[[null,null,{LAT},{LNG}],{RADIUS}]," +
+                "[null,[\"en\",\"US\"],null,null,null,null,null,null,[2],null,[[[2,1,2]]]],[[1,2,3,4,8,6]]]"
+        const val DEFAULT_STREETVIEW_META =
+            "https://maps.googleapis.com/maps/api/js/GeoPhotoService.SingleImageSearch?pb=" +
+                "!1m5!1sapiv3!5sUS!11m2!1m1!1b0!2m4!1m2!3d{LAT}!4d{LNG}!2d50!3m10!2m2!1sen!2sUS" +
+                "!9m1!1e2!11m4!1m3!1e2!2b1!3e2!4m10!1e1!1e2!1e3!1e4!1e8!1e6!5m1!1e2!6m1!1e2&callback=cb"
+
+        // By-panoid metadata (photometa/v1). `!3m3!1m2!1e2!2s{PANOID}` selects the pano.
+        const val DEFAULT_STREETVIEW_PANO =
+            "https://www.google.com/maps/photometa/v1?authuser=0&hl=en&gl=us&pb=" +
+                "!1m4!1smaps_sv.tactile!11m2!2m1!1b1!2m2!1sen!2sus!3m3!1m2!1e2!2s{PANOID}" +
+                "!4m57!1e1!1e2!1e3!1e4!1e5!1e6!1e8!1e12!2m1!1e1!4m1!1i48!5m1!1e1!5m1!1e2!6m1!1e1!6m1!1e2" +
+                "!9m36!1m3!1e2!2b1!3e2!1m3!1e2!2b0!3e3!1m3!1e3!2b1!3e2!1m3!1e3!2b0!3e3!1m3!1e8!2b0!3e3" +
+                "!1m3!1e1!2b0!3e3!1m3!1e4!2b0!3e3!1m3!1e10!2b1!3e2!1m3!1e10!2b0!3e3"
+
+        // hspqX request proto: feature id at [2][0], page size at [4][2][1].
+        const val DEFAULT_RPC_CONTEXT = "CAE="
+        const val DEFAULT_REVIEW_FEED_PROTO = "[[[\"{FID}\"],null,null,null,null,[null,null,null,[[1],[3]]]],[10,\"{TOKEN}\"],null,null," +
+            "[null,null,null,null,null,null,81],null,null,[null,1,1,null,1,null,1,null,null,null,null,[1,1,null,[[1]]]],null,null," +
+            "[3,1,null,null,null,[2]],null,[1]]"
+        const val DEFAULT_PHOTOS_PROTO =
+            "[2,null,[\"{FID}\",null,null,null,null,null,null,null,0],null," +
+                "[null,[1200,1000],[null,{COUNT},null,null,1],null,null,null," +
+                "[[[1,0,3],[2,1,2],[2,0,3],[8,0,3],[10,0,3],[10,1,2],[10,0,4],[9,1,2]],1],null,0]," +
+                "null,null,null,null,null,null,null,null,null,null,[null,1,null,1]]"
+
+        /** Directions response anchors (see DirectionsParser's header for the shape). Relative to
+         *  the response root for routes/geometries, to the route node for summary/spans, and to
+         *  the summary node for the rest. */
+        val DEFAULT_DIRECTIONS_PATHS: Map<String, List<Int>> = mapOf(
+            "routes" to listOf(0, 1),
+            "geometries" to listOf(0, 7),
+            "summary" to listOf(0),
+            "legs" to listOf(1),
+            "legSummary" to listOf(0),
+            "distance" to listOf(2, 0),
+            "typical" to listOf(3, 0),
+            "traffic" to listOf(10, 0, 0),
+            "typicalLow" to listOf(10, 4, 0),
+            "typicalHigh" to listOf(10, 4, 1),
+            "start" to listOf(7, 3, 2),
+            "end" to listOf(7, 3, 3),
+            "summaryText" to listOf(1),
+            "spans" to listOf(3, 5, 0),
+        )
+
+        const val DEFAULT_SUGGEST_ENDPOINT = "https://www.google.com/s?tbm=map&gs_ri=maps&suggest=p&authuser=0&hl=en&gl=us"
+        const val DEFAULT_SUGGEST_PB = "!2i5!4m12!1m3!1d{SPAN}!2d{LNG}!3d{LAT}!2m3!1f0!2f0!3f0!3m2!1i{W}!2i{H}!4f13.1" +
+            "!7i20!10b1!12m6!1m2!18b1!30b1!2m2!1i203!2i100!19m4!1m3!1i1!2i1!3i1!20m1!1e1"
+        /** Suggest response anchors (see SuggestParser's header). "lat2"/"lng2" are the fallback
+         *  position inside the place node when the row has no top-level one. */
+        val DEFAULT_SUGGEST_PATHS: Map<String, List<Int>> = mapOf(
+            "rows" to listOf(0, 1),
+            "title" to listOf(0, 0),
+            "primary" to listOf(1, 0),
+            "secondary" to listOf(2, 0),
+            "lat" to listOf(11, 2),
+            "lng" to listOf(11, 3),
+            "lat2" to listOf(13, 0, 3, 2),
+            "lng2" to listOf(13, 0, 3, 3),
+            "featureId" to listOf(13, 0, 0),
+        )
+
+        val DEFAULT_PATHS: Map<String, List<Int>> = mapOf(
+            "results" to listOf(64),
+            "single" to listOf(0, 1, 0, 14),
+            // "At this place": the business(es) Google lists at a searched ADDRESS
+            // (a sub-field of the single geocoded node). Lets an address snap to the
+            // business there. Each entry's place node is at [i][0].
+            "atThisPlace" to listOf(0, 1, 0, 14, 68),
+            // "People also search for": a root-level list of similar places shown when a
+            // search focuses on one result. Each entry is [featureId, name, [[_,_,lat,lng],
+            // …, rating@6]] — see SearchParser.parseSimilarPlaces.
+            "similar" to listOf(2, 11, 0),
+            "name" to listOf(1, 11),
+            "lat" to listOf(1, 9, 2),
+            "lng" to listOf(1, 9, 3),
+            "address" to listOf(1, 39),
+            "addressComponents" to listOf(1, 2),
+            "category" to listOf(1, 13, 0),
+            "rating" to listOf(1, 4, 7),
+            "reviewCount" to listOf(1, 4, 8),
+            "priceText" to listOf(1, 4, 2),
+            // Gas stations: the live fuel price string ("$5.34/Regular") — pinned from a live
+            // "gas stations" capture 2026-07-10 ([88] also carries the station type marker +
+            // chain name; [0] is the price). Null on every non-fuel place.
+            "fuelPrice" to listOf(1, 88, 0),
+            // The same block's language-independent type ("SearchResult.TYPE_GAS_STATION") and the
+            // place's country ("GB"), from captures of a London and a French search 2026-10-08:
+            // [88] = [label, type, [type, country, ...], name, ...]. In the UK [88][0] is a fuel
+            // label ("Diesel fuel"), which fuelPrice's digit gate keeps out.
+            "placeType" to listOf(1, 88, 1),
+            "countryCode" to listOf(1, 88, 2, 1),
+            "website" to listOf(1, 7, 0),
+            // Action link (Google's "Book online" / "Reserve a table" / "Order online"
+            // button): the primary action node at [1][75][0][0][5] — label [0], URL [1][2][0].
+            // The label adapts per business type (booking salon, reservations restaurant, …).
+            "actionLabel" to listOf(1, 75, 0, 0, 5, 0),
+            "actionUrl" to listOf(1, 75, 0, 0, 5, 1, 2, 0),
+            "phone" to listOf(1, 178, 0, 0),
+            "featureId" to listOf(1, 10),
+            "placeId" to listOf(1, 78),
+            // Preview photos. Google MOVED this block [105]→[72] (drift caught 2026-06-27:
+            // every place lost its hero strip); the photo array is now [1][72][0], each
+            // photo's FIFE URL still at [6][0]. Verified live (Taco Bell / Starbucks / a salon).
+            "photos" to listOf(1, 72, 0),
+            "featuredReview" to listOf(1, 142, 1, 0, 1, 0, 0),
+            "about" to listOf(1, 100, 1),
+            // The business's posts: [1][122][1], each [1][0][0][0] text, [2][0] posted epoch,
+            // [4][1]/[4][2] link and label, [5][0][0] photo (captured 2026-09-27).
+            "updates" to listOf(1, 122, 1),
+            // Editorial one-liner ([32][1][1] = the fuller "Classic burger chain
+            // serving…"; [32][0][1] is the shorter category subtitle) and the
+            // owner-written "From the owner" blurb ([154][0][0]).
+            "editorialSummary" to listOf(1, 32, 1, 1),
+            "ownerDescription" to listOf(1, 154, 0, 0),
+            "openStatus" to listOf(1, 203, 1, 8, 0),
+            "statusRich" to listOf(1, 203, 1, 4, 0),
+            // RETIRED (2026-07-04) — kept only so an older installed app reading a NEWER remote
+            // bundle still finds the keys it expects. These ints were pinned from an hl=fr capture
+            // as an open/closed code (6=open/5=closed/13=soon), but a live EN capture DISPROVED
+            // that: closed pharmacies carried 6 and an Open-24-hours business carried 13/4 —
+            // they're span/style markers, and the fr agreement was a coincidence. The parser no
+            // longer reads them; open/closed is parsed from the localized status TEXT
+            // (SearchParser.parseOpenNow's per-language keyword table). Do not resurrect.
+            "statusCodeRich" to listOf(1, 203, 1, 4, 1, 0, 1),
+            "statusCodeSimple" to listOf(1, 203, 1, 8, 1, 0, 1),
+            "status118" to listOf(1, 118, 0, 3, 1, 4, 0),
+            "hours203" to listOf(1, 203, 0),
+            "hours118" to listOf(1, 118, 0, 3, 0),
+            // The whole [118] list: named in-store departments ("Safeway Pharmacy", "Delivery"),
+            // one entry each — name@[0], weekly hours@[3][0] (readHours shape), status@[3][1][4][0].
+            // status118/hours118 above read its FIRST entry; kept for older remote bundles.
+            "departments" to listOf(1, 118),
+            // Permanently-closed flag: place node `[23]` == 1 (null on an open place).
+            // It's how Google marks dead POIs that carry no open/closed status text,
+            // and — unlike popular times — it survives the keyless degraded response.
+            "closedFlag" to listOf(1, 23),
+            // Popular-times histogram: [84][0] = 7 days, each [d][0]=day-of-week,
+            // [d][1]=hourly [hour, occupancy%, …]. Relative to the place node [1].
+            "popularTimes" to listOf(1, 84),
+            // "People also search for" under a FOCUSED result (root-relative, 2026-10-03): entries are
+            // [_, placeNode] like the results list, so they parse with the same paths. A chain's other
+            // branches sit here when a name search focuses one branch (discussion #656).
+            "alsoSearched" to listOf(0, 1, 0, 14, 99, 0, 0, 1),
+        )
+
+        val DEFAULT = Calibration(
+            version = 1,
+            searchEndpoint = "https://www.google.com/search?tbm=map&authuser=0&hl=en&gl=us",
+            searchPb = SearchPb.DEFAULT_TEMPLATE,
+            directionsEndpoint = "https://www.google.com/maps/preview/directions?authuser=0&hl=en&gl=us",
+            directionsPb = DirectionsPb.DEFAULT_TEMPLATE,
+            reviewsEndpoint = "https://www.google.com/maps/preview/review/listentitiesreviews?authuser=0&hl=en&gl=us",
+            reviewsPb = "!1m2!1y{HIGH}!2y{LOW}!2m2!2i0!3i20!3e1!5m2!1svela!7e81",
+            sessionWarmUrl = "https://www.google.com/maps?hl=en&gl=us",
+            photosEndpoint = DEFAULT_PHOTOS_ENDPOINT,
+            photosProto = DEFAULT_PHOTOS_PROTO,
+            streetViewMetaUrl = DEFAULT_STREETVIEW_META,
+            streetViewPanoUrl = DEFAULT_STREETVIEW_PANO,
+            paths = DEFAULT_PATHS,
+            directionsPaths = DEFAULT_DIRECTIONS_PATHS,
+        )
+    }
+}

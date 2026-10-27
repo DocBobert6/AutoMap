@@ -1,0 +1,188 @@
+#!/usr/bin/env bash
+# dpad_test_suite/lib.sh — shared helpers for reproducible on-device D-pad tests.
+#
+# Every test drives the app with ONLY a 5-key D-pad (via `adb shell input keyevent`) and asserts
+# on the focused element (read from `uiautomator dump`). This is the scripted, repeatable version
+# of the manual adb checks used while building the D-pad support (docs/dpad.md).
+#
+# Requires: a connected device/emulator (adb), python3 on the host, and the app installed.
+# Override the device with `ADB="adb -s <serial>"`.
+set -uo pipefail
+
+PKG="${VELA_PKG:-app.vela}"
+ADB="${ADB:-adb}"
+
+# ---- D-pad keycodes -------------------------------------------------------------------------
+K_UP=19; K_DOWN=20; K_LEFT=21; K_RIGHT=22; K_OK=23; K_BACK=4; K_HOME=3
+
+# key <code> [settle_seconds]  — press one key and wait for the UI to settle.
+key() { $ADB shell input keyevent "$1" >/dev/null 2>&1; sleep "${2:-0.4}"; }
+# keys <code>...  — press several keys in sequence (default settle each).
+keys() { for c in "$@"; do key "$c"; done; }
+
+# launch_fresh [settle_seconds]  — force-stop + cold launch.
+launch_fresh() {
+  $ADB shell am force-stop "$PKG" >/dev/null 2>&1
+  sleep 1
+  $ADB shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
+  sleep "${1:-3.5}"
+}
+
+# ---- focus inspection -----------------------------------------------------------------------
+# focused  — prints "bounds|text|desc" of the currently-focused node, or empty if none.
+focused() {
+  $ADB shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  $ADB shell cat /sdcard/ui.xml 2>/dev/null | python3 -c '
+import sys, re
+d = sys.stdin.read()
+for m in re.finditer(r"<node [^>]*focused=\"true\"[^>]*>", d):
+    s = m.group(0)
+    b = re.search(r"bounds=\"([^\"]*)\"", s)
+    t = re.search(r"text=\"([^\"]*)\"", s)
+    c = re.search(r"content-desc=\"([^\"]*)\"", s)
+    print((b.group(1) if b else "") + "|" + (t.group(1) if t else "") + "|" + (c.group(1) if c else ""))
+    break
+'
+}
+focused_bounds() { focused | cut -d"|" -f1; }
+focused_text()   { focused | cut -d"|" -f2; }
+focused_desc()   { focused | cut -d"|" -f3; }
+# focus_ytop  — the top Y of the focused node ([x1,y1][x2,y2] -> y1), or -1 if nothing focused.
+focus_ytop() {
+  local b; b="$(focused_bounds)"
+  [ -z "$b" ] && { echo -1; return; }
+  echo "$b" | sed -E 's/^\[[0-9]+,([0-9]+)\].*/\1/'
+}
+
+# find_text <exact>  — bounds of the first node whose text== <exact> (empty if not found).
+find_text() {
+  $ADB shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  $ADB shell cat /sdcard/ui.xml 2>/dev/null | python3 -c '
+import sys, re
+d = sys.stdin.read(); want = sys.argv[1]
+for m in re.finditer(r"<node [^>]*>", d):
+    s = m.group(0); t = re.search(r"text=\"([^\"]*)\"", s); b = re.search(r"bounds=\"([^\"]*)\"", s)
+    if t and t.group(1) == want:
+        print(b.group(1) if b else ""); break
+' "$1"
+}
+# on_screen <exact>  — 0 (true) if a node with that exact text exists.
+on_screen() { [ -n "$(find_text "$1")" ]; }
+# find_text_contains <substr>  — bounds of the first node whose text CONTAINS <substr>.
+find_text_contains() {
+  $ADB shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  $ADB shell cat /sdcard/ui.xml 2>/dev/null | python3 -c '
+import sys, re
+d = sys.stdin.read(); want = sys.argv[1]
+for m in re.finditer(r"<node [^>]*>", d):
+    s = m.group(0); t = re.search(r"text=\"([^\"]*)\"", s); b = re.search(r"bounds=\"([^\"]*)\"", s)
+    if t and want in t.group(1):
+        print(b.group(1) if b else ""); break
+' "$1"
+}
+# on_screen_contains <substr>  — 0 (true) if any node's text contains <substr> (partial match).
+on_screen_contains() { [ -n "$(find_text_contains "$1")" ]; }
+# ycenter <bounds>  — the vertical center of an [x1,y1][x2,y2] bounds string.
+ycenter() { echo "$1" | sed -E 's/^\[[0-9]+,([0-9]+)\]\[[0-9]+,([0-9]+)\].*/\1 \2/' | awk '{print int(($1+$2)/2)}'; }
+# focus_and_ok <exact>  — press DOWN until the focused row vertically contains the node with that
+# text, then OK it. Robust to the exact number of rows (the focused clickable Row often has no text
+# of its own, so we match by position). Returns non-zero if it can't reach the row in 9 presses.
+focus_and_ok() {
+  local want="$1" tb cy
+  tb="$(find_text "$want")"; [ -z "$tb" ] && return 1
+  cy="$(ycenter "$tb")"
+  for _ in $(seq 1 9); do
+    local fb fy1 fy2
+    fb="$(focused_bounds)"
+    fy1="$(echo "$fb" | sed -E 's/^\[[0-9]+,([0-9]+)\].*/\1/')"
+    fy2="$(echo "$fb" | sed -E 's/.*\]\[[0-9]+,([0-9]+)\]$/\1/')"
+    if [ -n "$fy1" ] && [ "$cy" -ge "$fy1" ] && [ "$cy" -le "$fy2" ] 2>/dev/null; then key "$K_OK" 2; return 0; fi
+    key "$K_DOWN"
+  done
+  return 1
+}
+
+# ---- assertions -----------------------------------------------------------------------------
+PASS=0; FAIL=0
+pass() { echo "  PASS: $1"; PASS=$((PASS + 1)); }
+fail() { echo "  FAIL: $1"; FAIL=$((FAIL + 1)); }
+
+assert_focus_text() {
+  local got; got="$(focused_text)"
+  if [ "$got" = "$1" ]; then pass "focused element is '$1'"; else fail "expected focus '$1', got '${got:-<none>}'"; fi
+}
+assert_focus_desc() {
+  local got; got="$(focused_desc)"
+  if [ "$got" = "$1" ]; then pass "focused element desc is '$1'"; else fail "expected focus desc '$1', got '${got:-<none>}'"; fi
+}
+# assert_focus_ytop_between <lo> <hi>  — focused node's top Y is within [lo,hi] (for icon/handle
+# targets that have no text, e.g. the search bar or the sheet handle).
+assert_focus_ytop_between() {
+  local y; y="$(focus_ytop)"
+  if [ "$y" -ge "$1" ] && [ "$y" -le "$2" ] 2>/dev/null; then pass "focus Y=$y in [$1,$2] ($3)"; else fail "expected focus Y in [$1,$2] ($3), got $y"; fi
+}
+# screen_h: the display height in px.
+screen_h() { $ADB shell wm size 2>/dev/null | sed -nE 's/.*: *[0-9]+x([0-9]+).*/\1/p' | tail -1; }
+# assert_focus_ytop_pct <lo> <hi> <label>: the focused node's top Y lies between two percentages
+# of the screen height, so one test fits a small keypad phone and a tall touch phone alike.
+assert_focus_ytop_pct() {
+  local y h lo hi; y="$(focus_ytop)"; h="$(screen_h)"; lo=$((h * $1 / 100)); hi=$((h * $2 / 100))
+  if [ "$y" -ge "$lo" ] && [ "$y" -le "$hi" ] 2>/dev/null; then pass "focus Y=$y is $1-$2% down the screen ($3)"; else fail "expected focus $1-$2% down a $h px screen ($3), got Y=$y"; fi
+}
+# find_desc <exact>: bounds of the first node whose content-desc == <exact> (empty if not found).
+find_desc() {
+  $ADB shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  $ADB shell cat /sdcard/ui.xml 2>/dev/null | python3 -c '
+import sys, re
+d = sys.stdin.read(); want = sys.argv[1]
+for m in re.finditer(r"<node [^>]*>", d):
+    s = m.group(0); c = re.search(r"content-desc=\"([^\"]*)\"", s); b = re.search(r"bounds=\"([^\"]*)\"", s)
+    if c and c.group(1) == want:
+        print(b.group(1) if b else ""); break
+' "$1"
+}
+# focus_holds <bounds>: 0 (true) if the focused node contains the center of <bounds>.
+focus_holds() {
+  python3 -c '
+import re, sys
+f = [int(x) for x in re.findall(r"\d+", sys.argv[1])]; t = [int(x) for x in re.findall(r"\d+", sys.argv[2])]
+if len(f) != 4 or len(t) != 4: sys.exit(1)
+cx, cy = (t[0] + t[2]) // 2, (t[1] + t[3]) // 2
+sys.exit(0 if f[0] <= cx <= f[2] and f[1] <= cy <= f[3] else 1)
+' "$(focused_bounds)" "$1"
+}
+# focus_to_desc <keycode> <content-desc> [max]: press the key until focus is on the control with
+# that content description. Layouts differ by screen: a wide bar has more buttons before the gear.
+focus_to_desc() {
+  local want; want="$(find_desc "$2")"; [ -z "$want" ] && return 1
+  for _ in $(seq 1 "${3:-6}"); do
+    focus_holds "$want" && return 0
+    key "$1"
+  done
+  focus_holds "$want"
+}
+assert_nothing_focused() {
+  if [ -z "$(focused)" ]; then pass "nothing focused (as expected: $1)"; else fail "expected nothing focused ($1), got '$(focused)'"; fi
+}
+assert_something_focused() {
+  if [ -n "$(focused)" ]; then pass "something is focused ($1)"; else fail "expected some focus ($1), got nothing"; fi
+}
+assert_on_screen() { if on_screen "$1"; then pass "'$1' is on screen"; else fail "'$1' not on screen"; fi; }
+assert_not_on_screen() { if on_screen "$1"; then fail "'$1' still on screen"; else pass "'$1' gone"; fi; }
+assert_on_screen_contains() { if on_screen_contains "$1"; then pass "text containing '$1' is on screen"; else fail "no text contains '$1'"; fi; }
+assert_not_on_screen_contains() { if on_screen_contains "$1"; then fail "text '$1' still on screen"; else pass "'$1' gone"; fi; }
+
+# IME state (for text-field-escape tests): 0 (true) if soft keyboard shown.
+ime_shown() { $ADB shell dumpsys input_method 2>/dev/null | grep -q "mInputShown=true"; }
+assert_ime_hidden() { if ime_shown; then fail "soft keyboard still shown"; else pass "soft keyboard hidden"; fi; }
+
+# ---- misc -----------------------------------------------------------------------------------
+current_pkg() { $ADB shell dumpsys window 2>/dev/null | sed -nE 's/.*mCurrentFocus=Window\{[^ ]+ [^ ]+ ([^}\/]+).*/\1/p' | head -1; }
+in_app() { [ "$(current_pkg)" = "$PKG" ]; }
+shot() { $ADB exec-out screencap -p > "$1" 2>/dev/null; }
+
+report() {
+  echo "-------------------------------------------"
+  echo "  $((PASS + FAIL)) checks: $PASS passed, $FAIL failed"
+  [ "$FAIL" -eq 0 ]
+}

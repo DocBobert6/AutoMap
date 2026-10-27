@@ -1,0 +1,163 @@
+package app.vela.core.data
+
+import android.content.Context
+import app.vela.core.model.LabelPlace
+import app.vela.core.model.LatLng
+import app.vela.core.model.Place
+import app.vela.core.model.SavedPlace
+import app.vela.core.model.distanceTo
+import app.vela.core.util.PlaceNames
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/** How far from a kept map label its listing may be: the saved-place rule's own reach. */
+const val KEPT_LABEL_MAX_M = 250.0
+
+/**
+ * The listing among [listings] of a place kept from the map label [name] at [at], or null. What
+ * is taken is written back to the saved place and the lists, so the test is strict: the names
+ * agree, it is within [KEPT_LABEL_MAX_M], it is open and has a feature id, and its house number
+ * is not another one than [address]'s. A listing named exactly as kept leads, then the nearest.
+ * The caller passes listings only (no bare addresses, no transit stops or junctions).
+ */
+fun keptLabelListing(name: String, at: LatLng, address: String?, listings: List<Place>): Place? {
+    val house = PlaceNames.houseNumber(address)
+    val near = listings.filter { p ->
+        !p.featureId.isNullOrBlank() && !p.permanentlyClosed && p.location.distanceTo(at) <= KEPT_LABEL_MAX_M &&
+            PlaceNames.agree(name, p.name, PlaceNames.cityWords(p.address)) &&
+            (house == null || PlaceNames.houseNumber(p.address).let { it == null || it == house })
+    }
+    return near.filter { PlaceNames.same(name, it.name) }.ifEmpty { near }.minByOrNull { it.location.distanceTo(at) }
+}
+
+/** [all] with [listing] written onto the star kept from the basemap label [heldId] at [at] that
+ *  still awaits one ([SavedPlace.awaitsListing]). Returns [all] itself when there is none. */
+fun linkSaved(all: List<SavedPlace>, heldId: String, at: LatLng, listing: Place): List<SavedPlace> {
+    fun held(p: SavedPlace) = p.awaitsListing && LabelPlace.same(p.id, p.location, heldId, at)
+    return if (all.none { held(it) }) all else all.map { if (held(it)) it.linked(listing) else it }
+}
+
+/** Persisted favorite places (most-recently-saved first). */
+@Singleton
+class SavedPlaceStore @Inject constructor(
+    @ApplicationContext context: Context,
+) {
+    private val prefs = context.getSharedPreferences("vela_saved", Context.MODE_PRIVATE)
+
+    // ignoreUnknownKeys: a newer build's extra field must not fail the decode here,
+    // or the getOrDefault(empty) wipes the data on the next write (see PlaceListStore).
+    private val json = Json { ignoreUnknownKeys = true }
+
+    fun saved(): List<SavedPlace> =
+        runCatching { json.decodeFromString<List<SavedPlace>>(prefs.getString(KEY, "[]") ?: "[]") }
+            .getOrDefault(emptyList())
+
+    /** Toggle [place]; returns true if it is now saved. */
+    fun toggle(place: SavedPlace): Boolean {
+        val current = saved()
+        val exists = current.any { it.id == place.id }
+        val updated = if (exists) current.filterNot { it.id == place.id } else listOf(place) + current
+        prefs.edit().putString(KEY, json.encodeToString(updated)).apply()
+        return !exists
+    }
+
+    fun isSaved(id: String): Boolean = saved().any { it.id == id }
+
+    /** Removes several saved places in one write. */
+    fun removeAll(ids: Set<String>): List<SavedPlace> {
+        val updated = saved().filterNot { it.id in ids }
+        prefs.edit().putString(KEY, json.encodeToString(updated)).apply()
+        return updated
+    }
+
+    /** Give a saved place your own name (issue #434): a parking lot saved as coordinates or a
+     *  road name gets called what you call it. The place keeps its id and location. */
+    fun rename(id: String, name: String, address: String? = null): Boolean {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return false
+        val current = saved()
+        if (current.none { it.id == id }) return false
+        // The street moves into the address before the name stops being it (issue 736), once:
+        // [address] when the caller worked it out from the record, else from the record itself.
+        val updated = current.map {
+            if (it.id != id) it
+            else if (address != null) it.copy(name = trimmed, address = address, streetKept = it.streetKept || it.isPoint)
+            else it.renamed(trimmed)
+        }
+        prefs.edit().putString(KEY, json.encodeToString(updated)).apply()
+        return true
+    }
+
+    /** Marks a saved place as a label on a point (see [SavedPlace.bare]). False when it is not saved. */
+    fun setBare(id: String, bare: Boolean): Boolean {
+        val current = saved()
+        if (current.none { it.id == id }) return false
+        prefs.edit().putString(KEY, json.encodeToString(current.map { if (it.id == id) it.copy(bare = bare) else it })).apply()
+        return true
+    }
+
+    /** Writes [listing] onto the star kept from the label [heldId] at [at] ([linkSaved]). False
+     *  when no saved place awaits one. */
+    fun link(heldId: String, at: LatLng, listing: Place): Boolean {
+        val current = saved()
+        val linked = linkSaved(current, heldId, at, listing)
+        if (linked === current) return false
+        prefs.edit().putString(KEY, json.encodeToString(linked)).apply()
+        return true
+    }
+
+    /** Sets/clears a quick-saved place's own map icon (issue #629). False when it is not saved. */
+    fun setIcon(id: String, icon: String?): Boolean {
+        val current = saved()
+        if (current.none { it.id == id }) return false
+        val updated = current.map { if (it.id == id) it.copy(icon = icon?.ifBlank { null }) else it }
+        prefs.edit().putString(KEY, json.encodeToString(updated)).apply()
+        return true
+    }
+
+    /** Pin or unpin [id] on the search page. False when it is not saved. */
+    fun setPinned(id: String, pinned: Boolean): Boolean {
+        val current = saved()
+        if (current.none { it.id == id }) return false
+        prefs.edit().putString(KEY, json.encodeToString(current.map { if (it.id == id) it.copy(pinned = pinned) else it })).apply()
+        return true
+    }
+
+    /** The saved list as a portable JSON document (for export / backup). */
+    fun exportJson(): String = json.encodeToString(saved())
+
+    /** Merge a previously-exported [json] list into the saved set, de-duped by id
+     *  (existing entries kept, new ones appended). Returns how many were newly added;
+     *  0 on a parse failure or nothing new. */
+    /**
+     * Merge saved places from an exported file.
+     *
+     * Reports WHICH outcome happened (issue #287): a file from another app and a re-imported
+     * backup both used to come back as 0, and the app could only say "nothing to import", which
+     * sent people looking for a bug in the wrong place.
+     */
+    fun importMerge(json: String): ImportResult {
+        // Vela's own export first; failing that, the formats other map apps produce (issue #279),
+        // so someone arriving from Organic Maps / OsmAnd / CoMaps / Takeout keeps their pins
+        // instead of only being told the file is the wrong kind.
+        val incoming = runCatching { this.json.decodeFromString<List<SavedPlace>>(json) }.getOrNull()
+            ?: PlaceImport.parse(json).ifEmpty { null }
+            ?: return ImportResult.WrongFormat(ImportFormats.describe(json))
+        val current = saved()
+        val existing = current.mapTo(HashSet()) { it.id }
+        // Two placemarks at one rounded coordinate share an id. Keep the first of them, or every
+        // id-keyed action afterwards (unsave, list membership) hits both at once.
+        val added = incoming.distinctBy { it.id }.filterNot { it.id in existing }
+        if (added.isEmpty()) return ImportResult.NothingNew
+        prefs.edit().putString(KEY, this.json.encodeToString(current + added)).apply()
+        return ImportResult.Added(added.size)
+    }
+
+    private companion object {
+        const val KEY = "places"
+    }
+}

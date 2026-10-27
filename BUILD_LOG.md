@@ -1,0 +1,527 @@
+# AutoMap build log (slipstream of Vela at 85eb69c)
+
+## Environment fixes (local build config only, NOT source patches)
+- Gradle daemon could not connect in this VM until `JAVA_TOOL_OPTIONS=-Djava.net.preferIPv4Stack=true`
+  (daemon bound to an IPv6-mapped socket; client dispatch reset without it). Verified on a trivial
+  Gradle project first (HELLO-OK, Gradle 8.14.6 and 9.8.0).
+- Gradle user home isolated to `~/workspace/automap/.gradle-home` (shared `~/.gradle` journal lock
+  from another daemon blocked the build).
+- System JDK 21 has a broken cacerts symlink (`/etc/ssl/certs/java/cacerts` missing). Using
+  Temurin 21 at `~/workspace/jdk21` (real cacerts) as JAVA_HOME.
+- Egress proxy re-signs TLS with "Hatch Sandbox Egress CA" (`/etc/ssl/certs/hatch-egress-ca.pem`).
+  Imported into `~/workspace/automap/.gradle-home/cacerts-automap`, referenced via
+  `javax.net.ssl.trustStore` in JAVA_TOOL_OPTIONS in `build-logs/run-gradle.py`.
+- Java 17 toolchain required by `:osmand-shaded` (toolchain languageVersion 17). Downloaded
+  Temurin 17.0.21 to `~/workspace/jdk17`, registered via
+  `org.gradle.java.installations.paths` in `gradle.properties` (local build config only).
+- Build runner: `build-logs/run-gradle.py` (proxy from environment, ANDROID_HOME,
+  GRADLE_USER_HOME, JAVA_HOME, JAVA_TOOL_OPTIONS). It contains no secrets; proxy credentials
+  are read from the environment at run time, never written to a file by this script.
+- `gradle.properties` local change: `org.gradle.java.installations.paths` added (see above).
+  No source patch has been applied yet.
+
+## Build 0 — rename + icon applied, rebuild in progress
+- Worktree: `~/workspace/automap`, cloned from `~/workspace/vela-feasibility`, checked out at
+  upstream commit 85eb69c ("Reach snapshot for 2026-10-26").
+- Rename applied via `patches/build0-rename.py` PLUS a finish pass (the script died at step 5:
+  its DonatePrompt anchor '/** The filled primary button' does not exist upstream — the
+  composable is the file's last block). Finish pass removed: DonatePrompt composable
+  (WelcomeScreen), showDonatePrompt/DONATE_URL/openDonate/dismissDonatePrompt (Onboarding),
+  the showDonatePrompt term in MapViewModel's prompt gate (missed by the original script),
+  the settings_support search-index line (SettingsHub), and the donate_no_browser reuse in
+  WhatsNew.openRelease (now uses the existing no_browser_installed key). Verified after:
+  base strings.xml contains 0 'Vela'; no user-visible 'Vela' string literal in Kotlin;
+  app_name = AutoMap, app_name_generic = Maps (unchanged, opt-in alias).
+- Icon applied: adaptive foreground = full-bleed PNG from the locked
+  `automap-icon-ui.png` (transparent rounded corners mirror-filled so no seam under any
+  launcher mask), background = solid #D2D4C2 (edge average), monochrome = simplified
+  vector map glyph (crossing highways + ramp + pond, no arrow, no trees, no text).
+  48px render still reads as a map (roads + pond). Old vector chevron foreground deleted.
+- AutoSpace companion (uncommitted, worktree only — that worktree has unrelated
+  pre-existing changes, so nothing was committed): `gearslip/.../host/KnownApps.kt`
+  partial set gains "app.automap" (preferred over app.vela when both installed).
+  RecommendedApps entry deferred: no published AutoMap release URL exists yet.
+- Rebuild as `-PappId=app.automap` (build-logs/build0.log): BUILD SUCCESSFUL in 2m 51s.
+  VERIFIED Build 0: APK build-logs/apk-build0/automap-build0.apk, 138 MB, package
+  app.automap, version 0.3.0/code 1, label AutoMap (all locales), debug cert
+  70aa9404..., sha256 e2e76aab3521ea28bbd9ed670a90abfc2d382a06bb19dc748c44f701b50a1187,
+  icon PNG 624,866 B present in the APK (res/drawable-nodpi-v4/ic_launcher_foreground.png).
+  AutoSpace companion: KnownApps partial set gains app.automap (uncommitted worktree change;
+  RecommendedApps entry deferred — no published AutoMap release URL yet).
+
+## Builds 1-3 — VERIFIED (one APK, build-logs/apk-build123)
+- Day palette (Build 1) + night palette (Build 2) applied together: both are branches of
+  applyMapTheme and cannot be meaningfully separated into two APKs; each value was
+  verified separately in the artifact (see below). Build 3 controls + final icon layers
+  (icon itself landed in Build 0; Build 3 verified the 48px legibility render).
+- Build 1 day: land #f8edd7, water #99daf7, park/grass/wood/wetland #cef3c9,
+  buildings #e9e9ea, roads #a8b6c4, motorway #8aa4c0 unchanged, route #1F6FEB unchanged.
+- Build 2 night: MODERN_DARK land #1c2a4a, water #0b1e3a, green #2f7d6e, pitch #1f5f52,
+  minor #5a6f8e, service #3a4a66, major/motorway #7a8fb5, building #566a96,
+  buildingLine #6a7da8, halo #141d2e; route freeflow cyan #3FE0D4 at night via
+  MapScreen.routeTrafficColor(route, mapDark) AND VelaMapView.routeGradient dark-aware
+  (new ROUTE_FREEFLOW_NIGHT, passed at all 6 call sites; the empty-spans outline call
+  is unaffected). AMOLED untouched.
+- Build 3: Appearance gets Color scheme Automatic/Day/Night (FOLLOW/LIGHT/DARK
+  underneath, unchanged) and Map detail 2D/3D (new MapDetail pref, default 3D; phone
+  b3dKeep gated, car tilt flattened + building-3d hidden in 2D via applyOverlays).
+  New string keys are base-only (translators fill locales later, per upstream
+  check-translations practice: missing = warning, not failure). One fix during the
+  build: the strings edit initially deleted settings_map_theme_title, breaking
+  SettingsHub compile (CANNOT_INFER_PARAMETER_TYPE at listOf) — key restored.
+- VERIFIED: GRADLE_EXIT 0, APK build-logs/apk-build123/automap-build123.apk, 140 MB,
+  package app.automap, sha256 af5a10446cd60ddc8ff76e950a1e6945e6326db631bbbc06e693c87986576d25;
+  dex contains f8edd7, 99daf7, cef3c9, 1c2a4a, 566a96, 3FE0D4; resources.arsc contains
+  "Color scheme", "Automatic", "Day", "Night", "Map detail".
+
+## Builds 4-6 — VERIFIED (build-logs/apk-build456)
+- Build 4: default puck shape is now CAR (PuckStyle.init default SHAPE_CAR); a saved
+  choice still wins, and the shape selector remains. Car uses the same navPuckBitmap.
+- Build 5: car nav declutter ported (applyOverlays, gated on TurnDeclutterPref):
+  poi_r1/r7/r20/transit, vela-transit-stops, highway shields, vela-bikeroutes/trails/
+  transit, label_other/village, one-way arrows, vela-addr-* hide during nav, restore
+  after. Hillshade deliberately excluded (its own toggle, Build 17).
+- Build 6: car signs — gate 13.5 → 12.5, glyph scale up (~30%, cap 56 → 72 px),
+  ring stroke 1.5 → 2.5, white halo disc behind each sign bitmap. Phone — controls
+  icon-size stops 0.98/1.37/1.95 → 1.22/1.71/2.44 (both creation and scaled paths),
+  white icon halo 1.5. Phone thresholds NOT lowered (nav 15.4 / browse 19.0 are
+  user-tuned values; the lower threshold is the car's).
+- VERIFIED: GRADLE_EXIT 0, APK build-logs/apk-build456/automap-build456.apk, 142 MB,
+  sha256 8000ecdf7c668cac5cffc0931defa5d587d39deeb6d0bb0c4dd57829fd861a55.
+
+## Builds 7-8 — VERIFIED (build-logs/apk-build78)
+- Build 7: verified the car already inherits the phone's building-3d geometry
+  (applyBuilding3dGeometry: minzoom 17, 30% height at z17 → full at z19) and the new
+  palette building colours (day #e9e9ea, night #566a96) through shared applyMapTheme.
+  Added the dense-downtown cap: snapshotter long edge capped at 2048 px (ordinary
+  head units ≤1920 unaffected; draw() already stretches the bitmap to the surface
+  and scales overlays by sx/sy, so the cap cannot break projection). Both the
+  Options size and the per-frame setSize use the capped size.
+- Build 8: car turn-approach building fade (FadeBuildingsOnTurn pref, default on,
+  toggle in Performance settings next to turn declutter): opacity eases per tick
+  toward 0.25 within 150 m of the next turn, back to 1.0 past 400 m, via the
+  snapshotter's building-3d fillExtrusionOpacity. Per-building occlusion NOT built
+  (agreed deferral). Fade state resets on style reload.
+- VERIFIED: GRADLE_EXIT 0, APK build-logs/apk-build78/automap-build78.apk, 145 MB,
+  sha256 d1e8631d6390531bc55bb889ab6640f7579072ded6e6e394f8e63651e0be8c43.
+
+## Builds 9-10 — VERIFIED (build-logs/apk-build910)
+- Build 9: CarFraming.contextZoomDelta (pure, JVM-testable): distance to turn
+  (≤150 m +0.7 → 0 at ≥400 m), maneuver type (fork/ramp/roundabout +0.4, sharp/U-turn
+  +0.5, turn +0.2, merge/keep/slight +0.15), lane count (4 lanes −0.15, 5+ −0.3),
+  tight next leg (<200 m +0.3, <500 m +0.15); clamped [−0.5, +1.0], added to the
+  speed/turn-framing zoom and clamped to [13.0, 18.5]. The renderer scores the next
+  non-quiet maneuver (same quiet-skip as NavTurnTarget.pointFor).
+- Build 10: user pan/pinch/zoom-button is now a HARD camera override
+  (userCamOverride, set in stopPanning/zoomBy, cleared only by follow() or leaving
+  overview; auto-recenter respects it). Overview was already hard. Pitch/easing:
+  verified existing — bearing/tilt/zoom ease per 70 ms ticker tick (CAM_BEARING_EASE
+  0.3, TILT_EASE 0.05, ZOOM_EASE 0.06); the context delta rides that easing, so no
+  new easing mechanism was invented.
+- VERIFIED: GRADLE_EXIT 0, APK build-logs/apk-build910/automap-build910.apk, 145 MB,
+  sha256 de0a0469fa917951ffadd4ed05e0251694aa8bf8574ec39f78c0caaeb8fa3251.
+
+## Build 11 — VERIFIED (build-logs/apk-build11)
+- PaintedRoads car port: CarStyle.inject adds the vela-paint-baked vector source
+  (pmtiles:// + the configured bake URL) and the 8 paint layers as JSON (real-metre
+  width expressions translated verbatim, minzoom 16.5, above the last bridge layer),
+  gated on the Vela look. Theme colours + arrow images applied in applyTheme
+  (snapshotter addImage works; bitmap density set to the car's). Visibility follows
+  the new PaintedRoadsPref setting (default on) via applyOverlays. Phone: the dial
+  still picks the source, but the setting gates it off entirely; toggle in Map
+  settings. Arrow icon-size uses the car's density (documented approximation only
+  in that the snapshotter renders at pixelRatio 1.0).
+- VERIFIED (re-checked from the artifact 2026-10-27): GRADLE_EXIT 0, APK
+  build-logs/apk-build11/automap-build11.apk, 140 MB, package app.automap,
+  version 0.3.0/code 1, sha256
+  95d963e7b76f77eec8a56707f190a2c935c9dae9ae0b8e200a0ef556384a73e5;
+  dex contains vela-paint-baked and vela-paint-arrow; resources.arsc contains
+  "Painted road markings".
+- SDK licences: the workspace SDK's licence files predated the platform-37 licence hash; fixed
+  by running sdkmanager --licenses against the ABSOLUTE sdk path (an earlier run with
+  `--sdk_root=~/...` silently wrote into a stray `/home/hatch/~/workspace/...` tree, which also
+  swallowed the build-tools 36.0.0 install; that install was moved into the real SDK).
+- Gitignored runtime files (CI fetches them the same way): core/libs osmand-java.jar
+  (18,663,092 B), osmand-shared-jvm.jar (1,756,140 B), gnu-trove-osmand.jar (327,840 B),
+  kxml2-vela.jar (37,252 B); app/libs cronet-155.0.8059.16.aar (14,890,158 B),
+  sherpa-onnx-1.13.3.aar (57,044,841 B) — all from upstream PimpinPumpkin/Vela releases
+  (obf-runtime / cronet-runtime / tts-runtime tags), all passing CI's size thresholds.
+- BASELINE VERIFIED (build baseline15): BUILD SUCCESSFUL in 18m 21s. APK
+  `app/build/outputs/apk/debug/app-debug.apk`, 137 MB, package app.vela, versionCode 1,
+  versionName 0.3.0, debug-signed (Android Debug cert SHA-256
+  70aa9404cfd61c119d9f043719b8caf527fd2e10eb3dad485eb5979b3f124cc5).
+
+## Build 12 — PIPELINE VERIFIED, product region still open (technical pilot only)
+- Tools restored 2026-10-27: osmium-tool 1.16.0 / tippecanoe 2.49.0 (a system apt
+  replay held the dpkg lock briefly, then the cached .debs installed cleanly).
+- Source: Geofabrik Kentucky extract dated 2026-10-26 (kentucky-261025.osm.pbf,
+  154,863,410 B; BBBike Cincinnati still 404). Clipped to a northern-Kentucky bbox
+  (-84.9,38.7,-84.3,39.2: Cincinnati KY suburbs) purely as a TECHNICAL pilot to
+  verify the pipeline — this is NOT the product pilot-region decision, which
+  remains Robert's call, and nothing was uploaded (no --upload, no hosting choice).
+- Pipeline run end-to-end (scripts/bake-painted-roads.sh steps, Gradle via
+  run-gradle.py): osmium tags-filter -> osmium export (31,056-line geojsonseq)
+  -> :core:testDebugUnitTest '*PaintedRoadsBakeTest' GRADLE_EXIT 0 ->
+  tippecanoe to build-logs/bake-pilot/painted-pilot-nky.pmtiles (1,003 KB,
+  layer paint, z15 only).
+- COVERAGE REPORT (no invented markings: marks derive only from OSM tags/geometry;
+  untagged ways get no lane/arrow marks): input 19,080 ways (5,915 lanes-tagged,
+  858 turn:lanes-tagged) + 8,088 nodes (6,552 crossing, 659 traffic_signals,
+  877 stop) -> 31,323 marks: SURFACE 6398, LANE 7842, CENTER 6611, ARROW 2800,
+  BIKE 572, CROSSWALK 3225, STOP 2940, MEDIAN 935. Arrow icons:
+  arrow-left 1283, arrow-right 803, arrow-through 272, arrow-left-through 176,
+  arrow-through-right 243, arrow-left-through-right 9, arrow-left-right 13,
+  arrow-uturn 1.
+- Bake output lives only under build-logs/bake-pilot/ (NOT bundled into any APK);
+  bundling/hosting awaits the pilot-region + hosting decisions.
+- Build 12's product gate (which region to ship, where to host it) is OPEN and is
+  listed as outstanding in the final report; the pipeline itself is verified.
+
+## Builds 13-14 — VERIFIED (build-logs/apk-build1314)
+- Build 13 (staged rollout, mechanism + stage 1): stage 1 is the Build 12
+  technical pilot, written up as build-logs/bake-pilot/COVERAGE.md (source,
+  pipeline steps, input/output counts, the ~31% lanes-tag coverage limit).
+  Stage 2+ = the same script per region Robert names, one coverage report
+  each, published only after a hosting decision. No region was added silently
+  and no bake output was bundled into an APK.
+- Build 14 (lane emphasis at splits/exits, car): CarMapRenderer now dims
+  non-matching baked turn ARROWS to 0.25 within 400 m of a mappable turn
+  (plain left/right turns + U-turns only; forks, ramps, roundabouts, merges
+  and keeps are NOT guessed), via an icon-opacity expression (zoom fade-in
+  x a substring case on the feature's `icon` property, verified against the
+  MapLibre 13.6.1 Expression API: `in(String, Expression)` + `switchCase`).
+  Lane LINES are untouched — they carry no direction. The next-non-quiet
+  maneuver lookup is shared with Build 9's context zoom; emphasis state
+  resets on style reload like the other overlay states.
+- VERIFIED: GRADLE_EXIT 0, BUILD SUCCESSFUL in 59s (gradle.log tail),
+  APK build-logs/apk-build1314/automap-build1314.apk, 138 MB, package
+  app.automap, version 0.3.0/code 1, sha256
+  86e9207a422aec4c4bcc6fd3a05864c2dd4ee0061abdaa82065ba7e66045d40a;
+  dex contains laneEmphasisApplied, emphasisDirection, vela-paint-arrow.
+
+## Build 15 — VERIFIED (build-logs/apk-build15)
+- Overpass/exit emphasis, car, 2D only (no 3D bridge geometry — the open stack
+  cannot express it, lines extrude nothing): CarStyle.inject widens every
+  bridge_*_casing line-width x1.3, inserts a `vela-bridge-shadow` line under
+  the first bridge layer (black, 0.20 opacity, offset 2.5 px, blurred) as the
+  deck shadow, and enlarges exit shields (icon-size 1 -> 1.35, text-size
+  10 -> 13) whenever visible. The Build 5 declutter still hides shields
+  during nav — noted, not silently weakened.
+- Ramp route emphasis: drawRoute draws a wider translucent halo (30 px, alpha
+  110) over ~200 m of route around each RAMP/FORK maneuver's location, driven
+  only by the route's own maneuvers — no road class guessed from the polyline.
+- VERIFIED: GRADLE_EXIT 0, BUILD SUCCESSFUL in 31s (gradle.log tail),
+  APK build-logs/apk-build15/automap-build15.apk, 138 MB, package
+  app.automap, version 0.3.0/code 1, sha256
+  a6fb2c00a81faa330849d880ddf547e6239bd95ef01844117b8ade703fa7dfc1;
+  dex contains rampHaloPaint, vela-bridge-shadow, laneEmphasisApplied.
+
+## Build 16 — VERIFIED (build-logs/apk-build16)
+- Destination arrival, car: within 300 m of the destination the camera pulls
+  back (never in) just enough to hold puck + destination in frame (same span
+  math as framePoints); the destination pin gains a highlight ring (the
+  entrance-area marker — no OSM entrance point exists in the route model, so
+  none is invented) and, when the ARRIVE maneuver knows it, an "On your
+  left"/"On your right" pill (null side draws no pill, never a guess).
+- Nearby car parks as nearby places (NOT a recommendation): a new
+  `vela-parking` symbol layer in the car style (source poi, filter
+  subclass=parking per the OMT schema, minzoom 15, hidden by default) with a
+  code-drawn blue P badge image, shown only inside the arrival window.
+  Polygon-only car parks with no POI point do not appear (data limit, not
+  filled in). The Build 5 declutter is untouched — no POI tier is unhidden.
+- VERIFIED: GRADLE_EXIT 0, BUILD SUCCESSFUL in 26s (gradle.log tail),
+  APK build-logs/apk-build16/automap-build16.apk, 138 MB, package
+  app.automap, version 0.3.0/code 1, sha256
+  10c9154a432877f40b333587024fb621a743f804eabe61b3fc4513b144d563b3;
+  dex contains vela-parking, arrivalRingPaint, "On your left", rampHaloPaint.
+
+## Build 17 — VERIFIED (build-logs/apk-build17)
+- Terrain relief in the car as a toggle OFF by default: CarStyle.inject adds
+  the terrarium DEM source (AWS Open Data, keyless) + a `vela-hillshade`
+  layer (exaggeration 0.32, below the first road layer, capped at z16) with
+  the phone's day colours; the renderer re-colours it per theme at night
+  (MODERN_DARK shadow #0a1018 / highlight #3a4a68 / 0.45). Visibility follows
+  the EXISTING Topography toggle (same pref as the phone, still off by
+  default) and mirrors the phone: shown for overview/browse, hidden during
+  nav so the route stays clean. Shaded relief only, never 3D terrain.
+- VERIFIED: GRADLE_EXIT 0, BUILD SUCCESSFUL in 32s (gradle.log tail),
+  APK build-logs/apk-build17/automap-build17.apk, 138 MB, package
+  app.automap, version 0.3.0/code 1, sha256
+  48023f5b5d50d879b5c686c9107e4f8c833630ce6b510247fef3c379edd9340a;
+  dex contains vela-hillshade, terrarium, Topography.
+
+## Build 18 — VERIFIED (build-logs/apk-build18)
+- Sun-angle building shading, car, with toggle: new pure function
+  `core/.../data/SunAngle.kt` (NOAA-style approximation, ~1 degree) gives
+  azimuth/elevation from lat/lng/time; CarStyle.inject takes an optional
+  style-light position [1.15, azimuth, 90-elevation] baked at style load
+  (the snapshotter exposes no light setter — verified via javap — so the
+  angle moves only on style reloads: theme flips, surface recreations).
+  Intensity stays at 0.25 so a low sun never washes anything out; at night
+  (elevation <= 0), with the toggle off, or with no GPS fix yet, no position
+  is passed and the default light stands — night never washed out. New
+  SunShading pref (default ON, following the time-of-day palette — a default
+  choice for Robert to correct) + toggle in Map settings next to Topography
+  + search index. Applies on the patched-style path only; the plain-URL
+  fallback keeps the default light, as it does for every injected layer.
+- VERIFIED: SunAngleTest 4/4 green (:core:testDebugUnitTest), then
+  GRADLE_EXIT 0, BUILD SUCCESSFUL in 1m 39s, APK
+  build-logs/apk-build18/automap-build18.apk, 138 MB, package app.automap,
+  version 0.3.0/code 1, sha256
+  58c8d9f9632f072971dd089b2b521dd27fa6f67a1c9ded45a85e65ab91edb734;
+  dex contains sunPosition, SunShading, vela-hillshade; resources.arsc
+  contains "Sun-angle building shading".
+
+## Build 19 — VERIFIED (final APK = build-logs/apk-final/automap-final.apk)
+- Final APK is the Build 18 artifact, byte-identical (same sha256 below);
+  no source changed after it, only docs/diff files.
+- Regression, code-level (this VM): full :app:assembleDebug green;
+  22/22 feature markers pass in the final APK dex/arsc (day + night palette
+  hexes, paint/hillshade/parking/bridge-shadow layer ids, lane emphasis,
+  ramp halo, arrival ring, sun position, context zoom, fade, MapDetail,
+  "Color scheme", "Map detail", "Painted road markings",
+  "Sun-angle building shading"); icon PNG 624,866 B present; label AutoMap
+  (all locales); package app.automap, 0.3.0/code 1; base strings.xml
+  contains 0 "Vela"; changed-file audit shows no routing, traffic, places,
+  search, voice-publishing or backup code touched; no tree feature added
+  (only "trees" hit is the icon comment itself); AutoSpace KnownApps entry
+  for app.automap still present (uncommitted there).
+- Regression, code-level tests: full :core:testDebugUnitTest GRADLE_EXIT 0 —
+  182 suites, 1248 tests, 0 failures, 0 errors, 20 skipped
+  (build19-coretests.log).
+- GPL publication (local): automap-patch-stack.diff (11,855 lines: 43
+  tracked-file diffs + 8 new files; icon PNG noted by hash, not in the text
+  diff; gradle.properties excluded as local build config) + build script
+  build-logs/run-gradle.py + runbook BUILD_AND_SYNC.md + release notes
+  RELEASE_NOTES.md. Nothing pushed to any repo: the worktree remote is the
+  local feasibility clone, and the private DocBobert6/AutoMap repo (created
+  2026-10-26, README says no release/APK yet) awaits Robert's word before
+  any push — no binary has been conveyed, so no GPL conveyance is triggered.
+- Device-level regression OWED (no paired device in this VM, not claimed):
+  screenshots + drive tests (dense-city/highway/interchange, day/night,
+  2D/3D), snapshot timing/memory/legibility vs Build 0 baseline, offline,
+  backup/restore, AutoSpace turn publishing.
+- Release signing: NOT DONE — all builds debug-signed. SIGNATURE CHANGE
+  BETWEEN SESSIONS (verified with apksigner on each APK): builds 0–11 carry
+  Android Debug cert SHA-256 70aa9404cfd61c119d9f043719b8caf527fd2e10eb3dad485eb5979b3f124cc5,
+  while builds 13–18 and the final APK carry a DIFFERENT debug cert,
+  SHA-256 4754268cd20cd4b6cd918b85f83d22fc32e5cf8b69fd46bc8f60f42483f5d3d8
+  (SHA-1 b67530d5c9dde18db03d31a630f11ac5ff91026c), from the debug
+  keystore created in this session at /root/.android/debug.keystore
+  (2026-10-27 01:08). Consequence: the final APK will NOT install over a
+  builds 0–11 APK — uninstall first. A release keystore must be created
+  under ~/workspace/automap/ and backed up before any published release;
+  losing it would block all future update installs.
+
+## Follow-up — Robert's three decisions (2026-10-26 22:01 EDT, implemented 2026-10-27)
+- Decision 1, pilot regions (hosting STILL undecided — bakes prepared only,
+  NOT uploaded, NOT bundled into any APK):
+  Pipeline = Build 12 (osmium tags-filter + export + PaintedRoadsBakeTest +
+  tippecanoe -l paint -z15 -Z15 -P -b 24). Sources: Geofabrik Kentucky
+  2026-10-26 (build-logs/bake-pilot/kentucky.osm.pbf, 148 MB) and Geofabrik
+  Ohio 2026-10-27 (build-logs/bake-regions/ohio.osm.pbf, 312 MB).
+  - Northern Kentucky, bbox -85.1,38.5,-84.2,39.1 (Kentucky only): Florence,
+    Covington, Newport, Dry Ridge (38.68,-84.53), Grant County, I-75/I-71
+    south of the Ohio River; excludes Cincinnati/Ohio, Maysville, Louisville.
+    Input 21,325 ways (6,063 lanes 28.4%; 873 turn:lanes); 6,460 crossing +
+    672 traffic_signals + 852 stop nodes. Bake 33,157 marks.
+    Output build-logs/bake-regions/northern/painted-northern-kentucky.pmtiles
+    (1.4 MB). Supersedes the stage-1 technical pilot bbox
+    -84.9,38.7,-84.3,39.2 for product purposes.
+  - Cincinnati metro, bbox -84.9,38.8,-84.0,39.5 (Kentucky + Ohio merged
+    with osmium merge, then clipped once, so state-line ways are not
+    double-counted; Kentucky alone would have missed the Ohio half):
+    Cincinnati + Ohio suburbs (Mason, West Chester, Blue Ash, Sharonville,
+    Milford), Kentucky river suburbs, I-75/I-71/I-275; excludes Dayton
+    (39.76, north of 39.5), Columbus, Louisville. Input 86,546 ways
+    (27,837 lanes 32.2%; 3,630 turn:lanes); 30,895 crossing + 3,518
+    traffic_signals + 4,038 stop nodes. Bake 153,621 marks.
+    Output build-logs/bake-regions/cincinnati/painted-cincinnati-metro.pmtiles
+    (3.8 MB). Overlaps the northern-Kentucky bbox by design (metro spans
+    the state line); which file a client loads is part of the undecided
+    hosting decision, not papered over.
+  - Central Kentucky, bbox -85.3,37.6,-84.0,38.5 (Kentucky only): Lexington,
+    Frankfort, Richmond, Danville, I-64/I-75; excludes Louisville (west of
+    -85.3), northern Kentucky north of 38.5, points east of -84.0.
+    Input 36,271 ways (4,269 lanes 11.8%; 391 turn:lanes); 5,855 crossing +
+    1,108 traffic_signals + 549 stop nodes. Bake 34,155 marks.
+    Output build-logs/bake-regions/central/painted-central-kentucky.pmtiles
+    (2.4 MB).
+  Coverage report: build-logs/bake-regions/COVERAGE_REGIONS.md. Limit stated
+  there: lane tagging is sparse by construction (28.4%/32.2%/11.8% with
+  lanes, only a few percent with turn:lanes, thinnest in central Kentucky);
+  OSM tagging reality, no invented markings.
+- Decision 2, Automatic colour scheme default: CONFIRMED, no code change.
+  app/.../ui/theme/AppTheme.kt: mapMode initial FOLLOW, prefs load defaults
+  to "FOLLOW" with fallback FOLLOW. FOLLOW is the Automatic equivalent.
+- Decision 3, SunShading off by default + first-boot prompt:
+  app/.../ui/SunShading.kt: mutableStateOf(false), prefs default false
+  (was true in both). app/.../ui/Onboarding.kt: showSunShadingPrompt state
+  + sun_prompt_done pref in vela_onboarding; armVoiceOrSun() arms the voice
+  offer if still owed, otherwise the sun offer; dismissVoicePrompt,
+  dismissLocationPrompt, dismissNotifPrompt, completeWelcome and init all
+  route through it, so the prompt appears once, never stacks on an
+  unanswered voice prompt, and existing installs upgrading to this build
+  get it when welcome is done and the question was never answered.
+  dismissSunShadingPrompt(context, enable) records sun_prompt_done=true
+  once either way and calls SunShading.set(context, enable), so only an
+  explicit yes enables it; skip/dismiss leaves it OFF.
+  app/.../ui/VelaRoot.kt: SunShadingPrompt composable (VelaDialog) between
+  the voice prompt and WhatsNew. Strings (values/strings.xml,
+  translatable="false"): root_sun_title "New: sun-angle building shading",
+  root_sun_body (position of the sun, night keeps night colours, takes
+  effect on map style reload, Settings Map to change), root_sun_enable
+  "Enable shading", root_sun_skip "Keep it off". Settings toggle already
+  existed (MapSettings next to Topography, settings_sun_shading) and was
+  not moved. Everything else unchanged: NOAA approximation
+  (core/.../data/SunAngle.kt), intensity 0.25, style-load-only angle
+  updates, night/no-GPS/toggle-off guards keeping the default light.
+  Build-line note: first rebuild failed on :app:mergeDebugResources —
+  root_sun_body carried a doubled backslash before an apostrophe
+  (Invalid unicode escape sequence). Fixed by rewording the string with
+  no apostrophe at all; rebuilt green. Do not reintroduce an escaped
+  apostrophe in that string.
+- Follow-up local APK (debug-signed, VM-verified, NOT the published one):
+  build-logs/apk-followup/automap-followup.apk, 140 MB,
+  sha256 9511309ab96924004f7bb6a4935140d5cf65a747768b1137001d5193a304f133,
+  aapt2: package app.automap, versionCode 1, versionName 0.3.0, label
+  AutoMap (all locales), icon ic_launcher_foreground present, apksigner
+  debug cert SHA-256 4754268cd20cd4b6cd918b85f83d22fc32e5cf8b69fd46bc8f60f42483f5d3d8
+  (same as builds 13-18/final, NOT builds 0-11 — uninstall-first
+  consequence stands). Dex contains dismissSunShadingPrompt,
+  showSunShadingPrompt, sun_prompt_done, root_sun_title.
+  Tests: :core:testDebugUnitTest --tests '*SunAngleTest' GRADLE_EXIT 0,
+  4 tests, 0 skipped, 0 failures, 0 errors. No first-boot/preference
+  unit test was added: the prompt lives in Compose + SharedPreferences
+  onboarding code with no Robolectric harness in this tree; its
+  once-only/persist/respect behaviour is verified by code inspection
+  (paths above) and by dex presence, not by a unit test — stated here
+  rather than claimed.
+- Device verification still OWED (not claimed): screenshots, drive tests,
+  snapshot timing, backup/restore, AutoSpace turn publishing on Robert's
+  device.
+
+## Follow-up publishing — GitHub (2026-10-27)
+- Route used (after direct upload was proven blocked): GitHub Actions
+  release workflow, NOT a chat attachment, NOT a Contents-API file push
+  (APK ~140 MB > 100 MB limit). Repo DocBobert6/AutoMap main now holds
+  only: README, PLAN, LICENSE, docs/icon.png, automap-patch-stack.diff
+  (2.1 MB, regenerated with --binary so the icon PNG rides in it; 50
+  files; verified locally with `git apply --check` against a fresh
+  archive of upstream 85eb69c), and
+  .github/workflows/automap-debug-release.yml (workflow_dispatch only).
+  Push route: custom.github push-tree, commit 58ce5091, then fix commit
+  7c262971 (see below). Tree read back from GitHub: 9 entries, main
+  head 7c262971.
+- First CI run 40437752010 FAILED at step 3 (Checkout upstream Vela):
+  actions/checkout treats `ref` as a branch/tag name, fetching
+  refs/heads/85eb69c* and refs/tags/85eb69c*, which do not exist.
+  Fixed by fetching the pinned SHA directly (git fetch --depth=1 origin
+  85eb69c946711df272b54d3f4305e72746ce1035; verified locally first).
+  Direct upload to uploads.github.com with the surrogate still 401s
+  (request_id 552D:3EB274:15AE04:1C4325:6AE00867, recorded earlier);
+  the CI route is the working one.
+- Second CI run 40438033302 SUCCESS, all 13 steps green (patch apply,
+  obf/cronet/TTS fetches from upstream Vela releases, assembleDebug
+  -PappId=app.automap, gh release upload --clobber to the existing
+  prerelease tag v0.3.0-automap-debug, release id 424963865).
+- Published asset VERIFIED by read-back from GitHub:
+  https://github.com/DocBobert6/AutoMap/releases/tag/v0.3.0-automap-debug
+  asset AutoMap-0.3.0-debug.apk, 143,728,912 bytes, download URL
+  https://github.com/DocBobert6/AutoMap/releases/download/v0.3.0-automap-debug/AutoMap-0.3.0-debug.apk
+  Downloaded copy via authenticated API: 143,728,912 bytes (exact match),
+  sha256 19204355f205040ee9f5e6179a4699084bfe92773e0887a587455829c4092923,
+  aapt2 package app.automap, versionCode 1, versionName 0.3.0, label
+  AutoMap, icon present, dex contains dismissSunShadingPrompt,
+  sun_prompt_done, root_sun_title.
+- CERT CAVEAT (important, read before installing): the CI-built APK is
+  signed with the GitHub runner's ephemeral debug keystore, cert
+  SHA-256 89565e1ec975965bd1e5a5f23d6472b7d4640dd41a486e0ddcabdb2cba5624a4
+  (SHA-1 d378f49583f02f7db75dd09265437c4e9899d495) — DIFFERENT from both
+  local debug certs (builds 0-11: 70aa9404...; builds 13-18 + local
+  follow-up: 4754268c...). It will NOT install over any earlier local
+  build; uninstall first. Every CI debug build gets a fresh runner
+  keystore, so CI debug builds cannot update over each other either.
+  A release keystore is still not created; that remains the fix for
+  stable updates.
+- Release body (as created earlier) already states: debug-signed, no
+  release keystore yet, device verification still owed, region bakes
+  prepared not hosted with hosting undecided, will not install over
+  builds 0-11 APKs. Unauthenticated curl of the download URL 404s
+  because the repo is private; Robert, as owner, downloads it signed
+  in via the release page.
+
+## Altima top-down 3D puck + vehicle colour picker (2026-10-27)
+- Scope decided by Robert 2026-10-26 22:51-22:52: a top-down realistic 3D
+  Nissan Altima, used as BOTH the map puck and the settings preview
+  (top-down 3D in settings too, no side view anywhere). The side profile
+  in the AutoSpace icon was the model reference only (sedan proportions).
+- Rendering, tintable by design (no baked raster colour):
+  app/.../ui/map/Puck3D.kt: car() replaced with an Altima sedan model
+  (2.20 long, 0.86 wide), raised hood and trunk panels, glass cabin with
+  body-coloured roof and sunroof, mirrors, wheels with silver hubs, front
+  grille, headlights and taillights. Body fill is the picked colour;
+  edges are a darker shade of it and the roof a lighter one, so shading
+  works over light and dark colours. altimaTopDownPreviewBitmap() renders
+  the same mesh top-down at a low tilt, nose up, for settings.
+  app/.../ui/map/VelaMapView.kt: drawCarPuck() (flat symbol path) updated
+  to the same Altima proportions and hex body colour, with wheels,
+  mirrors, hood and trunk seams, and sunroof.
+- Colour preference: app/.../ui/NavChrome.kt: PuckStyle.carColor is now a
+  hex string (#RRGGBB) under the same key puck_car_color, default
+  #D93025 (the old red). normalizeCarColor() maps saved legacy names
+  (red/blue/white/green/yellow) to their exact old hexes, so a user who
+  never opens the picker keeps their colour. Invalid values are ignored
+  by setCarColor, never applied. The map puck, car screen bitmap, and
+  settings preview all read the same value, so the style key changes and
+  the puck re-registers on a colour change.
+- Settings: new app/.../ui/settings/sections/VehicleColorPicker.kt,
+  AltimaColorPicker(), shown in NavigationSettings in place of the old
+  five colour chips when the shape is the car (the old 64dp preview is
+  skipped for the car, since the picker shows a 144dp preview; other
+  shapes keep their old preview). Picker contents, all synced live and
+  all writing the same preference: a 144dp top-down 3D Altima preview, a
+  colour wheel (hue around, saturation centre-out, brightness from the
+  V slider), HSV sliders, RGB sliders, and a hex field accepting
+  #RRGGBB with or without the hash (invalid input shows an error and is
+  never applied), plus Reset to default (#D93025). Strings added to the
+  base strings.xml only, translatable=false, no apostrophes.
+- Local verification (VM, debug): :app:assembleDebug -PappId=app.automap
+  GRADLE_EXIT 0. Local APK build-logs/apk-altima/automap-altima.apk,
+  143,750,068 bytes, sha256
+  6779e8664b3e1f416a882473717502c157c70c7ba054351fef54c0dbaa0a98ba,
+  aapt2 package app.automap, versionCode 1, versionName 0.3.0. Dex
+  contains AltimaColorPicker, altimaTopDownPreviewBitmap,
+  normalizeCarColor, puck_car_color; resources.arsc contains the new
+  settings_puck_* strings. No unit test was added for the picker or the
+  mesh: the picker is Compose-only with no Robolectric harness in this
+  tree, and the mesh is Android-graphics code, so behaviour is verified
+  by code inspection (loft ring vertex counts match: body 10/10, hood
+  6/6, trunk 4/4, cabin 4/4) plus dex/resources presence, not by a unit
+  test - stated, not claimed. No routing, traffic, places, search, voice
+  publishing, backup, palette, Automatic default, or SunShading code was
+  touched.
+- Publishing (GitHub, not a chat attachment): patch stack regenerated
+  (53 files, 2,184,740 bytes, git apply --check clean against a fresh
+  archive of upstream 85eb69c) and pushed to DocBobert6/AutoMap main,
+  commit a8894cbd6b9961fd8924e00d24067070069f68ee (README, PLAN,
+  LICENSE, docs/icon.png, automap-patch-stack.diff, workflow unchanged).
+  Workflow dispatch run 40441875999 completed success. Published asset
+  verified by downloading it back through the authenticated API:
+  https://github.com/DocBobert6/AutoMap/releases/tag/v0.3.0-automap-debug
+  asset AutoMap-0.3.0-debug.apk, 143,750,068 bytes (exact match to the
+  GitHub listing and to the local build size), sha256
+  ab205b6e1233aa024af924c48311aac772f8d34079f2c745ef485575bdf2fddb,
+  aapt2 package app.automap, versionCode 1, versionName 0.3.0, dex and
+  resources.arsc contain the Altima markers above.
+- CERT CAVEAT: the CI APK is signed with the GitHub runner ephemeral
+  debug keystore, cert SHA-256
+  700059a40ed60999e72cbd11fb8c6c784659ce43a0b253a16ef8cebf6803a121
+  (SHA-1 26cf5cb51b05ec0b4d65b8a05c9ca86be8be0015) - different from the
+  previous CI cert and from every local debug cert. It will NOT install
+  over any earlier build; uninstall first. CI debug builds cannot update
+  over each other. No release keystore was created.
+- Still owed, not claimed: device screenshots, drive tests, and
+  AutoSpace turn publishing on Robert device; the picker and puck
+  appearance at real map and settings sizes still need his eyes on a
+  device, since this VM cannot render the Compose UI.

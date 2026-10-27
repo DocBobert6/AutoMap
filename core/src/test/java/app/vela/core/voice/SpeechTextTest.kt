@@ -1,0 +1,248 @@
+package app.vela.core.voice
+
+import org.junit.Assert.assertEquals
+import org.junit.Test
+
+class SpeechTextTest {
+
+    private fun split(t: String) = SpeechText.splitSentences(t)
+
+    // --- Real sentence ends SHOULD split (so a pause is spliced) ---
+
+    @Test fun `vela nav prefix splits after navigation`() {
+        assertEquals(
+            listOf("Starting navigation.", "Turn right onto Main Street"),
+            split("Starting navigation. Turn right onto Main Street"),
+        )
+    }
+
+    @Test fun `faster route prefix splits`() {
+        assertEquals(
+            listOf("Taking the faster route.", "In a quarter mile, turn left"),
+            split("Taking the faster route. In a quarter mile, turn left"),
+        )
+    }
+
+    @Test fun `test-voice phrase splits at the real period`() {
+        assertEquals(
+            listOf("Voice guidance is on.", "In a quarter mile, turn right."),
+            split("Voice guidance is on. In a quarter mile, turn right."),
+        )
+    }
+
+    @Test fun `digit-started next clause splits`() {
+        assertEquals(
+            listOf("Recalculating.", "3 miles to your destination"),
+            split("Recalculating. 3 miles to your destination"),
+        )
+    }
+
+    // --- A road-type word before the period is NOT split, on purpose ---
+    // "Street."/"Avenue." etc. are ambiguous: they're a genuine sentence end in "…Main Street. Then…",
+    // but forSpeech ALSO produces them from an abbreviation ("St. Mary" → "Street. Mary"). Since we
+    // can't tell them apart, we conservatively don't split there — no spurious mid-name pause. Real
+    // Vela multi-sentence prompts break after ordinary words ("navigation."/"route."/"on."), so this
+    // costs nothing in practice.
+    @Test fun `road-type word before period is left whole to avoid false name splits`() {
+        assertEquals(
+            listOf("Turn right onto Main Street. Then merge onto Interstate 80."),
+            split("Turn right onto Main Street. Then merge onto Interstate 80."),
+        )
+    }
+
+    @Test fun `three sentences yield three chunks`() {
+        assertEquals(listOf("One.", "Two.", "Three."), split("One. Two. Three."))
+    }
+
+    // --- Abbreviations / names must NOT split (the review-caught bug) ---
+
+    @Test fun `abbreviation Jr in a street name does not split`() {
+        assertEquals(
+            listOf("Turn right onto Martin Luther King Jr. Boulevard"),
+            split("Turn right onto Martin Luther King Jr. Boulevard"),
+        )
+    }
+
+    @Test fun `abbreviation Mt in a street name does not split`() {
+        assertEquals(listOf("Turn left onto Mt. Vernon Avenue"), split("Turn left onto Mt. Vernon Avenue"))
+    }
+
+    @Test fun `forSpeech-expanded Street dot before a name does not split`() {
+        // VoiceGuide.forSpeech turns "St. Mary" (Saint) into "Street. Mary"; must stay one chunk.
+        assertEquals(listOf("Turn onto Street. Mary's Road"), split("Turn onto Street. Mary's Road"))
+    }
+
+    @Test fun `directional abbreviation N dot does not split`() {
+        assertEquals(listOf("Continue on North. Baker Avenue"), split("Continue on North. Baker Avenue"))
+    }
+
+    @Test fun `single-letter initial does not split`() {
+        assertEquals(listOf("Head to U.S. Route 50"), split("Head to U.S. Route 50"))
+    }
+
+    @Test fun `lowercase continuation is not a sentence break`() {
+        assertEquals(listOf("Continue on Elm St. then turn right"), split("Continue on Elm St. then turn right"))
+    }
+
+    // --- Numbers / trailing punctuation must NOT split ---
+
+    @Test fun `decimal does not split`() {
+        assertEquals(listOf("In 0.5 miles turn right"), split("In 0.5 miles turn right"))
+    }
+
+    @Test fun `trailing period is a single sentence`() {
+        assertEquals(listOf("You have arrived."), split("You have arrived."))
+    }
+
+    @Test fun `single instruction is returned unchanged`() {
+        val s = "In a quarter mile, turn right onto Main Street"
+        assertEquals(listOf(s), split(s))
+    }
+
+    @Test fun `blank and tiny inputs are safe`() {
+        assertEquals(listOf(""), split(""))
+        assertEquals(listOf("."), split("."))
+    }
+
+    // --- Street-ordinal reading (128th → "one twenty eighth") ---
+    // Space, not hyphen, between tens and ordinal: the hyphenated compound got a reduced "-ty"
+    // from the neural voice ("152nd" → sounded like "one fifth second" on a real drive).
+
+    private fun num(t: String) = SpeechText.spokenNumbers(t)
+
+    @Test fun `three-digit street ordinal reads the street way`() {
+        assertEquals("Turn right onto one twenty eighth Street", num("Turn right onto 128th Street"))
+        assertEquals("one forty fifth Avenue", num("145th Avenue"))
+        assertEquals("two thirty third", num("233rd"))
+        assertEquals("one fifty second Street", num("152nd Street")) // the real-drive report
+    }
+
+    @Test fun `round hundred and low remainder`() {
+        assertEquals("one hundredth Street", num("100th Street"))
+        assertEquals("one oh fifth", num("105th"))
+        assertEquals("one oh first", num("101st"))
+        assertEquals("one tenth", num("110th"))
+        assertEquals("two twentieth", num("220th"))
+    }
+
+    @Test fun `one and two digit ordinals are left for espeak`() {
+        assertEquals("5th Street", num("5th Street"))
+        assertEquals("42nd", num("42nd"))
+        assertEquals("Head east on Main Street", num("Head east on Main Street"))
+    }
+
+    @Test fun `four-digit numbers are untouched`() {
+        assertEquals("1280th", num("1280th"))
+    }
+
+    // --- Clause splitting (comma / semicolon beats) ---
+
+    private fun clauses(t: String) = SpeechText.splitClauses(t)
+
+    @Test fun `comma with a space is a clause break`() {
+        assertEquals(listOf("In a quarter mile,", "turn right onto Main Street"), clauses("In a quarter mile, turn right onto Main Street"))
+    }
+
+    @Test fun `semicolon is a clause break`() {
+        assertEquals(listOf("powered by Google;", "protected by privacy"), clauses("powered by Google; protected by privacy"))
+    }
+
+    @Test fun `a grouped number is not split`() {
+        assertEquals(listOf("In 1,000 feet turn right"), clauses("In 1,000 feet turn right"))
+    }
+
+    @Test fun `no comma returns one clause`() {
+        assertEquals(listOf("Turn right onto Main Street"), clauses("Turn right onto Main Street"))
+    }
+
+    @Test fun `speechFragments tags a firm pause at periods and a short one at commas`() {
+        val frags = SpeechText.speechFragments("In a quarter mile, turn right. Then merge.", 0.32f, 0.16f)
+        assertEquals(3, frags.size)
+        assertEquals("In a quarter mile," to 0.16f, frags[0]) // comma → short beat
+        assertEquals("turn right." to 0.32f, frags[1]) // sentence end → firm beat
+        assertEquals("Then merge." to 0f, frags[2]) // last → no trailing silence
+    }
+
+    @Test fun `speechFragments leaves a single clause whole with no gap`() {
+        assertEquals(listOf("Turn right onto Main Street" to 0f), SpeechText.speechFragments("Turn right onto Main Street", 0.32f, 0.16f))
+    }
+
+    // --- cleanSearchTranscript: turn a raw Whisper transcript into a search query ---
+
+    private fun clean(t: String) = SpeechText.cleanSearchTranscript(t)
+
+    @Test fun `whisper non-speech tags collapse to blank`() {
+        // No real speech (silence / a tap / room noise) -> Whisper emits only bracketed sound tags.
+        // These must collapse to "" so the caller's ifBlank{null} runs NO search.
+        assertEquals("", clean("[music] [music] [music]"))
+        assertEquals("", clean("[thud] [thud] [thud] [thud]"))
+        assertEquals("", clean("[BLANK_AUDIO]"))
+        assertEquals("", clean("  [ Music ]  "))
+    }
+
+    @Test fun `a truncated trailing tag from a capped capture also collapses`() {
+        // Device-seen: a long non-speech run truncated at the 15 s cap ends with an UNCLOSED tag.
+        // Both the complete groups and the dangling "[musi" must go, not leave the fragment behind.
+        assertEquals("", clean("[music] [music] [musi"))
+        assertEquals("", clean("[thud] [thud] [thud] [th"))
+        // ...but a real word before a dangling tag survives.
+        assertEquals("coffee", clean("coffee [noi"))
+    }
+
+    @Test fun `real query keeps its words and drops a stray tag`() {
+        assertEquals("coffee shop", clean("coffee [noise] shop"))
+        assertEquals("gas stations near me", clean("gas stations near me"))
+    }
+
+    @Test fun `trailing sentence punctuation and quotes are trimmed`() {
+        assertEquals("Coffee near me", clean("Coffee near me."))
+        assertEquals("pharmacy", clean("“pharmacy”"))
+        assertEquals("hardware store", clean("hardware store!"))
+    }
+
+    @Test fun `an inner period is preserved`() {
+        assertEquals("St. Paul", clean("St. Paul"))
+        assertEquals("J.C. Penney", clean("J.C. Penney."))
+    }
+
+    // Google's abbreviated duration/distance strings spoken through TTS read the literal "min"
+    // (transit guidance, user 2026-08-08) — units expand to words, digit-anchored so names survive.
+    @Test fun `english unit abbreviations expand for speech`() {
+        assertEquals("Walk 10 minutes", SpeechText.spokenEnUnits("Walk 10 min"))
+        assertEquals("Walk 1 minute", SpeechText.spokenEnUnits("Walk 1 min"))
+        assertEquals("11 minutes", SpeechText.spokenEnUnits("11 min"))
+        assertEquals("0.4 miles", SpeechText.spokenEnUnits("0.4 mi"))
+        assertEquals("1 mile", SpeechText.spokenEnUnits("1 mi"))
+        assertEquals("2 hours 5 minutes", SpeechText.spokenEnUnits("2 h 5 min"))
+        assertEquals("400 meters", SpeechText.spokenEnUnits("400 m"))
+        assertEquals("2 kilometers", SpeechText.spokenEnUnits("2 km"))
+    }
+
+    @Test fun `unit expansion never rewrites names or clock times`() {
+        assertEquals("M St", SpeechText.spokenEnUnits("M St"))
+        assertEquals("Walk to Mi Casa", SpeechText.spokenEnUnits("Walk to Mi Casa"))
+        assertEquals("depart 7:33 PM", SpeechText.spokenEnUnits("depart 7:33 PM"))
+        assertEquals("Route 9 to H St", SpeechText.spokenEnUnits("Route 9 to H St"))
+    }
+
+    @Test fun `a clock time is read as a time, not a measurement`() {
+        // The phonemizer read "5:49" as feet and inches on a real drive.
+        assertEquals("five forty nine PM", SpeechText.spokenClock("5:49 PM"))
+        assertEquals("six PM", SpeechText.spokenClock("6:00 PM"))
+        assertEquals("twelve oh five", SpeechText.spokenClock("12:05"))
+        assertEquals("seventeen oh nine", SpeechText.spokenClock("17:09"))
+        assertEquals("ten thirty AM", SpeechText.spokenClock("10:30 AM"))
+    }
+
+    @Test fun `it only rewrites what is actually a clock`() {
+        assertEquals("a 1:5 slope", SpeechText.spokenClock("a 1:5 slope"))
+        assertEquals("ratio 30:70", SpeechText.spokenClock("ratio 30:70"))
+    }
+
+    @Test fun `the whole sentence survives the rewrite`() {
+        assertEquals(
+            "Shop closes at six PM and you arrive around five forty nine PM",
+            SpeechText.spokenClock("Shop closes at 6:00 PM and you arrive around 5:49 PM"),
+        )
+    }
+}

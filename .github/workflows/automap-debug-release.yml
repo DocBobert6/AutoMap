@@ -1,0 +1,87 @@
+name: AutoMap debug release
+
+# GitHub-native model (from 2026-10-27): this repo's main branch IS the full
+# AutoMap source tree. This workflow checks out this repo and builds from
+# that tree directly — it does NOT check out upstream Vela and does NOT
+# apply a patch stack. The patch-stack model is retired (see README).
+#
+# Manual-only, triggered only by workflow_dispatch, never by push.
+# Debug-signed only: there is no release keystore yet, so this is a testing
+# build, not a release-signed build. Each CI run signs with the runner's
+# ephemeral debug keystore, so a CI debug APK will NOT install over any
+# earlier build — uninstall first. It attaches the APK to the existing
+# prerelease tag v0.3.0-automap-debug (tag scheme unchanged).
+# Upstream Vela's workflows are deliberately NOT carried over: their
+# scheduled data bakes and nightly cuts must not run under AutoMap's name.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout AutoMap source tree
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
+
+      - name: Check the Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v5
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Fetch obf routing runtime jars
+        run: |
+          mkdir -p core/libs
+          for f in osmand-java.jar osmand-shared-jvm.jar gnu-trove-osmand.jar kxml2-vela.jar; do
+            curl -fSL -o "core/libs/$f" \
+              "https://github.com/${{ github.repository }}/releases/download/obf-runtime/$f" \
+            || curl -fSL -o "core/libs/$f" \
+              "https://github.com/PimpinPumpkin/Vela/releases/download/obf-runtime/$f"
+          done
+          test "$(stat -c%s core/libs/osmand-java.jar)" -gt 10000000
+
+      - name: Fetch Cronet runtime AAR
+        run: |
+          v=$(sed -n 's/^vela.cronetVersion=//p' gradle.properties)
+          f="app/libs/cronet-$v.aar"
+          mkdir -p app/libs
+          curl -fsSL -o "$f" "https://github.com/${{ github.repository }}/releases/download/cronet-runtime/cronet-$v.aar" \
+          || curl -fsSL -o "$f" "https://github.com/PimpinPumpkin/Vela/releases/download/cronet-runtime/cronet-$v.aar" \
+          || bash scripts/build-cronet-aar.sh "$v" app/libs
+          test "$(stat -c%s "$f")" -gt 10000000
+
+      - name: Fetch TTS runtime AAR
+        run: |
+          mkdir -p app/libs
+          curl -fSL -o app/libs/sherpa-onnx-1.13.3.aar \
+            "https://github.com/${{ github.repository }}/releases/download/tts-runtime/sherpa-onnx-1.13.3.aar" \
+          || curl -fSL -o app/libs/sherpa-onnx-1.13.3.aar \
+            "https://github.com/PimpinPumpkin/Vela/releases/download/tts-runtime/sherpa-onnx-1.13.3.aar"
+          test "$(stat -c%s app/libs/sherpa-onnx-1.13.3.aar)" -gt 50000000
+
+      - name: Build debug APK (app.automap)
+        run: ./gradlew :app:assembleDebug -PappId=app.automap --no-daemon
+
+      - name: Attach APK to the debug prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cp app/build/outputs/apk/debug/app-debug.apk AutoMap-0.3.0-debug.apk
+          ls -lh AutoMap-0.3.0-debug.apk
+          sha256sum AutoMap-0.3.0-debug.apk
+          gh release upload v0.3.0-automap-debug AutoMap-0.3.0-debug.apk --clobber --repo "$GITHUB_REPOSITORY"

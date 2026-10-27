@@ -1,0 +1,50 @@
+package app.vela.ui
+
+import androidx.compose.ui.graphics.Color
+
+/**
+ * One Google-style palette shared by every bottom surface — the place sheet, the
+ * directions panel, the route chooser, the steps list and the nav bar — so they
+ * read as one consistent sheet instead of several differently-colored cards.
+ *
+ * Deliberately FIXED (not Material-You tokens) so a wallpaper tint can't wash the
+ * text out; choose the variant with the in-app `isAppInDarkTheme()`. Accent color
+ * stays the theme `primary` (teal); traffic uses [TrafficGreen]/[TrafficAmber]/
+ * [TrafficRed].
+ */
+object SheetPalette {
+    val Amoled = Color(0xFF000000)   // pure black for OLED power saving
+    // Google Maps dark chrome: #202124 sheet/body, #303134 search bar + inset rows.
+    val Dark = Color(0xFF131314)     // sheet / card background
+    val Light = Color(0xFFFFFFFF)
+    val InkDark = Color(0xFFE8EAED)  // primary text
+    val InkLight = Color(0xFF202124)
+    val DimDark = Color(0xFF9AA0A6)  // secondary text
+    val DimLight = Color(0xFF5F6368)
+    val RowAmoled = Color(0xFF0D0F11)// inset row / chip background in AMOLED
+    val RowDark = Color(0xFF282A2C)  // inset row / chip background
+    val RowLight = Color(0xFFF1F3F4)
+    val BorderAmoled = Color(0xFF22252A) // subtle separation line for pure black surfaces
+
+    // Shared traffic-coded colors (route ETAs, the route line, the steps header).
+    val TrafficGreen = Color(0xFF1E8E3E)
+    val TrafficAmber = Color(0xFFE8923D)
+    val TrafficRed = Color(0xFFD93838)
+
+    // Google's open/ETA green *text*: vivid on dark, deep on light. TrafficGreen
+    // is the light-theme value; on a dark sheet it reads almost black.
+    fun statusGreen(dark: Boolean) = if (dark) Color(0xFF4CAF50) else TrafficGreen
+
+    fun bg(dark: Boolean, amoled: Boolean = false) = when {
+        amoled && dark -> Amoled
+        dark -> Dark
+        else -> Light
+    }
+    fun ink(dark: Boolean) = if (dark) InkDark else InkLight
+    fun dim(dark: Boolean) = if (dark) DimDark else DimLight
+    fun row(dark: Boolean, amoled: Boolean = false) = when {
+        amoled && dark -> RowAmoled
+        dark -> RowDark
+        else -> RowLight
+    }
+}

@@ -1,0 +1,5032 @@
+package app.vela.ui.place
+
+import app.vela.ui.icons.Sym
+import app.vela.ui.icons.SymOutlined
+
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.foundation.gestures.scrollBy
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.calculateTargetValue
+import androidx.compose.animation.core.exponentialDecay
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.horizontalScroll
+import app.vela.ui.theme.isAppInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.activity.compose.BackHandler
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material3.Surface
+import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Directions
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.filled.DirectionsBoat
+import androidx.compose.material.icons.automirrored.filled.DirectionsBike
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.DirectionsBus
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.DirectionsSubway
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.DirectionsTransit
+import androidx.compose.material.icons.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.Train
+import androidx.compose.material.icons.filled.Tram
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.FormatQuote
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.LocalCafe
+import androidx.compose.material.icons.filled.LocalGasStation
+import androidx.compose.material.icons.filled.LocalGroceryStore
+import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material.icons.filled.TripOrigin
+import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.SportsScore
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Streetview
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
+// D-pad-only operation (docs/dpad.md) — one import block so upstream merges stay clean.
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import app.vela.ui.dpadHighlight
+import app.vela.ui.dpadFieldEscape
+import app.vela.ui.rememberDpadAutoFocus // D-pad-first initial focus (docs/dpad.md)
+import app.vela.ui.VelaMenu // D-pad-first menu (docs/dpad.md)
+import app.vela.ui.item
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.draw.clip
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import app.vela.R
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import app.vela.core.model.AboutSection
+import app.vela.core.model.LatLng
+import app.vela.core.model.Place
+import app.vela.core.model.fullAddress
+import app.vela.core.model.ShortcutKind
+import app.vela.core.model.Review
+import app.vela.core.model.Route
+import app.vela.core.model.TransitItinerary
+import app.vela.core.model.TransitLine
+import app.vela.core.model.TransitMode
+import app.vela.core.model.TransitStep
+import app.vela.core.model.TransitStopTime
+import app.vela.core.model.TravelMode
+import coil.compose.AsyncImage
+import app.vela.ui.RatingStars
+import app.vela.ui.SheetPalette
+import app.vela.ui.formatDistance
+import app.vela.ui.formatDuration
+import app.vela.ui.map.TransitNavState
+import kotlin.math.roundToInt
+import app.vela.ui.placeStatusColor
+import java.util.Locale
+
+// Google-like, fixed sheet palette — independent of the Material You wallpaper
+// tint so the name/time/address always read crisp (white-on-dark / black-on-white)
+// like Google Maps, instead of a washed-out dynamic tone.
+// The sheet palette is shared app-wide (see ui/SheetPalette) so the place sheet,
+// directions panel, route chooser and steps list all match.
+/** Height the rating row occupies (its 6dp top pad plus a titleMedium line) - the slot held while
+ *  a rated place's details are still loading, so the action pills below do not move when it lands. */
+private const val RATING_ROW_DP = 30f
+
+private val SheetDark = SheetPalette.Dark
+private val SheetLight = SheetPalette.Light
+private val InkDark = SheetPalette.InkDark
+private val InkLight = SheetPalette.InkLight
+private val DimDark = SheetPalette.DimDark
+private val DimLight = SheetPalette.DimLight
+
+@Composable
+fun PlaceSheet(
+    place: Place,
+    isSaved: Boolean,
+    reviews: List<Review> = emptyList(),
+    reviewsLoading: Boolean = false,
+    reviewsFound: Int = 0,
+    /** Google served its limited view (a short review list): the tab says so. */
+    reviewsLimited: Boolean = false,
+    /** The native feed has a next page: the list ends in "More reviews". Null = no button. */
+    onMoreReviews: (() -> Unit)? = null,
+    /** Reviews wait for a tap ([app.vela.ui.ReviewsOnTap]). Null = load as usual. */
+    onShowReviews: (() -> Unit)? = null,
+    reviewsMoreLoading: Boolean = false,
+    photosLoading: Boolean = false,
+    /** The strip holds the first batch only: end it with a "More photos" tile. */
+    morePhotos: Boolean = false,
+    onMorePhotos: () -> Unit = {},
+    /** Walk the gallery for its categories (Menu and the rest). Null hides the chip. */
+    onPhotoCategories: (() -> Unit)? = null,
+    /** Photos wait for a tap ([app.vela.ui.PhotosOnTap]). Null = load as usual. */
+    onShowPhotos: (() -> Unit)? = null,
+    detailsLoading: Boolean = false,
+    placesHere: List<Place> = emptyList(),
+    /** The tapped label is still being looked up on Google: skeletons stand in for the details,
+     *  which fade in when the listing lands. */
+    resolving: Boolean = false,
+    /** The tapped label's Google lookup found nothing: the source line says "not matched". */
+    unlinked: Boolean = false,
+    /** What the sheet's own state (detent, expanded, menus) is keyed on. The map screen keeps it
+     *  at the tapped placeholder's id when the tap resolves to a listing with another id, so the
+     *  resolve updates the open sheet instead of re-mounting it (the "flash", user 2026-09-22). */
+    sheetKey: String = place.id,
+    /** Open the sheet on this tab (e.g. "Menu" from the results row button). Null = Overview. */
+    initialTab: String? = null,
+    stopDepartures: app.vela.core.model.StopDepartures? = null,
+    stopDeparturesLoading: Boolean = false,
+    stopDeparturesCachedAt: Long? = null,
+    onTapRoute: (app.vela.core.model.StopDepartureLine) -> Unit = {},
+    onClose: () -> Unit,
+    onToggleSave: () -> Unit,
+    onDirections: () -> Unit,
+    // Route AND begin guidance in one tap (issue #272). Null hides the pill.
+    onStartNavigation: (() -> Unit)? = null,
+    onStreetView: () -> Unit = {},
+    onOpenPlace: (Place) -> Unit = {},
+    onOpenSimilar: (app.vela.core.model.SimilarPlace) -> Unit = {},
+    onSetShortcut: (ShortcutKind) -> Unit = {},
+    onRetryReviews: () -> Unit = {},
+    onNeedReviews: () -> Unit = {},
+    onClearParking: () -> Unit = {},
+    lists: List<app.vela.core.model.PlaceList> = emptyList(),
+    onAddToList: (listId: String) -> Unit = {},
+    onRemoveFromList: (listId: String) -> Unit = {},
+    onCreateListWith: (name: String) -> Unit = {},
+    onSetNote: (String?) -> Unit = {},
+    // Issue #629: the saved place's own map icon; shown only once it is saved somewhere.
+    onChooseIcon: () -> Unit = {},
+    onExpandedChange: (Boolean) -> Unit = {},
+    // Bumped by MapScreen when the user grabs the map — the sheet glides down to its minimized
+    // card so the map is unobstructed (Google's behavior). 0 = never.
+    minimizeTick: Int = 0,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val dark = isAppInDarkTheme()
+    val ink = if (dark) InkDark else InkLight
+    val dim = if (dark) DimDark else DimLight
+    // The saved parking spot's own sheet: car glyph beside the name, a Clear action pill.
+    val isParking = place.id.startsWith("parking:")
+    // Match by feature id too — the volatile place id can change between visits for a
+    // multi-listing chain, which hid the "Edit note"/"Saved" affordances (see ListPlace.matches).
+    val containingLists = lists.filter { l -> l.places.any { it.matches(place.id, place.featureId) } }
+    val inAnyList = containingLists.isNotEmpty()
+    // The star and the Save pill are filled for a place in any list, not only a quick-saved one
+    // (issue #792). The star's menu is declared here so the pill can reach the chooser beside it.
+    val marked = isSaved || inAnyList
+    var saveMenu by remember(sheetKey) { mutableStateOf(false) }
+    // The listing's details fade in when a tap resolves, instead of popping in all at once.
+    // While the tap is looked up, whatever the map's own data already knows shows at once (the
+    // open-data category, address, phone, website and hours; user 2026-09-22) and Google's
+    // listing replaces it in place. Only a section with NOTHING to show yet is a skeleton, and
+    // only a section that was a skeleton fades in: text already on screen just updates.
+    val detailsSkeleton = resolving && place.category.isNullOrBlank() && place.hours.isEmpty()
+    val bodySkeleton = resolving && place.address.isNullOrBlank() && place.phone.isNullOrBlank() &&
+        place.website.isNullOrBlank() && place.hours.isEmpty()
+    val ratingReveal = rememberReveal(sheetKey, resolving)
+    val detailsReveal = rememberReveal(sheetKey, detailsSkeleton)
+    val bodyReveal = rememberReveal(sheetKey, bodySkeleton)
+    var showListChooser by remember(sheetKey) { mutableStateOf(false) }
+    var showNoteEditor by remember(sheetKey) { mutableStateOf(false) }
+    // Rename a saved place from its own sheet (discussion #681): a dropped pin saved as a street
+    // name or coordinates gets a name of yours without a trip to the search page's pinned row.
+    var showSavedRename by remember(sheetKey) { mutableStateOf(false) }
+    // A tapped photo opens the full-screen gallery; resets when the sheet switches place.
+    var galleryStart by remember(sheetKey) { mutableStateOf<Int?>(null) }
+    // Gallery category filter (null = All); resets per place. Chips appear only when Google tagged photos.
+    var photoCat by remember(sheetKey) { mutableStateOf<String?>(null) }
+
+    // Three detents, Google-style: EXPANDED (reviews) ↔ PEEK (default, ~half) ↔ MINIMIZED (a small
+    // card). A gentle swipe down steps one detent (expanded→peek→minimized); from minimized another
+    // swipe dismisses, and a big/fast swipe dismisses outright. So the first gentle pull minimizes
+    // instead of closing. expandedState stays the reviews driver; minimizedState is only ever set from
+    // peek, so the two are never both true.
+    val expandedState = remember(sheetKey) { mutableStateOf(false) }
+    val minimizedState = remember(sheetKey) { mutableStateOf(false) }
+    val screenH = LocalConfiguration.current.screenHeightDp
+    // The sheet height is a hand-driven Animatable (dp), not animateDpAsState: dragging moves it
+    // 1:1 WITH THE FINGER, and releasing coasts on the fling velocity to whichever detent the
+    // projected landing point is closest to - Google's feel. The old three-state spring hopped a
+    // whole detent the moment a drag crossed a pixel threshold, which read as staccato steps
+    // (user 2026-07-10). State flips from taps / the reviews panel / auto-expand still animate,
+    // via the LaunchedEffect below.
+    // A parked-car (or any minimal-content) sheet has nothing to minimize INTO — one compact
+    // fixed height, so a drag can't shrink it and hide the actions (user 2026-07-10). All three
+    // detents equal that height, so every detent computation resolves to it and the drag can't
+    // resize the sheet.
+    val singleDetent = isParking
+    // Transit stops expand FULL-SCREEN like any other place (the short-lived peek cap from earlier
+    // today blocked maximizing a stop entirely - reported independently by the user and issue #71's
+    // reporter within hours; with real multi-route boards the full detent has plenty to show).
+    // Landscape (2026-07-20, the side-panel layout) is a TWO-detent ladder: 0.26 of a ~390dp
+    // landscape screen is ~101dp - only the name row fits and the action pills (Directions/Call)
+    // fold out of the minimized card - so minimized gets a dp floor that keeps the skeleton
+    // visible. Expanded CAPS BELOW THE SEARCH BAR (screenH - 104dp): the full-height 0.92 slid the
+    // panel's top strip under the full-width bar, which kept taking taps over it (user 2026-07-20,
+    // "maximized does not hide the search bar" - in the panel layout the bar deliberately STAYS,
+    // so the panel must stop under it instead). Between a 200dp floor and a ~286dp cap there is
+    // no room for a distinct middle stop, so peek = expanded and the panel steps minimized <->
+    // tall, Google's landscape feel. Portrait numbers are untouched.
+    val landscapeSheet = LocalConfiguration.current.screenWidthDp > screenH
+    // The search bar steps aside for an open panel in landscape, so the panel takes the height
+    // up to just under the status bar, as Google's does.
+    val landscapeExpH = maxOf(screenH + 8f, screenH * 0.55f)
+    val minH = if (singleDetent) screenH * 0.30f
+    else if (landscapeSheet) maxOf(screenH * 0.26f, 200f).coerceAtMost(screenH * 0.55f)
+    else screenH * 0.26f
+    val peekH = if (singleDetent) screenH * 0.30f
+    else if (landscapeSheet) landscapeExpH
+    else screenH * 0.56f
+    val expH = if (singleDetent) screenH * 0.30f
+    else if (landscapeSheet) landscapeExpH
+    else screenH * 0.92f
+    fun detentFor(expanded: Boolean, minimized: Boolean) = when {
+        expanded -> expH
+        minimized -> minH
+        else -> peekH
+    }
+    val heightAnim = remember(sheetKey) { Animatable(detentFor(expandedState.value, minimizedState.value)) }
+    val settleSpec = remember { spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 350f) }
+    // landscapeSheet + screenH in the keys: ROTATING kept the other orientation's pixel height
+    // (the effect never re-ran, its keys hadn't changed), so a sheet expanded in portrait came
+    // into landscape taller than the landscape cap and sat over the search bar (user 2026-07-23).
+    // Re-running on a geometry change snaps to the detent the new orientation computes.
+    LaunchedEffect(sheetKey, expandedState.value, minimizedState.value, landscapeSheet, screenH) {
+        val target = detentFor(expandedState.value, minimizedState.value)
+        // Skip when a drag-release settle is already animating to this exact detent - restarting
+        // would zero the coast velocity mid-glide.
+        if (heightAnim.targetValue != target) heightAnim.animateTo(target, settleSpec)
+    }
+    // The user grabbed the map: glide down to the minimized card on a SOFT spring (the settle
+    // stiffness reads as a blink for this unprompted drop). Runs after the state-flip effect
+    // above, so animating on VALUE (not targetValue) deliberately replaces its quicker settle.
+    val glideSpec = remember { spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 140f) }
+    // Consume-once guard: seenTick INITIALIZES to the tick's CURRENT value, so a fresh mount
+    // (picking a place from the results list re-mounts the sheet) never treats a STALE tick as
+    // a new pan - a LaunchedEffect fires on first composition too, and without this the next
+    // place opened pre-minimized (user 2026-07-10). Only a bump AFTER mount glides.
+    var seenTick by remember { mutableStateOf(minimizeTick) }
+    LaunchedEffect(minimizeTick) {
+        if (minimizeTick == seenTick) return@LaunchedEffect
+        seenTick = minimizeTick
+        // Flip the states FIRST so the extras' shrink-and-fade (SheetFold) runs CONCURRENTLY
+        // with the height glide - one continuous motion, same order the drag-release path uses.
+        // (The old glide-then-flip order existed for the swap-based mini card, since removed.)
+        expandedState.value = false
+        minimizedState.value = true
+        if (heightAnim.value > minH + 0.5f) heightAnim.animateTo(minH, glideSpec)
+    }
+    // NOTE: heightAnim.value is deliberately NOT read here in composition - the height is applied
+    // in the layout modifier on the Card below, so an animation frame only re-LAYOUTS the sheet
+    // instead of recomposing the whole thing (photos, reviews, hours) 60x a second. Reading it in
+    // composition was the dropped-frames report on the tap-to-expand animation (user 2026-07-10).
+    val density = LocalDensity.current
+    val settleScope = rememberCoroutineScope()
+    // The body is a SKELETON (name row, rating, action pills - the minimized card) plus
+    // SheetFold sections between/around it. The extras' fold is LOCKED TO THE SHEET
+    // HEIGHT: their height/alpha scale by how far the sheet sits between the minimized
+    // floor and peek, read in the layout/render phase each frame. Whatever drives the
+    // height (pan glide, a slow drag, the release settle) drives the fold identically -
+    // a separately-clocked exit animation could never stay in step with a spring and
+    // read as staccato (user 2026-07-11). A parked car (singleDetent) keeps its extras:
+    // nothing to minimize into. (Declared up here because the Card's height layout also
+    // reads the fraction: the card floors at the minimized detent while the fold is engaged.)
+    val extrasFraction: () -> Float = {
+        if (singleDetent) 1f else ((heightAnim.value - minH) / (peekH - minH)).coerceIn(0f, 1f)
+    }
+    // Composition gate: extras stay MOUNTED while any part of them shows (so a fold or a
+    // partial drag always has content) and unmount only once the sheet settles at the
+    // floor - the same lifecycle the old mini-card swap gave the hidden body, keeping
+    // zero-height controls out of D-pad focus search. derivedStateOf collapses the
+    // per-frame height reads into one recomposition at the flip points.
+    val extrasComposed by remember(sheetKey, singleDetent, minH) {
+        derivedStateOf { singleDetent || !minimizedState.value || heightAnim.value > minH + 1f }
+    }
+    // Release: project where the fling would coast to, snap the STATES to the nearest detent (so
+    // everything keyed on them stays honest), and glide there carrying the finger's velocity. A
+    // hard fling projects past the middle detent and lands on MINIMIZED from anywhere; a gentle
+    // drop settles back where it came from. A swipe still never CLOSES the sheet (X / back do).
+    //
+    // Friction 1.6 keeps the tuned eagerness: an exponential decay's total coast is
+    // v / (4.2 * friction), so 1.6 reproduces the same landing points as the earlier
+    // linear projection factor of 0.15 - it's the one knob for "how hard must I throw it".
+    val flingDecay = remember { exponentialDecay<Float>(frictionMultiplier = 1.6f) }
+    fun settleFromVelocity(velocityPxPerSec: Float) {
+        if (singleDetent) { settleScope.launch { heightAnim.animateTo(peekH, settleSpec) }; return }
+        val vDp = with(density) { velocityPxPerSec.toDp().value }
+        // Where the throw would naturally coast to, then the nearest detent to THAT point.
+        val naturalEnd = flingDecay.calculateTargetValue(heightAnim.value, -vDp)
+        // A real FLICK (>450 dp/s) commits AT LEAST one detent in its direction - the pure
+        // projection needed the coast to cross half the gap, which made short flicks feel
+        // dead (user 2026-07-11). A hard throw still crosses two detents via the projection.
+        val detents = listOf(minH, peekH, expH)
+        val target = when {
+            vDp < -FLING_COMMIT_DPS -> {
+                val up = detents.filter { it > heightAnim.value + 1f }
+                maxOf(up.minOrNull() ?: expH, up.minByOrNull { kotlin.math.abs(it - naturalEnd) } ?: expH)
+            }
+            vDp > FLING_COMMIT_DPS -> {
+                val down = detents.filter { it < heightAnim.value - 1f }
+                minOf(down.maxOrNull() ?: minH, down.minByOrNull { kotlin.math.abs(it - naturalEnd) } ?: minH)
+            }
+            else -> detents.minByOrNull { kotlin.math.abs(it - naturalEnd) } ?: peekH
+        }
+        expandedState.value = target == expH
+        minimizedState.value = target == minH
+        settleScope.launch {
+            val towardTarget = (naturalEnd - heightAnim.value) * (target - heightAnim.value) > 0f
+            if (towardTarget && kotlin.math.abs(naturalEnd - heightAnim.value) >= kotlin.math.abs(target - heightAnim.value)) {
+                // Google's feel: no spring snap - the sheet RIDES THE THROW'S OWN INERTIA and the
+                // detent simply stops it (Animatable bounds clamp the decay exactly there). Only
+                // a throw whose natural coast reaches the detent qualifies, so the stop never
+                // looks magnetic.
+                try {
+                    heightAnim.updateBounds(
+                        lowerBound = minOf(heightAnim.value, target),
+                        upperBound = maxOf(heightAnim.value, target),
+                    )
+                    heightAnim.animateDecay(-vDp, flingDecay)
+                } finally {
+                    heightAnim.updateBounds(lowerBound = null, upperBound = null)
+                }
+                if (kotlin.math.abs(heightAnim.value - target) > 0.5f) heightAnim.animateTo(target, settleSpec)
+            } else {
+                // The throw doesn't carry to the detent (gentle drop, or released between
+                // detents against the velocity): glide there with a soft spring instead.
+                heightAnim.animateTo(target, settleSpec, initialVelocity = -vDp)
+            }
+        }
+    }
+    fun dragSheetBy(dyPx: Float) {
+        val dyDp = with(density) { dyPx.toDp().value }
+        settleScope.launch { heightAnim.snapTo((heightAnim.value - dyDp).coerceIn(minH, expH)) }
+    }
+    // Swipe down ANYWHERE on the sheet to dismiss (not just the handle): a nested-
+    // scroll handler watches the body — when it's at the top, a downward drag first
+    // collapses an expanded sheet, then dismisses it. Upward / mid-list drags scroll.
+    val bodyScroll = rememberScrollState()
+    // The open tab, and where its in-flow tab row sits, for the pinned copy.
+    var placeTab by remember(place.id, initialTab) { mutableStateOf(initialTab) }
+    var tabKeys by remember(place.id) { mutableStateOf(listOf("Overview")) }
+    var tabRowY by remember(place.id) { mutableStateOf(Float.MAX_VALUE) }
+    var bodyY by remember { mutableStateOf(0f) }
+    val tabScope = rememberCoroutineScope()
+    // Landing minimized rescrolls the body to its top. The fold clamps most of a scrolled
+    // body away as the content shrinks, but a couple of lines of residue can survive (a
+    // 2-line name + pills slightly overflow the floor height) and left the name's first
+    // line hiding behind the handle after minimizing a scrolled expanded sheet.
+    LaunchedEffect(minimizedState.value) {
+        if (minimizedState.value && !singleDetent && bodyScroll.value > 0) {
+            bodyScroll.animateScrollTo(0, tween(250))
+        }
+    }
+    val dismissConn = remember(sheetKey) {
+        object : NestedScrollConnection {
+            // True once this gesture actually moved the sheet - its release then settles the sheet
+            // and eats the fling instead of letting the body scroll run away with it.
+            private var draggingSheet = false
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                // The classic bottom-sheet grammar, 1:1 with the finger: a downward drag with the
+                // body at its top SHRINKS the sheet; an upward drag GROWS it while it still has
+                // room (content only scrolls once the sheet is fully expanded) - Google's feel.
+                if (available.y > 0f && bodyScroll.value == 0 && heightAnim.value > minH) {
+                    draggingSheet = true
+                    dragSheetBy(available.y)
+                    return available
+                }
+                if (available.y < 0f && heightAnim.value < expH) {
+                    draggingSheet = true
+                    dragSheetBy(available.y)
+                    return available
+                }
+                return Offset.Zero
+            }
+            // The fling phase runs at the end of every drag (even at zero velocity). If this
+            // gesture moved the sheet, coast it to the nearest detent on the finger's velocity -
+            // a hard downward flick lands on MINIMIZED from anywhere; a swipe never closes the
+            // sheet (X / back do).
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                if (draggingSheet) {
+                    draggingSheet = false
+                    settleFromVelocity(available.y)
+                    return available
+                }
+                return Velocity.Zero
+            }
+        }
+    }
+    // Scroll-sync with the live reviews panel: the panel forwards boundary drags (reviews at
+    // their top + finger down, or bottom + up) as raw deltas; we scroll the sheet body 1:1 with
+    // the finger, and past the body's own ends mirror dismissConn (collapse → dismiss on a pull
+    // past the top; expand on a push past the bottom). pull[0]/pull[1] accumulate those
+    // overshoots; any real body movement resets them (same feel as dismissConn's acc).
+    val scope = rememberCoroutineScope()
+    // [0]=pull-down overshoot, [1]=push-up overshoot, [2]=collapsed-this-gesture guard (0/1) so one
+    // continuous down-drag collapses but can't also dismiss (matches dismissConn).
+    val pull = remember(sheetKey) { floatArrayOf(0f, 0f, 0f) }
+    // True while the user is reading reviews "full screen" (panel engaged): set by the panel's
+    // engagement signal, cleared when they drag back toward the sheet top. Hides the native
+    // histogram so the panel gets the height.
+    val reviewsEngaged = remember(sheetKey) { mutableStateOf(false) }
+    val onPanelOverscroll: (Float) -> Unit = { dy ->
+        val consumed = bodyScroll.dispatchRawDelta(-dy)
+        val leftover = -dy - consumed
+        when {
+            leftover < -0.5f -> { // pulling down past the body top
+                pull[1] = 0f
+                pull[0] += -leftover
+                if (pull[2] == 0f) {
+                    when {
+                        expandedState.value && pull[0] > 90f -> { expandedState.value = false; reviewsEngaged.value = false; pull[0] = 0f; pull[2] = 1f }
+                        !minimizedState.value && pull[0] > 150f -> { minimizedState.value = true; reviewsEngaged.value = false; pull[0] = 0f; pull[2] = 1f }
+                        // Minimized is the floor here too — a pull never closes the sheet.
+                    }
+                }
+            }
+            leftover > 0.5f -> { // pushing up past the body bottom
+                pull[0] = 0f
+                pull[1] += leftover
+                if (pull[1] > 90f) {
+                    if (minimizedState.value) minimizedState.value = false
+                    else if (!expandedState.value) expandedState.value = true
+                    pull[1] = 0f
+                }
+            }
+            else -> { pull[0] = 0f; pull[1] = 0f }
+        }
+    }
+    val onPanelOverscrollEnd: (Float) -> Unit = { velocityY ->
+        pull[0] = 0f; pull[1] = 0f; pull[2] = 0f
+        // Disengage at GESTURE END, not per-pixel: re-inserting the header content (rating +
+        // histogram + tabs) mid-drag shifts the layout right under the held finger — flicker.
+        // Fires when the body walked up OR is simply at/near its top — in engaged mode the
+        // panel fills the sheet, so the body's whole range is tiny and a "walked 150px" test
+        // could NEVER pass (engaged got stuck forever; the header never came back).
+        if (bodyScroll.value <= 1 || bodyScroll.value < bodyScroll.maxValue - 150) reviewsEngaged.value = false
+        // Carry a boundary fling into the sheet so it glides instead of dead-stopping at
+        // finger-up. velocityY is finger px/s (+down); scroll space is inverted.
+        if (kotlin.math.abs(velocityY) > 600f) {
+            scope.launch { bodyScroll.animateScrollBy(-velocityY * 0.3f) }
+        }
+    }
+    // The user started really scrolling the reviews panel: slide the sheet to full screen around
+    // them, Google-style (expand + settle the body so the panel fills the viewport). The second
+    // animateScrollTo chases the body's max as the expand animation grows it.
+    // Report the expanded detent up: MapScreen kills the search bar's taps while the sheet
+    // covers it (a tap on the sliver of bar behind an expanded sheet opened search OVER the
+    // place card, user 2026-07-11).
+    LaunchedEffect(expandedState.value) { onExpandedChange(expandedState.value) }
+    val onPanelEngaged: () -> Unit = {
+        reviewsEngaged.value = true
+        scope.launch {
+            expandedState.value = true
+            bodyScroll.animateScrollTo(bodyScroll.maxValue)
+            bodyScroll.animateScrollTo(bodyScroll.maxValue)
+        }
+    }
+    Card(
+        modifier
+            .fillMaxWidth()
+            .layout { measurable, constraints ->
+                // Layout-phase read (see the note above): recompose-free height animation.
+                val maxHPx = heightAnim.value.dp.roundToPx().coerceAtLeast(1)
+                val cap = minOf(constraints.maxHeight, maxHPx)
+                // While the minimize fold is engaged (fraction < 1) the card must not under-run
+                // the minimized detent: the folding content dips just below minH near the floor
+                // (the skeleton is a touch shorter than the detent), and a pure wrap-cap card
+                // then dived that last bit of slack in a blink - the end-of-fold hop (user
+                // 2026-07-11). The floor goes into the MEASUREMENT (minHeight), never just the
+                // reported size: flooring only the report left the card SURFACE at content
+                // height, top-placed in a taller slot, and the deficit showed through as a
+                // strip of map under the minimized card (user 2026-07-11). At rest above the
+                // fold (fraction = 1) the card keeps hugging short content: dropped pins and
+                // the parked car stay compact.
+                val floorPx = if (extrasFraction() < 1f) minOf(minH.dp.roundToPx(), cap) else 0
+                val p = measurable.measure(constraints.copy(minHeight = floorPx, maxHeight = cap))
+                layout(p.width, p.height) { p.place(0, 0) }
+            },
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = if (dark) SheetDark else SheetLight),
+    ) {
+        // Card background fills to the screen bottom; pad the content up off the nav bar.
+        Column(Modifier.navigationBarsPadding()) {
+            // D-pad-first (docs/dpad.md): when the sheet opens, land focus ON the handle so the
+            // sheet is the active surface — otherwise Compose leaves focus on the search bar
+            // behind the sheet (measured: sometimes the search field, sometimes a photo — the
+            // exact nondeterminism to kill). No-op under touch.
+            val sheetAutoFocus = rememberDpadAutoFocus()
+            // Drag the handle UP to expand (reviews), DOWN to shrink, down again to dismiss.
+            // TAP toggles expand/peek. The touch target is a tall (36dp) invisible strip — the
+            // 4dp handle is just the visual; a fat hit-area makes it easy to grab.
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .focusRequester(sheetAutoFocus)
+                    // D-pad (docs/dpad.md): the handle is a real button — focusable, OK steps a
+                    // detent. clickable replaces the old tap-only detector (same tap behavior
+                    // under touch); the drag detector below is untouched.
+                    .dpadHighlight(RoundedCornerShape(3.dp))
+                    .clickable {
+                        // Tap grows one detent: minimized→peek, peek→expanded, expanded→peek.
+                        // (No-op on a single-detent sheet — a parked car has nowhere to step.)
+                        if (!singleDetent) {
+                            if (minimizedState.value) minimizedState.value = false
+                            else expandedState.value = !expandedState.value
+                        }
+                    }
+                    .pointerInput(Unit) {
+                        // The handle drags the sheet 1:1 and the release coasts to the nearest
+                        // detent on the fling velocity - same physics as dragging the body.
+                        sheetDragGestures(dragBy = { dragSheetBy(it) }, settle = { settleFromVelocity(it) })
+                    }
+                    .heightIn(min = 36.dp)
+                    .padding(vertical = 14.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    Modifier
+                        .size(width = 40.dp, height = 5.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(dim.copy(alpha = 0.6f)),
+                )
+            }
+            Box(Modifier.onGloballyPositioned { bodyY = it.positionInWindow().y }) {
+            Column(
+                Modifier
+                    .nestedScroll(dismissConn)
+                    .verticalScroll(bodyScroll)
+                    // Minimized, the skeleton fits inside the floor height, so the scrollable
+                    // above has no range and never engages a drag - nothing reached dismissConn
+                    // and a flick on the minimized card read as dead while the same flick on the
+                    // handle worked (user 2026-07-11). Give the minimized body the handle's own
+                    // drag; the key remounts this as a no-op whenever the full body is showing,
+                    // handing drags back to the scrollable's nested-scroll path.
+                    .pointerInput(minimizedState.value, singleDetent) {
+                        if (!minimizedState.value || singleDetent) return@pointerInput
+                        sheetDragGestures(dragBy = { dragSheetBy(it) }, settle = { settleFromVelocity(it) })
+                    }
+                    // Minimized: a single tap ANYWHERE on the card pops it back to peek (Google) —
+                    // the action pills keep their own taps since inner clickables win their bounds.
+                    // Inert (enabled=false) whenever the full body is showing.
+                    .dpadHighlight(RoundedCornerShape(20.dp))
+                    .clickable(enabled = minimizedState.value && !singleDetent) { minimizedState.value = false }
+                    .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
+            ) {
+            // Photo hero at the top (Google-style); tap one to open the full gallery.
+            // Hidden entirely when "Load photos" is off (the fetch is skipped too, but the
+            // search response can seed a preview photo — don't show it either).
+            app.vela.ui.SheetFold(extrasComposed, extrasFraction) {
+            // Most transit stops have NO photos, so the pulsing placeholder tiles read as a perpetual
+            // loading animation for nothing (user 2026-07-13) - suppress the shimmer for transit places
+            // entirely; if the fetch does land photos, the row simply appears with them.
+            val transitNoShimmer = stopDepartures != null || stopDeparturesLoading ||
+                place.category?.lowercase()?.let { c ->
+                    listOf("station", "stop", "transit", "transport", "hub", "bus", "subway", "metro", "tram", "rail", "ferry", "terminal", "platform").any { it in c }
+                } == true
+            // RESERVE the strip's slot from the FIRST frame for a place that is going to have
+            // photos. The gallery scrape only raises photosLoading once the details land (a place
+            // tapped on the map arrives with no rating, so it does not read as photo-worthy yet),
+            // so the strip used to appear a second or two in and shove the action pills ~122dp
+            // down the screen - right as the user was reaching for Directions (user 2026-09-18).
+            // A named business will almost always have a gallery, so a CATEGORY is the signal: an
+            // address or a dropped pin has none, and reserving there would hold a placeholder for
+            // nothing. Deliberately NOT keyed on the feature id - a place tapped on Vela's own
+            // places layer carries no Google id until the details land, which is exactly the case
+            // the slot is for.
+            val photosExpected = (detailsLoading && !place.category.isNullOrBlank()) || resolving
+            if (onShowPhotos != null) {
+                FilledTonalButton(onClick = onShowPhotos, shape = CircleShape, modifier = Modifier.padding(bottom = 12.dp).dpadHighlight(CircleShape)) {
+                    Icon(Sym.PhotoLibrary, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.place_show_photos))
+                }
+            } else if (app.vela.ui.LoadPhotos.on.value &&
+                (place.photoUrls.isNotEmpty() || ((photosLoading || photosExpected) && !transitNoShimmer))
+            ) {
+                // (The All/Menu category chips that used to sit here are gone — the Menu TAB is
+                // the menu surface now, and the other categories read as noise; user 2026-07-10.)
+                val shown = remember(place.photoUrls) { place.photoUrls.indices.toList() }
+                LazyRow(
+                    Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    items(shown, key = { it }) { i ->
+                        AsyncImage(
+                            model = place.photoUrls[i],
+                            contentDescription = stringResource(R.string.place_photo_number, i + 1),
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(width = 152.dp, height = 110.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(dim.copy(alpha = 0.2f))
+                                .dpadHighlight(RoundedCornerShape(12.dp))
+                                .clickable { galleryStart = i },
+                        )
+                    }
+                    // First batch only (a place tap stops the gallery walk at a handful): the rest is
+                    // one tap away, and costs Google contact only when someone wants it.
+                    if (morePhotos && !photosLoading && place.photoUrls.isNotEmpty()) {
+                        item(key = "more") {
+                            Box(
+                                Modifier
+                                    .size(width = 110.dp, height = 110.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(dim.copy(alpha = 0.12f))
+                                    .dpadHighlight(RoundedCornerShape(12.dp))
+                                    .clickable(onClick = onMorePhotos),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Sym.PhotoLibrary, contentDescription = null, tint = dim)
+                                    Spacer(Modifier.height(6.dp))
+                                    Text(stringResource(R.string.place_more_photos), style = MaterialTheme.typography.labelLarge, color = ink)
+                                }
+                            }
+                        }
+                    }
+                    // The full gallery scrapes in the background a beat after the sheet opens —
+                    // pulse placeholder tiles so it reads as "more photos loading", not "done".
+                    if ((photosLoading || photosExpected) && !transitNoShimmer) {
+                        item { PhotoShimmerTile(dim) }
+                        if (place.photoUrls.isEmpty()) {
+                            item { PhotoShimmerTile(dim) }
+                            item { PhotoShimmerTile(dim) }
+                        }
+                    }
+                }
+            }
+            }
+            // spacedBy keeps the circled header buttons from touching now that they carry
+            // visible backgrounds (Google's circles have the same small gaps).
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (isParking) {
+                    Icon(
+                        Sym.DirectionsCar,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(26.dp).padding(end = 2.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                }
+                // A very long name (CJK businesses especially) clips at 2 lines, so a TAP toggles the
+                // full name and a LONG-PRESS copies it (issue #169). D-pad: the name is a focus stop
+                // with a ring, OK toggles; copying rides the share menu's "Copy name" item (the key
+                // alternative the long-press gesture needs, docs/dpad.md).
+                var nameExpanded by remember(sheetKey) { mutableStateOf(false) }
+                fun copyName() {
+                    runCatching {
+                        val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        cm.setPrimaryClip(android.content.ClipData.newPlainText(place.name, place.name))
+                        Toast.makeText(context, context.getString(R.string.place_name_copied), Toast.LENGTH_SHORT).show()
+                    }
+                }
+                Text(
+                    place.name,
+                    // titleLarge (22sp) not headlineSmall (24sp) so a longer name ("Starbucks Coffee
+                    // Company") fits two lines beside the Save/Share/⋮/✕ icons instead of ellipsizing.
+                    style = MaterialTheme.typography.titleLarge,
+                    // Medium weight, a step under bold, as Google's place sheet sets the name: bold
+                    // read heavy next to the rating and category lines, regular read thin.
+                    fontWeight = FontWeight.Medium,
+                    color = ink,
+                    maxLines = if (nameExpanded) Int.MAX_VALUE else 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .weight(1f)
+                        .dpadHighlight(RoundedCornerShape(8.dp))
+                        .focusable()
+                        .onKeyEvent { ev ->
+                            if (ev.type == KeyEventType.KeyDown &&
+                                (ev.key == Key.DirectionCenter || ev.key == Key.Enter || ev.key == Key.NumPadEnter)
+                            ) { nameExpanded = !nameExpanded; true } else false
+                        }
+                        .pointerInput(place.id) {
+                            detectTapGestures(
+                                onTap = { nameExpanded = !nameExpanded },
+                                onLongPress = { copyName() },
+                            )
+                        },
+                )
+                // Only the X up here: Save and Share are pills in the action row (issue #830).
+                HeaderCircleButton(Sym.Close, stringResource(R.string.place_close), dim, dim, onClick = onClose)
+            }
+
+            // WHERE THIS ROW CAME FROM, for a tapped map place that is not (yet) a Google listing
+            // (user 2026-09-22): Overture, AllThePlaces (with the chain's spider) or
+            // OpenStreetMap, so a place that never links says which dataset to fix. An OSM row
+            // links to its node. Gone once the Google listing replaces the placeholder, and not
+            // shown over a Google copy kept from an earlier visit (offline).
+            PlaceOrigin.of(place.id)?.takeIf { resolving || place.featureId == null }?.let { origin ->
+                val src = when (origin.kind) {
+                    PlaceOrigin.Kind.OVERTURE -> stringResource(R.string.place_source_overture)
+                    PlaceOrigin.Kind.ATP -> stringResource(R.string.place_source_atp, origin.detail ?: "?")
+                    PlaceOrigin.Kind.OSM -> stringResource(R.string.place_source_osm)
+                }
+                val line = when {
+                    resolving -> stringResource(R.string.place_origin_checking, src)
+                    unlinked -> stringResource(R.string.place_origin_unlinked, src)
+                    else -> stringResource(R.string.place_origin_plain, src)
+                }
+                val url = origin.osmUrl?.takeIf { !app.vela.ui.HideExternalLinks.on.value }
+                Text(
+                    line,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = dim.copy(alpha = 0.8f),
+                    modifier = Modifier.padding(top = 2.dp).then(
+                        if (url != null) Modifier.dpadHighlight(RoundedCornerShape(4.dp)).clickable {
+                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                        } else Modifier,
+                    ),
+                )
+            }
+            // The rating row is the other thing that lands late above the action pills, and it is
+            // worth ~30dp of shove on its own. Hold its line while the details are in flight for a
+            // place that will have one (user 2026-09-18); an unrated place never reaches here
+            // because the fetch that would have brought a rating has already finished.
+            if (resolving) {
+                SheetSkeleton(dim, listOf(128.dp), height = 16.dp, top = 10.dp)
+            } else if (place.rating == null && detailsLoading && !place.category.isNullOrBlank()) {
+                Spacer(Modifier.height(RATING_ROW_DP.dp))
+            }
+            if (place.rating != null && !resolving) {
+                Row(Modifier.padding(top = 6.dp).then(ratingReveal), verticalAlignment = Alignment.CenterVertically) {
+                    // Google leads with a bold rating number; keep it prominent.
+                    Text(
+                        String.format(Locale.US, "%.1f", place.rating),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = ink,
+                    )
+                    RatingStars(place.rating!!, modifier = Modifier.padding(horizontal = 5.dp))
+                    place.reviewCount?.let {
+                        Text("($it)", style = MaterialTheme.typography.bodyMedium, color = dim)
+                    }
+                }
+            }
+            app.vela.ui.SheetFold(extrasComposed, extrasFraction) {
+            if (detailsSkeleton) SheetSkeleton(dim, listOf(196.dp, 150.dp), top = 8.dp)
+            else Column(detailsReveal) {
+            // Distance (when the place came from a located search) + price +
+            // category on their own line so a long category ("Hamburger restaurant")
+            // doesn't wrap mid-word next to the stars; ellipsized if huge.
+            val rest = listOfNotNull(
+                place.distanceMeters?.let { formatDistance(it) },
+                // The parked car: how long ago, in the phone's words ("2 hours ago").
+                if (isParking) app.vela.ui.ParkingActions.parkedAt?.invoke()?.takeIf { it > 0L }?.let {
+                    android.text.format.DateUtils.getRelativeTimeSpanString(
+                        it, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS,
+                    ).toString()
+                } else null,
+                place.priceText,
+                place.category,
+            )
+            if (rest.isNotEmpty()) {
+                Text(
+                    rest.joinToString("  ·  "),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = dim,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+            // Dropped-pin coordinates — when a tapped/held point did NOT snap to a street address (an
+            // arbitrary spot, a bare road, or a failed reverse-geocode), surface the lat/lng PROMINENTLY
+            // right under the name, Google-style, alongside the road name we already carry in the address
+            // row below. A house-numbered snap ("123 F St") or a real business POI shows its address
+            // instead, so this doesn't clutter those. Tappable to copy. Detect the snap by the name's
+            // first token being a pure-digit house number (a numbered street like "128th St" keeps its
+            // "th", so it reads as unsnapped and correctly shows coordinates).
+            val isDroppedPin = place.id.startsWith("pin:")
+            val snappedToAddress = place.name.substringBefore(' ')
+                .let { it.isNotEmpty() && it.all(Char::isDigit) } && place.name.contains(' ')
+            if (isDroppedPin && !snappedToAddress) {
+                val coords = "%.5f, %.5f".format(Locale.US, place.location.lat, place.location.lng)
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Sym.MyLocation, contentDescription = null, tint = dim, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(coords, style = MaterialTheme.typography.bodyLarge, color = ink, modifier = Modifier.weight(1f))
+                    IconButton(onClick = {
+                        val cb = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        cb.setPrimaryClip(ClipData.newPlainText("coordinates", coords))
+                        Toast.makeText(context, context.getString(R.string.place_coordinates_copied), Toast.LENGTH_SHORT).show()
+                    }) {
+                        Icon(Sym.ContentCopy, contentDescription = stringResource(R.string.place_copy_coordinates), tint = dim, modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+            if (place.permanentlyClosed) {
+                // Dead POI — call it out clearly (Google-style red) even when Google
+                // sent no hours/status string at all (which is what "no hours" looked
+                // like before we parsed this).
+                Text(
+                    stringResource(R.string.place_permanently_closed),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFD93838),
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            if (place.temporarilyClosed && !place.permanentlyClosed) {
+                // Owner-set temporary closure — banner it like Google does, and suppress the ordinary
+                // status/hours lines below (an "Opens 11:30 AM Tue" under a temp-closure reads as if the
+                // place will open then, which is exactly the misleading state the closure overrides).
+                Text(
+                    stringResource(R.string.place_temporarily_closed),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFD93838),
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            // Google's live status STRING is PRIMARY: it's the only source that knows an owner-set
+            // "closed today" (the weekly hours now carry holiday overrides, but not ad-hoc closures).
+            // Only when Google gives NO status do we fall back to an Open/Closed computed from the weekly
+            // hours (past-midnight-aware) — better than a blank, without trusting stale regular hours
+            // over a real closure.
+            // Ticks each minute so a sheet left open crosses an open/close boundary instead of showing
+            // "Open · Closes 9 PM" forever after 9 PM (the fallback is only used when Google sent no status).
+            val nowMinute by produceState(initialValue = app.vela.ui.DemoClock.now() ?: java.time.LocalDateTime.now()) {
+                while (true) {
+                    kotlinx.coroutines.delay(60_000)
+                    value = app.vela.ui.DemoClock.now() ?: java.time.LocalDateTime.now()
+                }
+            }
+            val computedStatus = remember(place.hours, nowMinute) {
+                app.vela.core.util.OpeningHours.statusAt(place.hours, nowMinute)
+            }
+            val demoStatus = app.vela.ui.DemoClock.status(place) // screenshot clock, off unless the dial is set
+            val statusLine = demoStatus?.first ?: place.statusText
+                ?: computedStatus?.let { (if (it.open) "Open" else "Closed") + " · " + it.detail }
+            statusLine?.takeIf { !place.permanentlyClosed && !place.temporarilyClosed }?.let { status ->
+                // Google colors the status word (Open/Closed) and keeps the time
+                // in the normal ink color: "**Open** · Closes 9 PM".
+                val parts = status.split(Regex("\\s*[·⋅]\\s*"), limit = 2)
+                val statusInk = app.vela.ui.themedStatusColor(status, demoStatus?.second ?: place.openNow)
+                val annotated = buildAnnotatedString {
+                    withStyle(SpanStyle(color = statusInk, fontWeight = FontWeight.Bold)) {
+                        append(parts[0])
+                    }
+                    if (parts.size > 1) {
+                        withStyle(SpanStyle(color = ink)) { append("  ·  ${parts[1]}") }
+                    }
+                }
+                Text(annotated, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
+            }
+            // Holiday / special hours callout (Google shows these prominently — e.g. "Independence
+            // Day · Hours might differ" — not just buried on one day's row). The parser tags the
+            // holiday day's string with " · <label>"; surface the soonest one up top.
+            val holiday = remember(place.hours, nowMinute) {
+                upcomingHoliday(place.hours, nowMinute.toLocalDate())
+            }
+            if (!place.permanentlyClosed && !place.temporarilyClosed) holiday?.let { h ->
+                Text(
+                    buildAnnotatedString {
+                        withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = Color(0xFFE0A63C))) {
+                            append(h.label)
+                        }
+                        withStyle(SpanStyle(color = dim)) { append("  ·  ${h.whenLabel} · ${h.hours}") }
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            }
+            }
+            // Quick-action pills FIRST: a highlighted Directions, then Start, Call, Save, Share and
+            // Website, right under the identity block so Directions is reachable WITHOUT scrolling
+            // (Google's order). The actual phone number / website domain are tappable detail rows
+            // lower down (below the hours), out of the way of the primary action.
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ActionPill(Sym.Directions, stringResource(R.string.place_directions), emphasized = true, onClick = onDirections)
+                // START, right beside Directions (issue #272). Directions opens the picker, whose
+                // own Start sits BELOW the route list - with three routes on a large-font screen
+                // that is off the bottom of the sheet, so the common case (just take me there)
+                // needed a scroll. Not offered for the parked car, where you are already at the
+                // start of the walk and "Directions" is the useful verb.
+                if (onStartNavigation != null && !isParking) {
+                    ActionPill(Sym.Navigation, stringResource(R.string.place_start), onClick = onStartNavigation)
+                }
+                if (isParking) {
+                    ActionPill(Sym.Delete, stringResource(R.string.place_clear_parking), onClick = onClearParking)
+                }
+                // Google's own action (Order online / Reserve a table / Book online) when parsed.
+                if (!place.actionLabel.isNullOrBlank() && place.actionUrl != null && !app.vela.ui.HideExternalLinks.on.value) {
+                    ActionPill(Icons.Default.Restaurant, place.actionLabel!!) {
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(place.actionUrl))) }
+                    }
+                }
+                place.phone?.let { ph ->
+                    ActionPill(Sym.Call, stringResource(R.string.place_call)) {
+                        val dialable = "tel:" + ph.filter { it.isDigit() || it == '+' }
+                        runCatching { context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse(dialable))) }
+                    }
+                }
+                // Save and Share are pills here and nowhere else, Google's layout (issue #830,
+                // after #814 did the same for the route picker). Save opens the save menu: the
+                // quick save, the lists, the note, the icon, the name, Home and Work; a drawn shape
+                // adds edit and delete. Filled for a place in any list too. D-pad-first via
+                // VelaMenu (docs/dpad.md).
+                Box {
+                    ActionPill(
+                        if (marked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                        stringResource(if (marked) R.string.place_saved else R.string.place_save),
+                    ) { saveMenu = true }
+                    VelaMenu(expanded = saveMenu, onDismissRequest = { saveMenu = false }) {
+                        // A drawn or imported line/area: it can be deleted from its list here.
+                        if (place.id.startsWith("shape:")) item(stringResource(R.string.draw_edit)) { saveMenu = false; app.vela.ui.ShapeActions.edit?.invoke() }
+                        if (place.id.startsWith("shape:")) item(stringResource(R.string.draw_delete)) { saveMenu = false; app.vela.ui.ShapeActions.delete?.invoke() }
+                        item(stringResource(if (isSaved) R.string.place_saved else R.string.place_save)) { saveMenu = false; onToggleSave() }
+                        if (!isParking) {
+                            item(stringResource(R.string.place_save_to_list)) { saveMenu = false; showListChooser = true }
+                            if (inAnyList) item(stringResource(R.string.place_edit_note)) { saveMenu = false; showNoteEditor = true }
+                            if (inAnyList || isSaved) item(stringResource(R.string.place_choose_icon)) { saveMenu = false; onChooseIcon() }
+                            if (isSaved || inAnyList) item(stringResource(R.string.mapscreen_menu_rename)) { saveMenu = false; showSavedRename = true }
+                        }
+                        item(stringResource(R.string.place_set_as_home)) { saveMenu = false; onSetShortcut(ShortcutKind.HOME) }
+                        item(stringResource(R.string.place_set_as_work)) { saveMenu = false; onSetShortcut(ShortcutKind.WORK) }
+                    }
+                }
+                SharePill(place)
+                if (!app.vela.ui.HideExternalLinks.on.value) {
+                    place.website?.let { site ->
+                        ActionPill(Sym.Language, stringResource(R.string.place_website)) {
+                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(site))) }
+                        }
+                    }
+                }
+                // Street View - opens the IN-APP panorama viewer (keyless tile-stitch + GL sphere,
+                // 2026-07-15). Not gated by HideExternalLinks anymore: it's a first-class in-app
+                // surface now, not a hand-off to Google's app. A tap loads the nearest pano; no
+                // coverage shows a brief "no Street View here" toast.
+                // Hidden without Google: the imagery is Google's, and a pill that always answers
+                // "no Street View here" is worse than no pill.
+                if (!app.vela.ui.GoogleFree.on.value) {
+                    ActionPill(Sym.Streetview, stringResource(R.string.place_street_view), onClick = onStreetView)
+                }
+            }
+
+            app.vela.ui.SheetFold(extrasComposed, extrasFraction) {
+            // While the tap is still being looked up on Google the body is a skeleton, so the
+            // sheet reads as "loading the listing" instead of showing the bare label's half-empty
+            // body and then jumping when the listing lands (user 2026-09-22).
+            if (bodySkeleton) SheetSkeleton(dim, listOf(260.dp, 220.dp, 240.dp, 180.dp), gap = 18.dp, top = 18.dp)
+            else Column(bodyReveal) {
+            // Live departure board for a transit stop, FIRST in the body (user 2026-07-13: the schedule
+            // is what you open a stop for - Google leads with it too). Renders nothing for non-transit
+            // places, so the unconditional position is safe.
+            PlaceTabs(
+                place, reviews, reviewsLoading, reviewsFound, onRetryReviews, ink, dim,
+                onNeedReviews = onNeedReviews, onPanelOverscroll = onPanelOverscroll, onPanelOverscrollEnd = onPanelOverscrollEnd,
+                onPanelEngaged = onPanelEngaged, panelEngaged = reviewsEngaged.value, reviewsLimited = reviewsLimited,
+                onMoreReviews = onMoreReviews, reviewsMoreLoading = reviewsMoreLoading, onShowReviews = onShowReviews,
+                resolving = resolving, selectedKey = placeTab, onSelect = { placeTab = it },
+                onTabs = { tabKeys = it }, onTabRowY = { tabRowY = it },
+                photosLoading = photosLoading, morePhotos = morePhotos, onMorePhotos = onMorePhotos, onPhotoCategories = onPhotoCategories,
+                photosHeld = onShowPhotos != null,
+                overviewTail = {
+            // Other Google listings at the same spot (a co-branded shop's duplicate
+            // profile, or a different unit at the address), like Google's "Also at
+            // this location". Tap to open one.
+            if (placesHere.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                Text(stringResource(R.string.place_also_at_location), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = ink)
+                placesHere.forEach { other ->
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).dpadHighlight(RoundedCornerShape(8.dp)).clickable { onOpenPlace(other) }.padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(other.name, style = MaterialTheme.typography.bodyLarge, color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            val sub = listOfNotNull(
+                                other.rating?.let { String.format(Locale.US, "%.1f★", it) + (other.reviewCount?.let { n -> " ($n)" } ?: "") },
+                                other.category,
+                            ).joinToString("  ·  ")
+                            if (sub.isNotEmpty()) Text(sub, style = MaterialTheme.typography.bodyMedium, color = dim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        Icon(Sym.ArrowForward, contentDescription = stringResource(R.string.place_open), tint = dim, modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+
+            // "People also search for": related places (Google-style). Filled by the
+            // detail re-fetch (root [2][11][0]); a horizontal row of tappable cards.
+            if (place.similarPlaces.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                Text(stringResource(R.string.place_people_also_search), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = ink)
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    place.similarPlaces.forEach { s ->
+                        Column(
+                            Modifier.width(150.dp).clip(RoundedCornerShape(12.dp))
+                                .background(dim.copy(alpha = 0.10f))
+                                .dpadHighlight(RoundedCornerShape(12.dp))
+                                .clickable { onOpenSimilar(s) }
+                                .padding(12.dp),
+                        ) {
+                            Text(s.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            s.rating?.let {
+                                Spacer(Modifier.height(4.dp))
+                                Text(String.format(Locale.US, "%.1f★", it), style = MaterialTheme.typography.bodySmall, color = dim)
+                            }
+                        }
+                    }
+                }
+            }
+                },
+            ) {
+            StopDepartureBoard(stopDepartures, stopDeparturesLoading, ink, dim, dark, onTapRoute, stopDeparturesCachedAt)
+            // Gas stations: the fuel price, bold, first in the body like Google's gas prices card
+            // ("$5.34/Regular" from Google, "172.9p/E10 · 199.9p/B7" in the UK). Below the action
+            // pills, so a price that lands after the sheet opened moves nothing above them. A UK
+            // price says how old its station's report is (SPEC 5.8); Google's carry no time.
+            place.fuelPrice?.let { fp ->
+                val age = place.fuelPriceAt?.let { at ->
+                    val days = app.vela.core.data.FuelGb.daysAgo(at, System.currentTimeMillis() / 1000, java.time.ZoneId.systemDefault())
+                    when (days) {
+                        0 -> stringResource(R.string.place_fuel_updated_today)
+                        1 -> stringResource(R.string.place_fuel_updated_yesterday)
+                        else -> pluralStringResource(R.plurals.place_fuel_updated_days, days, days)
+                    }
+                }
+                Row(Modifier.fillMaxWidth().padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Sym.LocalGasStation, contentDescription = null, tint = dim, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        buildAnnotatedString {
+                            withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = ink)) { append(fp) }
+                            if (age != null) withStyle(SpanStyle(color = dim)) { append("  ·  $age") }
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+            place.fullAddress()?.let { addr ->
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Sym.Place, contentDescription = null, tint = dim, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(addr, style = MaterialTheme.typography.bodyMedium, color = ink, modifier = Modifier.weight(1f))
+                    IconButton(onClick = {
+                        val cb = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        cb.setPrimaryClip(ClipData.newPlainText("address", addr))
+                        Toast.makeText(context, context.getString(R.string.place_address_copied), Toast.LENGTH_SHORT).show()
+                    }) {
+                        Icon(Sym.ContentCopy, contentDescription = stringResource(R.string.place_copy_address), tint = dim, modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+
+            // A permanently-closed POI already says so in red above — don't also
+            // nag "Hours not listed" beneath it (the dead-POI hours are moot).
+            // The list owner's personal note, carried over from an imported Google Maps list
+            // ("this restaurant's fish is better than its chicken") — the part of a shared
+            // list Google itself throws away on export, kept front and center here.
+            place.savedNote?.let { note ->
+                Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.Top) {
+                    Icon(Sym.FormatQuote, contentDescription = null, tint = dim, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(note, style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic, color = ink)
+                }
+            }
+
+            // Departments (pharmacy / fuel / liquor / delivery-pickup windows) nest INSIDE the
+            // Hours expansion — the collapsed sheet stays one clean "Hours" line, and the whole
+            // schedule story (store week + every department) lives behind one tap. When a place
+            // somehow has departments but no main hours, they still show standalone.
+            val showDepartments = place.departments.isNotEmpty() && !place.permanentlyClosed && !place.temporarilyClosed
+            // A transit stop has no opening hours by nature - Google shows its departures, not "hours
+            // not listed" (issue #71). Suppress that line whenever a board is loading/present or the
+            // category reads like a stop, so a stop never shows the misleading hours placeholder.
+            val isTransitStop = stopDepartures != null || stopDeparturesLoading || place.category?.lowercase()?.let { c ->
+                listOf("station", "stop", "transit", "transport", "hub", "bus", "subway", "metro", "tram", "rail", "ferry", "terminal", "platform").any { it in c }
+            } == true
+            if (place.hours.isNotEmpty()) {
+                if (place.address != null) InfoDivider(dim)
+                HoursSection(place.hours, ink, dim, departments = if (showDepartments) place.departments else emptyList())
+            } else if (showDepartments) {
+                DepartmentsSection(place.departments, ink, dim)
+            } else if (place.category != null && !place.permanentlyClosed && !isTransitStop && !resolving) {
+                // Not while the listing is still being looked up: the map's data lacking hours
+                // says nothing about Google's, which usually has them.
+                Text(stringResource(R.string.place_hours_not_listed), style = MaterialTheme.typography.bodySmall, color = dim, modifier = Modifier.padding(top = 10.dp))
+            }
+
+            // Phone + website as their own tappable rows showing the actual number / domain — placed
+            // BELOW the hours (Google's order), well clear of the Directions button up top. The pills
+            // are the fast path; these are the detail for when you want to see/copy the number or URL.
+            place.phone?.let { ph ->
+                InfoDivider(dim)
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).dpadHighlight(RoundedCornerShape(8.dp)).clickable {
+                        val dialable = "tel:" + ph.filter { it.isDigit() || it == '+' }
+                        runCatching { context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse(dialable))) }
+                    }.padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Sym.Call, contentDescription = null, tint = dim, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(ph, style = MaterialTheme.typography.bodyMedium, color = ink, modifier = Modifier.weight(1f))
+                }
+            }
+            place.website?.takeIf { !app.vela.ui.HideExternalLinks.on.value }?.let { site ->
+                InfoDivider(dim)
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).dpadHighlight(RoundedCornerShape(8.dp)).clickable {
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(site))) }
+                    }.padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Sym.Language, contentDescription = null, tint = dim, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        runCatching { Uri.parse(site).host?.removePrefix("www.") }.getOrNull() ?: site,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+
+            // Action link (Book online / Reserve a table / Order online) — Google shows this
+            // as a prominent button. Rendered only when the parse found a real URL + label.
+            if (place.actionUrl != null && !place.actionLabel.isNullOrBlank() && !app.vela.ui.HideExternalLinks.on.value) {
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 10.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.13f))
+                        .dpadHighlight(RoundedCornerShape(12.dp))
+                        .clickable {
+                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(place.actionUrl))) }
+                        }
+                        .padding(vertical = 12.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        place.actionLabel!!,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Icon(
+                        Sym.ArrowForward,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+
+            // Popular times sit BELOW the action buttons (Google's order). Lazily
+            // filled by the WebView detail fetch, so it pops in a beat after open.
+            place.popularTimes?.let {
+                Spacer(Modifier.height(10.dp)) // clear air between the rows above and the chart
+                PopularTimesSection(it, ink, dim)
+            }
+            // While the (slow, ~10–20 s) detail fetch is in flight and popular times
+            // haven't landed yet, show a subtle indicator so it reads as "loading", not
+            // "missing" — it clears to the chart, or to nothing if this place has none.
+            if (place.popularTimes == null && detailsLoading && place.isListing()) {
+                // Sized like the chart (title, day chips, bars) so its arrival moves nothing.
+                SheetSkeleton(dim, listOf(120.dp), height = 14.dp, top = 22.dp)
+                SheetSkeleton(dim, listOf(260.dp), height = 24.dp, top = 12.dp)
+                SheetSkeleton(dim, listOf(300.dp), height = 80.dp, top = 12.dp)
+            }
+            // Google is giving this session its limited view (web/GoogleStanding): say so where the
+            // chart would be, so a missing chart reads as Google's doing and not a broken app.
+            if (place.popularTimes == null && !detailsLoading && place.featureId != null && place.isListing() && app.vela.web.GoogleStanding.limited.value) {
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 12.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Icon(Sym.Info, contentDescription = null, tint = dim, modifier = Modifier.size(16.dp).padding(top = 2.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.place_limited_view), style = MaterialTheme.typography.bodySmall, color = dim)
+                }
+            }
+            // (The editorial summary + "From the owner" blurb live in the About tab.)
+
+
+            }
+            }
+            }
+            }
+            // Pinned copy of the tab row once the in-flow one scrolls under the top edge.
+            androidx.compose.animation.AnimatedVisibility(
+                visible = extrasComposed && !minimizedState.value && !reviewsEngaged.value && tabKeys.size > 1 && tabRowY < bodyY,
+                enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(120)),
+                exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120)),
+            ) {
+                PlaceTabRow(
+                    tabKeys, tabKeys.indexOf(placeTab).takeIf { it >= 0 } ?: 0, menuTabNameOf(place), ink,
+                    onSelect = { k ->
+                        placeTab = k
+                        val delta = tabRowY - bodyY
+                        tabScope.launch { bodyScroll.scrollBy(delta) }
+                    },
+                    modifier = Modifier.background(if (dark) SheetDark else SheetLight).padding(horizontal = 20.dp),
+                )
+            }
+            }
+        }
+    }
+
+    galleryStart?.let { start ->
+        PhotoGallery(place.photoUrls, place.photoDates.map { d -> d?.let { context.getString(R.string.place_photo_caption, it) } }, start) { galleryStart = null }
+    }
+
+    if (showListChooser) {
+        SaveToListSheet(
+            lists = lists,
+            containingIds = containingLists.mapTo(HashSet()) { it.id },
+            onToggle = { listId, add -> if (add) onAddToList(listId) else onRemoveFromList(listId) },
+            onCreateWith = { name -> onCreateListWith(name) },
+            onDismiss = { showListChooser = false },
+        )
+    }
+    if (showSavedRename) {
+        var draft by remember { mutableStateOf(place.name) }
+        app.vela.ui.VelaDialog(
+            onDismissRequest = { showSavedRename = false },
+            title = stringResource(R.string.saved_rename_title),
+            confirmText = stringResource(R.string.saved_rename_action),
+            onConfirm = { if (draft.isNotBlank()) app.vela.ui.SavedActions.rename?.invoke(place, draft); showSavedRename = false },
+            dismissText = stringResource(android.R.string.cancel),
+            onDismiss = { showSavedRename = false },
+        ) {
+            androidx.compose.material3.OutlinedTextField(
+                value = draft,
+                onValueChange = { draft = it },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().dpadFieldEscape(),
+            )
+        }
+    }
+    if (showNoteEditor) {
+        NoteEditorDialog(
+            initial = place.savedNote,
+            onSave = { onSetNote(it); showNoteEditor = false },
+            onDismiss = { showNoteEditor = false },
+        )
+    }
+}
+
+/** A release faster than this (dp/s) counts as a FLICK and commits at least one detent in
+ *  its direction, however short the drag - the shared sheet-fling grammar. */
+internal const val FLING_COMMIT_DPS = 180f
+
+/**
+ * The shared sheet drag: moves the sheet 1:1 with the finger via [dragBy] (finger px, +down)
+ * and hands the release velocity (px/s) to [settle]. One implementation for every sheet's
+ * hand-driven drag surface (place handle + minimized body, directions panel, results handle)
+ * because the velocity measurement is subtle twice over: the tracker must feed INTEGRATED
+ * drag deltas - change.position is local to a node that MOVES as the sheet resizes, which
+ * zeroed the measured velocity - and the release takes whichever is stronger of the tracked
+ * velocity and the gesture's plain travel/time average, so a short flick can never read as
+ * ~zero (user 2026-07-11). Inner clickables keep their taps (a drag claims the pointer only
+ * past touch slop) and inner scrollables that CAN scroll consume first.
+ */
+internal suspend fun androidx.compose.ui.input.pointer.PointerInputScope.sheetDragGestures(
+    dragBy: (Float) -> Unit,
+    settle: (Float) -> Unit,
+) {
+    val tracker = VelocityTracker()
+    var acc = 0f
+    var t0 = 0L
+    var tN = 0L
+    detectVerticalDragGestures(
+        onDragStart = { tracker.resetTracking(); acc = 0f; t0 = 0L; tN = 0L },
+        onVerticalDrag = { change, dy ->
+            change.consume()
+            acc += dy
+            if (t0 == 0L) t0 = change.uptimeMillis
+            tN = change.uptimeMillis
+            tracker.addPosition(change.uptimeMillis, androidx.compose.ui.geometry.Offset(0f, acc))
+            dragBy(dy)
+        },
+        onDragEnd = {
+            val tracked = tracker.calculateVelocity().y
+            val avg = if (tN > t0) acc / (tN - t0) * 1000f else 0f
+            settle(if (kotlin.math.abs(avg) > kotlin.math.abs(tracked)) avg else tracked)
+        },
+        onDragCancel = { settle(0f) },
+    )
+}
+
+/** "Save to list": check the lists this place belongs to; create a new one inline.
+ *  internal so the search-suggestion overflow menu (MapScreen, issue #180) reuses it. */
+@Composable
+internal fun SaveToListSheet(
+    lists: List<app.vela.core.model.PlaceList>,
+    containingIds: Set<String>,
+    onToggle: (listId: String, add: Boolean) -> Unit,
+    onCreateWith: (name: String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var creating by remember { mutableStateOf(false) }
+    var newName by remember { mutableStateOf("") }
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
+            Column(Modifier.padding(vertical = 16.dp).widthIn(max = 420.dp)) {
+                Text(
+                    stringResource(R.string.place_save_to_list),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                )
+                LazyColumn(Modifier.heightIn(max = 320.dp)) {
+                    items(lists, key = { it.id }) { list ->
+                        val checked = list.id in containingIds
+                        Row(
+                            Modifier.fillMaxWidth().dpadHighlight(RoundedCornerShape(8.dp)).clickable { onToggle(list.id, !checked) }.padding(horizontal = 20.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                if (checked) Sym.Check else Sym.BookmarkBorder,
+                                contentDescription = null,
+                                tint = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(22.dp),
+                            )
+                            Spacer(Modifier.width(16.dp))
+                            Text(list.name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                            Text("${list.places.size}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                if (creating) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        OutlinedTextField(
+                            value = newName, onValueChange = { newName = it },
+                            label = { Text(stringResource(R.string.list_name_label)) }, singleLine = true,
+                            modifier = Modifier.weight(1f).dpadFieldEscape(),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Button(onClick = { if (newName.isNotBlank()) { onCreateWith(newName.trim()); newName = ""; creating = false } }, enabled = newName.isNotBlank()) {
+                            Text(stringResource(R.string.list_save))
+                        }
+                    }
+                } else {
+                    TextButton(onClick = { creating = true }, modifier = Modifier.padding(horizontal = 12.dp)) {
+                        Icon(Sym.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(stringResource(R.string.mapscreen_new_list))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Edit the owner's note on a place in a list. */
+@Composable
+private fun NoteEditorDialog(
+    initial: String?,
+    onSave: (String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var text by remember { mutableStateOf(initial.orEmpty()) }
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
+            Column(Modifier.padding(20.dp).widthIn(max = 420.dp)) {
+                Text(stringResource(R.string.place_edit_note), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = text, onValueChange = { text = it },
+                    label = { Text(stringResource(R.string.place_note_label)) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp).dpadFieldEscape(),
+                )
+                Spacer(Modifier.height(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.list_cancel)) }
+                    Spacer(Modifier.width(4.dp))
+                    Button(onClick = { onSave(text.trim().ifBlank { null }) }) { Text(stringResource(R.string.list_save)) }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The directions preview — a dedicated bottom panel (not buried in the place
+ * sheet) that opens when you tap "Directions": destination header, travel-mode
+ * tabs, the route option(s) with traffic-aware ETAs (alternates are selectable),
+ * and a prominent Start. Transit shows the results board instead.
+ */
+@Composable
+fun DirectionsPanel(
+    destinationName: String,
+    currentMode: TravelMode,
+    routes: List<Route>,
+    activeRoute: Route?,
+    flockOnRoute: List<Int> = emptyList(),
+    transit: List<TransitItinerary>,
+    transitLoading: Boolean,
+    modeEtas: Map<TravelMode, String> = emptyMap(),
+    onModeSelected: (TravelMode) -> Unit,
+    avoidTolls: Boolean = false,
+    avoidHighways: Boolean = false,
+    avoidFerries: Boolean = false,
+    onAvoidTolls: (Boolean) -> Unit = {},
+    onAvoidHighways: (Boolean) -> Unit = {},
+    onAvoidFerries: (Boolean) -> Unit = {},
+    onSelectRoute: (Int) -> Unit,
+    onStartNav: () -> Unit,
+    onSteps: (() -> Unit)?,
+    onSearchAlongRoute: (String) -> Unit,
+    onWalkDirections: suspend (LatLng, LatLng) -> List<String> = { _, _ -> emptyList() },
+    onStartTransit: (TransitItinerary) -> Unit = {},
+    onTransitPreview: (TransitItinerary, Boolean) -> Unit = { _, _ -> },
+    onTimeSelected: (Int, Long?) -> Unit = { _, _ -> },
+    transitPrefer: Set<Int> = emptySet(), // preferred vehicle kinds, transit only (issue #431)
+    onTransitPrefer: (Set<Int>) -> Unit = {},
+    transitRoutePref: Int = 0, // 0 best, 2 fewer transfers, 3 less walking (Google's numbering)
+    onTransitRoutePref: (Int) -> Unit = {},
+    minimizeTick: Int = 0, // bumped when the user grabs the map — glide down, then flip collapsed
+    onCollapsedChange: (Boolean) -> Unit = {}, // MapScreen shrinks the route-fit camera inset while minimized
+    // Tallest the BODY may open (dp), from the host: what the endpoints card leaves above a
+    // minimum map strip. Null = the old 58%-of-screen cap alone. On a 240x320 phone (issue #400)
+    // the 58% cap plus the card covered the whole map, so the route was chosen blind.
+    bodyMaxDp: Float? = null,
+    modifier: Modifier = Modifier,
+    onShowTraffic: (() -> Unit)? = null,
+    // The Google-style picker's header (the mode as the title, share and close as round buttons,
+    // the underlined mode tabs) over this panel's body. The transit tab uses it when the
+    // Google-style picker is on, so switching modes reads as one sheet.
+    googleHeader: Boolean = false,
+    onShare: () -> Unit = {},
+    onClose: () -> Unit = {},
+) {
+    val dark = isAppInDarkTheme()
+    val ink = if (dark) InkDark else InkLight
+    val dim = if (dark) DimDark else DimLight
+    // Keyed to the destination so opening directions for a different place starts
+    // expanded again instead of inheriting the previous session's collapsed state.
+    val collapsed = remember(destinationName) { mutableStateOf(false) }
+    // The body height is HAND-DRIVEN, the place/results sheets' exact grammar (user 2026-07-11:
+    // the old collapse was a 6px threshold flip - no finger tracking, no inertia): drags move it
+    // 1:1, release projects the throw's decay to the nearest end (0 = minimized, bodyMax = open)
+    // and rides the coast there. The body and the minimized Start bar both fold WITH this height
+    // (SheetFold), so the collapsed flip changes nothing visible.
+    val bodyMax = (LocalConfiguration.current.screenHeightDp * 0.58f).let { cap -> bodyMaxDp?.let { minOf(cap, it) } ?: cap }
+    val dirH = remember(destinationName) { Animatable(if (collapsed.value) 0f else bodyMax) }
+    RoutePanelBack(collapsed.value) { collapsed.value = false }
+    val dirSettle = remember { spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 350f) }
+    val dirDecay = remember { exponentialDecay<Float>(frictionMultiplier = 1.6f) }
+    val dirScope = rememberCoroutineScope()
+    val dirDensity = LocalDensity.current
+    val dirBodyScroll = rememberScrollState()
+    LaunchedEffect(collapsed.value) {
+        onCollapsedChange(collapsed.value)
+        val target = if (collapsed.value) 0f else bodyMax
+        // Skip when a drag-release settle already targets this end - restarting would zero
+        // the coast velocity mid-glide (same guard as the place sheet's detent effect).
+        if (dirH.targetValue != target) dirH.animateTo(target, dirSettle)
+    }
+    fun dragDirBy(dyPx: Float) {
+        val dyDp = with(dirDensity) { dyPx.toDp().value }
+        dirScope.launch { dirH.snapTo((dirH.value - dyDp).coerceIn(0f, bodyMax)) }
+    }
+    fun settleDir(velocityPxPerSec: Float) {
+        val vDp = with(dirDensity) { velocityPxPerSec.toDp().value }
+        val naturalEnd = dirDecay.calculateTargetValue(dirH.value, -vDp)
+        // Flick = commit (see settleFromVelocity): with only two detents 58% of a screen apart,
+        // the coast test needed a huge throw - the "can't quite flick it up" report.
+        val target = when {
+            vDp < -FLING_COMMIT_DPS -> bodyMax
+            vDp > FLING_COMMIT_DPS -> 0f
+            else -> if (kotlin.math.abs(naturalEnd) < kotlin.math.abs(bodyMax - naturalEnd)) 0f else bodyMax
+        }
+        dirScope.launch {
+            val towardTarget = (naturalEnd - dirH.value) * (target - dirH.value) > 0f
+            if (towardTarget && kotlin.math.abs(naturalEnd - dirH.value) >= kotlin.math.abs(target - dirH.value)) {
+                // The throw carries: ride its own inertia and let the end just stop it.
+                try {
+                    dirH.updateBounds(lowerBound = minOf(dirH.value, target), upperBound = maxOf(dirH.value, target))
+                    dirH.animateDecay(-vDp, dirDecay)
+                } finally {
+                    dirH.updateBounds(lowerBound = null, upperBound = null)
+                }
+                if (kotlin.math.abs(dirH.value - target) > 0.5f) dirH.animateTo(target, dirSettle)
+            } else {
+                dirH.animateTo(target, dirSettle, initialVelocity = -vDp)
+            }
+            // Flip the state AFTER the glide (glide first, flip after). Flipping BEFORE fired the
+            // LaunchedEffect(collapsed) into a SECOND animateTo racing this decay - the "bounces
+            // off the top" on a swipe-up-to-reopen (user 2026-07-11). dirH is at target now, so
+            // that effect's targetValue guard skips it.
+            collapsed.value = target == 0f
+        }
+    }
+    // Body-at-top drags collapse the panel and upward drags grow it, like the other sheets.
+    val dirConn = remember(destinationName) {
+        object : NestedScrollConnection {
+            private var dragging = false
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (available.y > 0f && dirBodyScroll.value == 0 && dirH.value > 0f) {
+                    dragging = true; dragDirBy(available.y); return available
+                }
+                if (available.y < 0f && dirH.value < bodyMax) {
+                    dragging = true; dragDirBy(available.y); return available
+                }
+                return Offset.Zero
+            }
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                if (dragging) { dragging = false; settleDir(available.y); return available }
+                return Velocity.Zero
+            }
+        }
+    }
+    // Grab the map: glide the OPEN chooser down to its Start bar, then flip collapsed - the same
+    // pan-minimize the place + results sheets do (user 2026-07-11). Consume-once guard so a
+    // remount can't replay a stale tick.
+    val glideSpec = remember { spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 140f) }
+    var seenDirTick by remember { mutableStateOf(minimizeTick) }
+    LaunchedEffect(minimizeTick) {
+        if (minimizeTick == seenDirTick || collapsed.value) return@LaunchedEffect
+        seenDirTick = minimizeTick
+        if (dirH.value > 0.5f) dirH.animateTo(0f, glideSpec)
+        collapsed.value = true
+    }
+    Card(
+        modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = if (dark) SheetDark else SheetLight),
+    ) {
+        Column(
+            Modifier
+                .navigationBarsPadding()
+                // The WHOLE panel drags, not just the handle (user 2026-07-11: "I have to have my
+                // finger basically right on the pull bar"). Inner clickables still win their taps
+                // (a drag claims the pointer only past touch slop), and the scrolling body keeps
+                // its own nested-scroll path since verticalScroll consumes there first.
+                .pointerInput(Unit) {
+                    sheetDragGestures(dragBy = { dragDirBy(it) }, settle = { settleDir(it) })
+                }
+                .padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 16.dp),
+        ) {
+            // Drag handle — swipe down to minimize the chooser (peek the route on the
+            // map before you Start), swipe up or tap to bring it back.
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .dpadHighlight(RoundedCornerShape(3.dp)) // D-pad: OK toggles (docs/dpad.md)
+                    .clickable { collapsed.value = !collapsed.value }
+                    .padding(vertical = 6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(Modifier.width(36.dp).height(4.dp).clip(CircleShape).background(dim.copy(alpha = 0.4f)))
+            }
+            // D-pad-first (docs/dpad.md): land focus on the Drive tab when the directions panel
+            // opens, so it's the active surface (else focus stays on the search bar behind it).
+            // No-op under touch.
+            val dirAutoFocus = rememberDpadAutoFocus()
+            if (googleHeader) {
+                Row(Modifier.padding(end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        modeTitle(currentMode),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Medium,
+                        color = ink,
+                        modifier = Modifier.weight(1f),
+                    )
+                    RoundAction(Sym.Share, stringResource(R.string.place_share), dark, onClick = onShare)
+                    Spacer(Modifier.width(8.dp))
+                    RoundAction(Sym.Close, stringResource(R.string.place_close_directions), dark, onClick = onClose)
+                }
+                Spacer(Modifier.height(10.dp))
+                // The tabs run edge to edge like the picker's: pull them back over the panel's
+                // start padding so the first glyph lines up with the title.
+                ModeTabs(currentMode, modeEtas, ink, onModeSelected, Modifier.bleed(20.dp, 8.dp), firstFocus = dirAutoFocus)
+                HorizontalDivider(color = dim.copy(alpha = 0.25f), modifier = Modifier.bleed(20.dp, 8.dp))
+            }
+            // The endpoint rows (origin / stops / destination, swap, close) live in the
+            // Google-style RouteTopCard at the top of the screen now — this panel keeps the
+            // mode chips, time chooser, routes and Start.
+            // The body caps at the ANIMATED height (bodyMax when open = the old ~58% screen cap,
+            // still scrollable inside) and fades over its last stretch; composed while any of it
+            // shows, unmounted once settled at zero (the extras-gate pattern).
+            val bodyComposed by remember(destinationName) {
+                derivedStateOf { !collapsed.value || dirH.value > 1f }
+            }
+            if (bodyComposed) {
+              // Start is a FOOTER under the scrolling list (2026-09-13, Google's layout): with
+              // four alternates it used to scroll off the bottom of the open chooser. The cap
+              // and fade wrap BOTH, so the footer folds away with the body when it collapses.
+              Column(
+                  Modifier
+                      .graphicsLayer {
+                          alpha = (dirH.value / 160f).coerceIn(0f, 1f)
+                          clip = true
+                          // No offscreen buffer for the fade (see SheetFold for the measurement).
+                          compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
+                      }
+                      .layout { measurable, constraints ->
+                          val capPx = dirH.value.dp.roundToPx().coerceAtLeast(0)
+                          val pl = measurable.measure(constraints.copy(maxHeight = minOf(constraints.maxHeight, capPx)))
+                          layout(pl.width, pl.height) { pl.place(0, 0) }
+                      },
+              ) {
+              Column(
+                  Modifier
+                      .weight(1f, fill = false)
+                      .nestedScroll(dirConn)
+                      .verticalScroll(dirBodyScroll),
+              ) {
+            Spacer(Modifier.height(10.dp))
+            // Scrollable so all four mode pills keep full size on a narrow screen — without this the
+            // 4th (Bike) overflowed the row and got clipped to the edge as an icon-only stub.
+            if (!googleHeader) Row(
+                Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                listOf(
+                    Triple(TravelMode.DRIVE, stringResource(R.string.place_mode_drive), Sym.DirectionsCar),
+                    Triple(TravelMode.TRANSIT, stringResource(R.string.place_mode_transit), Sym.DirectionsBus),
+                    Triple(TravelMode.WALK, stringResource(R.string.place_mode_walk), Sym.DirectionsWalk),
+                    Triple(TravelMode.BICYCLE, stringResource(R.string.place_mode_bike), Sym.DirectionsBike),
+                ).forEach { (mode, label, icon) ->
+                    // Google-style mode pills: stadium shape + a mode glyph, not bare squarish chips.
+                    // Once a mode's time is known the chip shows THAT ("25 min") and the glyph says
+                    // which mode, as Google's do; the mode name stays as the accessibility name.
+                    val eta = modeEtas[mode]
+                    FilterChip(
+                        selected = currentMode == mode,
+                        onClick = { onModeSelected(mode) },
+                        label = { Text(eta ?: label) },
+                        leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        shape = androidx.compose.foundation.shape.CircleShape,
+                        modifier = (if (mode == TravelMode.DRIVE) Modifier.focusRequester(dirAutoFocus) else Modifier)
+                            .semantics { contentDescription = if (eta != null) "$label, $eta" else label },
+                    )
+                }
+            }
+            // ONE depart/arrive time chooser, right under the mode chips — it applies to ALL modes
+            // (drive/transit/walk/bike), so it lives above the mode-specific results, not inside them.
+            Spacer(Modifier.height(12.dp))
+            DepartTimeChooser(
+                activeRoute ?: routes.firstOrNull(), dim,
+                isTransit = currentMode == TravelMode.TRANSIT,
+                onTimeSelected = onTimeSelected,
+            )
+            // Transit only (issue #431): which vehicles to prefer. Google's own option, carried on
+            // the request, so a bus-only rider sees the all-bus itinerary instead of the train.
+            if (currentMode == TravelMode.TRANSIT) {
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(stringResource(R.string.place_transit_prefer), style = MaterialTheme.typography.labelLarge, color = dim)
+                    listOf(
+                        0 to R.string.place_transit_bus,
+                        1 to R.string.place_transit_subway,
+                        2 to R.string.place_transit_train,
+                        3 to R.string.place_transit_tram,
+                    ).forEach { (kind, label) ->
+                        FilterChip(
+                            selected = kind in transitPrefer,
+                            onClick = { onTransitPrefer(if (kind in transitPrefer) transitPrefer - kind else transitPrefer + kind) },
+                            label = { Text(stringResource(label)) },
+                            shape = androidx.compose.foundation.shape.CircleShape,
+                        )
+                    }
+                }
+                // Google's route preference, carried on its request (2 fewer transfers, 3 less
+                // walking). One or neither: tapping the selected chip goes back to the best route.
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(stringResource(R.string.place_transit_route), style = MaterialTheme.typography.labelLarge, color = dim)
+                    listOf(
+                        2 to R.string.place_transit_fewer_transfers,
+                        3 to R.string.place_transit_less_walking,
+                    ).forEach { (pref, label) ->
+                        FilterChip(
+                            selected = transitRoutePref == pref,
+                            onClick = { onTransitRoutePref(if (transitRoutePref == pref) 0 else pref) },
+                            label = { Text(stringResource(label)) },
+                            shape = androidx.compose.foundation.shape.CircleShape,
+                        )
+                    }
+                }
+            }
+            // Route preferences, drive only (tolls/motorways/ferries mean nothing on foot or transit).
+            // Honored on-device where the region graph carries the avoid profiles; online the
+            // route falls back to normal rather than failing (the public OSRM can't exclude).
+            if (currentMode == TravelMode.DRIVE) {
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()).padding(end = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(stringResource(R.string.place_avoid_label), style = MaterialTheme.typography.labelLarge, color = dim)
+                    FilterChip(
+                        selected = avoidTolls,
+                        onClick = { onAvoidTolls(!avoidTolls) },
+                        label = { Text(stringResource(R.string.place_avoid_short_tolls)) },
+                        shape = androidx.compose.foundation.shape.CircleShape,
+                        modifier = Modifier.dpadHighlight(androidx.compose.foundation.shape.CircleShape),
+                    )
+                    FilterChip(
+                        selected = avoidHighways,
+                        onClick = { onAvoidHighways(!avoidHighways) },
+                        label = { Text(stringResource(R.string.place_avoid_short_highways)) },
+                        shape = androidx.compose.foundation.shape.CircleShape,
+                        modifier = Modifier.dpadHighlight(androidx.compose.foundation.shape.CircleShape),
+                    )
+                    FilterChip(
+                        selected = avoidFerries,
+                        onClick = { onAvoidFerries(!avoidFerries) },
+                        label = { Text(stringResource(R.string.place_avoid_short_ferries)) },
+                        shape = androidx.compose.foundation.shape.CircleShape,
+                        modifier = Modifier.dpadHighlight(androidx.compose.foundation.shape.CircleShape),
+                    )
+                    AvoidCamerasChip()
+                }
+                // Honesty note: with a toggle on but no offline region covering the trip, the online
+                // routers cannot honor it and used to just quietly route through tolls/highways
+                // anyway - say so instead of pretending (the "still routed me through the motorway"
+                // report). Keyed on the routes' own tag so it never shows when avoid worked.
+                if ((avoidTolls || avoidHighways || avoidFerries) && routes.isNotEmpty() && routes.all { it.avoidNotHonored }) {
+                    // Treatment upgraded (issue #286): this is the EXPLANATION for a control that
+                    // otherwise looks broken - a new user flips Avoid tolls, gets routed down the
+                    // toll road, and concludes the button does nothing. As dim bodySmall under the
+                    // chips it read as decoration. It is the same weight as any other advisory now,
+                    // with a glyph so the eye lands on it, and the text says what to DO rather than
+                    // only what went wrong. (The public OSRM still rejects `exclude=` for every
+                    // value; Google's keyless request honors tolls/highways/ferries since
+                    // 2026-09-06 / 2026-09-16, so today this mostly shows on trips with stops.)
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 8.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Icon(
+                            SymOutlined.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp).padding(top = 2.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            stringResource(R.string.place_avoid_not_honored),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = ink,
+                        )
+                    }
+                }
+            }
+            if (onShowTraffic != null && currentMode != TravelMode.TRANSIT && routes.isNotEmpty()) {
+                TrafficOnTapRow(onShowTraffic, ink, Modifier.padding(top = 8.dp))
+            }
+            if (currentMode == TravelMode.TRANSIT) {
+                TransitBoard(transit, transitLoading, ink, dim, dark, onWalkDirections, onStartTransit, onTransitPreview)
+            } else {
+                Spacer(Modifier.height(12.dp))
+                if (routes.isEmpty()) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Text(stringResource(R.string.place_finding_route), style = MaterialTheme.typography.bodyMedium, color = dim)
+                    }
+                } else {
+                    // Fastest ETA across the alternates (list is sorted fastest-first, but take the min
+                    // so the "+N min" deltas are robust even if two tie) → each slower route shows how much
+                    // longer it is, Google-style, so you can weigh the alternates at a glance.
+                    val fastestEta = routes.minOf { it.durationInTrafficSeconds ?: it.durationSeconds }
+                    // The tag follows the ETA, not the position: with avoid-cameras on, the
+                    // low-camera pick leads the list and the true fastest can sit below it -
+                    // tagging row 0 called a slower route "Fastest" (screenshot-caught 2026-07-14).
+                    val fastestIdx = routes.indexOfFirst { (it.durationInTrafficSeconds ?: it.durationSeconds) == fastestEta }
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        routes.forEachIndexed { i, r ->
+                            val selected = r === activeRoute || (activeRoute == null && i == 0)
+                            RouteOption(r, selected, fastestEtaSeconds = fastestEta, isFastest = i == fastestIdx, dark = dark, ink = ink, dim = dim, flockCount = flockOnRoute.getOrElse(i) { 0 }) { onSelectRoute(i) }
+                        }
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    Text(stringResource(R.string.place_search_along_route), style = MaterialTheme.typography.labelMedium, color = dim)
+                    Spacer(Modifier.height(6.dp))
+                    Row(
+                        Modifier.horizontalScroll(rememberScrollState()).padding(end = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        // (localized label, STABLE English query, icon) — query is the logic key, label localizes.
+                        app.vela.ui.QuickCategories.all().map { Triple(it.label, it.query, it.icon) }.forEach { (labelRes, query, icon) ->
+                            // One-shot ACTION chips, not selection state - a permanently
+                            // unselected FilterChip read as unfilled/disabled next to the
+                            // filled pills (user 2026-07-11); solid tonal fill, no border.
+                            FilterChip(
+                                selected = false,
+                                onClick = { onSearchAlongRoute(query) },
+                                border = null,
+                                colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+                                    containerColor = if (isAppInDarkTheme()) Color(0xFF333539) else Color(0xFFF1F3F4),
+                                    labelColor = ink,
+                                ),
+                                label = { Text(stringResource(labelRes)) },
+                                leadingIcon = {
+                                    // dim, not ink: solid glyphs at the label color read darker
+                                    // than the text (user 2026-07-11) - soft ink matches weight.
+                                    Icon(
+                                        icon,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                        tint = dim,
+                                    )
+                                },
+                                // Stadium pill, matching the map category chips + the mode chips above.
+                                shape = androidx.compose.foundation.shape.CircleShape,
+                            )
+                        }
+                    }
+                }
+            }
+              }
+                if (routes.isNotEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    Row(Modifier.padding(end = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(onClick = onStartNav, modifier = Modifier.weight(1f)) {
+                            Icon(Sym.Navigation, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                            Text(stringResource(R.string.place_start))
+                        }
+                        onSteps?.let {
+                            FilledTonalButton(onClick = it) {
+                                // Soft glyph ink: the solid List glyph at the label's own color
+                                // read darker than the word beside it (user 2026-07-11).
+                                Icon(
+                                    Sym.List,
+                                    contentDescription = null,
+                                    modifier = Modifier.padding(end = 8.dp),
+                                    tint = dim,
+                                )
+                                Text(stringResource(R.string.place_steps))
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                }
+              }
+            }
+            // Minimized: keep a Start button reachable without expanding. It FOLDS IN as the
+            // body folds out (inverse fraction of the same height), so neither end pops.
+            val startComposed by remember(destinationName) {
+                derivedStateOf { collapsed.value || dirH.value < 160f }
+            }
+            // Grows in only over the SAME last-160dp window the body fades out in - starting
+            // it at the first pixel of travel had two Start buttons on screen mid-drag.
+            app.vela.ui.SheetFold(startComposed, { ((160f - dirH.value) / 160f).coerceIn(0f, 1f) }) {
+                Button(
+                    onClick = onStartNav,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp, end = 12.dp),
+                ) {
+                    Icon(Sym.Navigation, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                    Text(stringResource(R.string.place_start))
+                }
+            }
+        }
+    }
+}
+
+/** The depart or arrive time last picked in [DepartTimeChooser], kept outside the composable so it
+ *  survives the sheet dropping its content. Held for one destination ([key]) and only while the
+ *  picked time is still ahead; "last available" (mode 3) has no time and is kept as it is. */
+internal object DepartPick {
+    class Pick(val mode: Int, val date: java.time.LocalDate, val time: java.time.LocalTime)
+
+    private var key: Any? = null
+    private var pick: Pick? = null
+    private var droppedOne = false
+
+    fun keep(forKey: Any?, mode: Int, date: java.time.LocalDate, time: java.time.LocalTime) {
+        key = forKey
+        pick = if (mode == 0) null else Pick(mode, date, time)
+        droppedOne = false
+    }
+
+    /** The pick for [forKey], or null. A pick for another destination, or one whose time has
+     *  passed, is dropped, and [dropped] then reports it once. */
+    fun restore(forKey: Any?, now: java.time.LocalDateTime = java.time.LocalDateTime.now()): Pick? {
+        val p = pick ?: return null
+        if (key == forKey && (p.mode == 3 || !p.date.atTime(p.time).isBefore(now))) return p
+        pick = null
+        droppedOne = true
+        return null
+    }
+
+    fun dropped(): Boolean = droppedOne.also { droppedOne = false }
+}
+
+/** "Leave now / Depart at / Arrive by" chooser. "Leave now" uses the live
+ *  traffic-aware duration; a future "Depart at" / "Arrive by" uses Google's own
+ *  *typical* best→worst spread (`Route.typicalRangeSeconds`, from summary[10][4])
+ *  to show an honest arrival/leave **window** rather than a false-precision single
+ *  time — Google's per-departure prediction needs a login/app-only request field
+ *  we can't reach keyless, so we surface the range Google itself plans with. Falls
+ *  back to a single ~estimate when no range is shipped (short trips, walk/bike). */
+@android.annotation.SuppressLint("NewApi")
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+internal fun DepartTimeChooser(
+    route: Route?,
+    dim: Color,
+    isTransit: Boolean = false,
+    onTimeSelected: (Int, Long?) -> Unit = { _, _ -> },
+) {
+    val context = LocalContext.current
+    val ink = if (isAppInDarkTheme()) InkDark else InkLight
+    // Keyed to the destination so switching places resets the picked time. mode: 0 now, 1 depart at,
+    // 2 arrive by, 3 last available (transit only). date + time compose the chosen wall-clock.
+    // The pick outlives this composable (DepartPick): the sheet drops its content when it is
+    // swiped down, and coming back used to show "Leave now" over results still for the picked time.
+    val pickKey = route?.summary
+    val kept = remember(pickKey) { DepartPick.restore(pickKey) }
+    var mode by remember(pickKey) { mutableStateOf(kept?.mode ?: 0) }
+    var date by remember(pickKey) { mutableStateOf(kept?.date ?: java.time.LocalDate.now()) }
+    // Default to the next 5-minute mark: a to-the-second "now" made every chip tap a brand-new
+    // epoch, and the old flow refetched for each one.
+    var time by remember(pickKey) {
+        val n = java.time.LocalTime.now().withSecond(0).withNano(0)
+        mutableStateOf(kept?.time ?: n.plusMinutes(((5 - n.minute % 5) % 5).toLong()))
+    }
+    // A pick that was dropped (another destination, or its time has passed) is "Leave now" again,
+    // for whoever fetches by it too.
+    LaunchedEffect(pickKey) { if (kept == null && DepartPick.dropped()) onTimeSelected(0, null) }
+    var showTimePicker by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    val nowDur = route?.let { it.durationInTrafficSeconds ?: it.durationSeconds } ?: 0.0
+    val range = route?.typicalRangeSeconds
+    val fmt = java.time.format.DateTimeFormatter.ofLocalizedTime(java.time.format.FormatStyle.SHORT)
+    val dateFmt = java.time.format.DateTimeFormatter.ofPattern("EEE, MMM d")
+
+    fun epoch(): Long = date.atTime(time).atZone(java.time.ZoneId.systemDefault()).toEpochSecond()
+    fun emit() {
+        if (mode == 1 || mode == 2) {
+            // No scheduling in the past (user 2026-07-11): a confirmed pick behind the clock
+            // silently becomes the next 5-minute mark from now, today - same clamp Google does.
+            if (date.atTime(time).atZone(java.time.ZoneId.systemDefault()).toInstant().isBefore(java.time.Instant.now())) {
+                date = java.time.LocalDate.now()
+                val n = java.time.LocalTime.now().withSecond(0).withNano(0)
+                time = n.plusMinutes(((5 - n.minute % 5) % 5).toLong())
+                // Say so: the pill now shows a different time than the one just picked, and an
+                // unexplained rewrite of explicit input reads as a bug (user 2026-07-11).
+                Toast.makeText(context, context.getString(R.string.place_time_past_toast), Toast.LENGTH_SHORT).show()
+            }
+        }
+        DepartPick.keep(pickKey, mode, date, time)
+        onTimeSelected(mode, if (mode == 0) null else epoch())
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        // Mode chips — scroll horizontally so 3–4 chips never clip on a narrow phone.
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            // Stadium pills, matching every other Vela chip (CLAUDE.md chip style). Switching
+            // into Depart at / Arrive by opens the time picker DIRECTLY (Google's flow) and
+            // nothing is emitted until a picker confirms — the old flow fired a fetch on the
+            // bare chip tap with an unpicked "now" (user 2026-07-11).
+            val pill = androidx.compose.foundation.shape.CircleShape
+            FilterChip(selected = mode == 0, onClick = { mode = 0; emit() }, label = { Text(stringResource(R.string.place_leave_now)) }, shape = pill)
+            FilterChip(selected = mode == 1, onClick = { mode = 1; showTimePicker = true }, label = { Text(stringResource(R.string.place_depart_at)) }, shape = pill)
+            FilterChip(selected = mode == 2, onClick = { mode = 2; showTimePicker = true }, label = { Text(stringResource(R.string.place_arrive_by)) }, shape = pill)
+            if (isTransit) FilterChip(selected = mode == 3, onClick = { mode = 3; emit() }, label = { Text(stringResource(R.string.place_last_available)) }, shape = pill)
+        }
+        // Time + date fields for depart/arrive (Google-style: a time field AND a date field).
+        if (mode == 1 || mode == 2) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilledTonalButton(onClick = { showTimePicker = true }) { Text(time.format(fmt)) }
+                FilledTonalButton(onClick = { showDatePicker = true }) { Text(date.format(dateFmt)) }
+            }
+        }
+
+        // Drive ETA estimate (only meaningful with a route — transit shows just the chips). Only claim
+        // "current traffic" when the route actually carries a live in-traffic ETA (an offline/GraphHopper
+        // route has neither a typical range nor live traffic).
+        if (route != null && mode != 3) {
+            fun window(base: java.time.LocalTime, lo: Double, hi: Double, sign: Int): String =
+                if (range != null)
+                    "${base.plusSeconds((sign * lo).toLong()).format(fmt)}–${base.plusSeconds((sign * hi).toLong()).format(fmt)}"
+                else base.plusSeconds((sign * nowDur).toLong()).format(fmt)
+            val lo = range?.first ?: nowDur
+            val hi = range?.second ?: nowDur
+            val hasLive = route.hasLiveTraffic
+            val typicalNote = stringResource(R.string.place_in_typical_traffic)
+            val liveNoteDepart = stringResource(R.string.place_based_current_traffic)
+            val departNote = when { range != null -> typicalNote; hasLive -> liveNoteDepart; else -> null }
+            // Leave-now shows just the arrival time, prominently - the "current traffic" note under
+            // it was clutter (the traffic-colored ETA already says it) and kept the time small.
+            val (summary, note) = when (mode) {
+                1 -> stringResource(R.string.place_depart_arrive, time.format(fmt), window(time, lo, hi, +1)) to departNote
+                2 -> stringResource(R.string.place_arriveby_leave, time.format(fmt), window(time, hi, lo, -1)) to departNote
+                else -> stringResource(R.string.place_arrive_approx, (app.vela.ui.DemoClock.now()?.toLocalTime() ?: java.time.LocalTime.now()).plusSeconds(nowDur.toLong()).format(fmt)) to
+                    range?.let { stringResource(R.string.place_usually_range, formatDuration(it.first), formatDuration(it.second)) }
+            }
+            Column {
+                Text(summary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = ink)
+                note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = dim) }
+            }
+        }
+    }
+    // Material 3 pickers in a Vela shell — the old android.app Holo dialogs looked nothing
+    // like the app (part of the "kinda janky", user 2026-07-11). Confirm is the ONLY emit.
+    if (showTimePicker) {
+        // The app's own clock setting (Settings > Appearance > Clock), not a fixed 12-hour dial
+        // (issues #357 and #762).
+        val tp = androidx.compose.material3.rememberTimePickerState(initialHour = time.hour, initialMinute = time.minute, is24Hour = app.vela.ui.Clock24.on.value)
+        PickerDialog(
+            onConfirm = { time = java.time.LocalTime.of(tp.hour, tp.minute); showTimePicker = false; emit() },
+            onDismiss = { showTimePicker = false },
+        ) { androidx.compose.material3.TimePicker(state = tp) }
+    }
+    if (showDatePicker) {
+        // NB selectedDateMillis is UTC midnight of the picked day — decode with UTC, not the
+        // system zone, or western-hemisphere picks land one day early.
+        val dp = androidx.compose.material3.rememberDatePickerState(
+            initialSelectedDateMillis = date.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli(),
+            selectableDates = object : androidx.compose.material3.SelectableDates {
+                // Days before today are grayed out (the confirm clamp still backstops a stale
+                // dialog left open across midnight).
+                override fun isSelectableDate(utcTimeMillis: Long) =
+                    utcTimeMillis >= java.time.LocalDate.now().atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
+                override fun isSelectableYear(year: Int) = year >= java.time.LocalDate.now().year
+            },
+        )
+        PickerDialog(
+            onConfirm = {
+                dp.selectedDateMillis?.let { date = java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneOffset.UTC).toLocalDate() }
+                showDatePicker = false
+                emit()
+            },
+            onDismiss = { showDatePicker = false },
+        ) { androidx.compose.material3.DatePicker(state = dp, showModeToggle = false) }
+    }
+}
+
+/** A Vela shell for the M3 time/date pickers: a raw Dialog (the D-pad house rule — an
+ *  AlertDialog can't be pre-focused), sheet colors, and the VelaDialog button grammar
+ *  (filled confirm pill that auto-focuses, plain dismiss). */
+@Composable
+private fun PickerDialog(onConfirm: () -> Unit, onDismiss: () -> Unit, content: @Composable () -> Unit) {
+    val dark = isAppInDarkTheme()
+    // Own the width (issue #432): the platform dialog keeps side margins that on a 360 dp phone
+    // leave less than the Material date picker's fixed 360 dp, and the last weekday column was
+    // clipped off, so Sundays could not be picked. Edge to edge on narrow phones, capped wider.
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        androidx.compose.foundation.layout.BoxWithConstraints {
+        // Under 392 dp the Material date picker (a fixed 360 dp) only fits with NO side gap.
+        val tight = maxWidth < 392.dp
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = if (dark) SheetDark else SheetLight,
+            modifier = Modifier.widthIn(max = 400.dp).padding(horizontal = if (tight) 0.dp else 8.dp),
+        ) {
+            Column(Modifier.padding(vertical = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                content()
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 6.dp, end = 6.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val confirmFocus = rememberDpadAutoFocus()
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.dpadHighlight(androidx.compose.foundation.shape.CircleShape),
+                    ) { Text(stringResource(android.R.string.cancel)) }
+                    Spacer(Modifier.width(6.dp))
+                    Button(
+                        onClick = onConfirm,
+                        shape = androidx.compose.foundation.shape.CircleShape,
+                        modifier = Modifier
+                            .focusRequester(confirmFocus)
+                            .dpadHighlight(androidx.compose.foundation.shape.CircleShape),
+                    ) { Text(stringResource(android.R.string.ok)) }
+                }
+            }
+        }
+        }
+    }
+}
+
+/** One route choice in the directions panel: a traffic-colored ETA + distance/
+ *  via, highlighted when it's the active one. The fastest carries a "Fastest" tag; each slower
+ *  alternate shows how much longer it is ("+5 min") so the choice is legible at a glance. */
+@Composable
+private fun RouteOption(r: Route, selected: Boolean, fastestEtaSeconds: Double, isFastest: Boolean, dark: Boolean, ink: Color, dim: Color, flockCount: Int = 0, onClick: () -> Unit) {
+    val etaSeconds = r.durationInTrafficSeconds ?: r.durationSeconds
+    val eta = formatDuration(etaSeconds)
+    val etaColor = trafficEtaColor(r) ?: ink
+    // Delta vs the fastest, rounded to the nearest minute. Only ONE route wears the "Fastest" tag
+    // (the caller passes isFastest for the top row — the list is sorted by this exact ETA). A
+    // near-tie under ~30 s used to round its delta to 0 and ALSO earn the tag, which read as two
+    // "Fastest" routes with different displayed times; now it just shows its ETA with no badge.
+    val deltaMin = ((etaSeconds - fastestEtaSeconds) / 60.0).roundToInt()
+    val bg = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+    else SheetPalette.row(dark)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(bg)
+            .dpadHighlight(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(eta, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = etaColor)
+                Spacer(Modifier.width(8.dp))
+                if (isFastest) {
+                    Text(
+                        stringResource(R.string.place_fastest),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                            .padding(horizontal = 6.dp, vertical = 1.dp),
+                    )
+                } else if (deltaMin >= 1) {
+                    // "+5 min" vs the fastest — a quiet tag so the fastest still reads as primary.
+                    Text(
+                        stringResource(R.string.place_delta_min, deltaMin),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = dim,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(ink.copy(alpha = 0.08f))
+                            .padding(horizontal = 6.dp, vertical = 1.dp),
+                    )
+                }
+            }
+            // The traffic word GRADES with the same thresholds that color the ETA (trafficEtaColor),
+            // so "heavy traffic" in words backs up the red time - color alone isn't readable for
+            // everyone. A live route whose typical time is unknown keeps the plain "live traffic".
+            // An on-device route says so in the traffic slot (issue #350): the user asked to know
+            // which kind of route they are looking at, and "no traffic word" alone did not say.
+            val trafficWord = if (r.offline) stringResource(R.string.place_route_offline) else if (!r.hasLiveTraffic) null else when {
+                r.trafficRatio == null -> stringResource(R.string.place_live_traffic)
+                r.trafficRatio!! > 1.4 -> stringResource(R.string.place_traffic_heavy)
+                r.trafficRatio!! > 1.15 -> stringResource(R.string.place_traffic_moderate)
+                else -> stringResource(R.string.place_traffic_light)
+            }
+            val sub = listOfNotNull(
+                formatDistance(r.distanceMeters),
+                r.summary?.takeIf { it.isNotBlank() }?.let { stringResource(R.string.place_via, it) },
+                trafficWord,
+            ).joinToString("  ·  ")
+            r.savedName?.let { SavedRouteChip(it, Modifier.padding(vertical = 2.dp)) }
+            Text(sub, style = MaterialTheme.typography.bodySmall, color = dim)
+            // Opt-in surveillance-camera warning: how many ALPR/Flock cameras this route passes.
+            if (flockCount > 0) {
+                Spacer(Modifier.height(3.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Icon(Sym.Videocam, contentDescription = null, tint = SheetPalette.TrafficAmber, modifier = Modifier.size(14.dp))
+                    Text(
+                        pluralStringResource(R.plurals.dir_cameras_on_route, flockCount, flockCount),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = SheetPalette.TrafficAmber,
+                    )
+                }
+            }
+        }
+        if (selected) Icon(Sym.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+    }
+}
+
+/** ETA color by congestion when live traffic is known: green free-flowing →
+ *  amber → red. Null when there's no live-traffic signal (use the ink color).
+ *  Free-flow green is Google's dark pastel (#6ED58B), not the deep traffic value. */
+internal fun trafficEtaColor(r: Route): Color? = r.trafficRatio?.let {
+    when {
+        it > 1.4 -> SheetPalette.TrafficRed
+        it > 1.15 -> SheetPalette.TrafficAmber
+        else -> androidx.compose.ui.graphics.Color(0xFF6ED58B)
+    }
+}
+
+/** The transit results board — Google's first transit view: a list of departure
+ *  options, each a time window + total duration + the colored line pills you
+ *  ride. Fed by the keyless WebView fetch ([app.vela.web.WebDirectionsFetcher]). */
+@Composable
+private fun TransitBoard(
+    trips: List<TransitItinerary>,
+    loading: Boolean,
+    ink: Color,
+    dim: Color,
+    dark: Boolean,
+    onWalkDirections: suspend (LatLng, LatLng) -> List<String> = { _, _ -> emptyList() },
+    onStartTransit: (TransitItinerary) -> Unit = {},
+    onPreview: (TransitItinerary, Boolean) -> Unit = { _, _ -> },
+) {
+    Spacer(Modifier.height(10.dp))
+    when {
+        loading -> Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+            Text(stringResource(R.string.place_finding_transit), style = MaterialTheme.typography.bodyMedium, color = dim)
+        }
+        trips.isEmpty() -> Text(stringResource(R.string.place_no_transit), style = MaterialTheme.typography.bodyMedium, color = dim)
+        else -> {
+            // One shared clock so every row's "departs in X min" countdown ticks together
+            // (recomputed each minute against the parsed departure epochs).
+            val nowSec by produceState(initialValue = app.vela.ui.DemoClock.nowSec()) {
+                while (true) {
+                    delay(30_000L)
+                    value = app.vela.ui.DemoClock.nowSec()
+                }
+            }
+            // A new set of results drops the expansions kept for the old one (issue #812).
+            LaunchedEffect(trips) { app.vela.ui.TransitExpanded.prune(trips.map { app.vela.ui.TransitExpanded.keyOf(it) }) }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                trips.take(6).forEach { TransitRow(it, nowSec, ink, dim, dark, onWalkDirections, onStartTransit, onPreview) }
+            }
+        }
+    }
+}
+
+/** Full-screen step-by-step transit guidance (Moovit-style): the current leg large, the remaining
+ *  legs as a timeline, Back / Next controls. Advances automatically as GPS reaches each leg's end. */
+@Composable
+fun TransitNavSheet(
+    nav: TransitNavState,
+    onNext: () -> Unit,
+    onBack: () -> Unit,
+    onEnd: () -> Unit,
+    onWalkDirections: suspend (LatLng, LatLng) -> List<String>,
+    modifier: Modifier = Modifier,
+) {
+    val dark = isAppInDarkTheme()
+    val ink = if (dark) InkDark else InkLight
+    val dim = if (dark) DimDark else DimLight
+    val itin = nav.itinerary
+    val step = itin.steps.getOrNull(nav.stepIndex)
+    // A BOTTOM PANE, not a full-screen takeover (issue #232, 2026-08-08): the top half stays live
+    // map, where the guided itinerary draws (colored ride legs + stop dots + dotted walks) and
+    // the camera frames the CURRENT leg, re-framing on each advance — the old full-screen sheet
+    // hid the map entirely and the guidance read as a text list ("it just tells you the
+    // instructions"). Same top-aligned-pane grammar as Street View's half-screen viewer.
+    Surface(
+        modifier.fillMaxWidth().fillMaxHeight(0.48f),
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        shadowElevation = 4.dp,
+        color = if (dark) SheetDark else SheetLight,
+    ) {
+        Column(Modifier.fillMaxSize().navigationBarsPadding().padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (nav.arrived) stringResource(R.string.transit_nav_arrived)
+                    else "${nav.stepIndex + 1} / ${itin.steps.size}",
+                    style = MaterialTheme.typography.titleMedium, color = dim, modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = onEnd) { Icon(Sym.Close, contentDescription = stringResource(R.string.place_close_directions), tint = dim) }
+            }
+            Spacer(Modifier.height(8.dp))
+            // Current leg, large.
+            if (step != null && !nav.arrived) {
+                Column(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(SheetPalette.row(dark)).padding(14.dp),
+                ) { TransitStepRow(step, ink, dim, onWalkDirections) }
+            } else {
+                Text(itin.arrivalText?.let { stringResource(R.string.place_arrive_approx, it) } ?: "", style = MaterialTheme.typography.bodyLarge, color = ink)
+            }
+            Spacer(Modifier.height(16.dp))
+            // Remaining legs as a compact timeline.
+            val remaining = itin.steps.drop(nav.stepIndex + 1)
+            if (remaining.isNotEmpty()) {
+                Text(stringResource(R.string.transit_nav_next), style = MaterialTheme.typography.labelMedium, color = dim)
+                Spacer(Modifier.height(6.dp))
+                // The list takes all the room above the buttons and scrolls inside it. It used to
+                // share that room with a spacer, and a short list left the buttons floating on the
+                // one card whose list was short (issue #831).
+                Column(
+                    Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) { remaining.forEach { TransitStepRow(it, ink, dim) } }
+            } else {
+                Spacer(Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                FilledTonalButton(onClick = onBack, enabled = nav.stepIndex > 0, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.settings_back))
+                }
+                // The last card's button ends the guidance (issue #811): Next had nothing left
+                // to advance to and only said the arrival line again.
+                Button(onClick = if (nav.arrived) onEnd else onNext, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(if (nav.arrived) R.string.nav_done else R.string.transit_nav_next))
+                }
+            }
+        }
+    }
+}
+
+/** "Departing" / "in 7 min" from a departure epoch, or null when there's nothing useful to
+ *  show - no epoch, already gone (>1 min past), or too far out (>90 min, where the printed
+ *  departure time carries it). Mirrors Google's leading countdown on the transit board. */
+/** Short localized weekday ("Mon") when the departure falls on a DIFFERENT local calendar day than
+ *  now - a night board's after-midnight tail ("11:48 PM" then "5:48 AM") otherwise reads as if the
+ *  morning runs were still today (user 2026-07-13, matching Google's day marking). Null = today.
+ *  SimpleDateFormat("EEE") localizes the weekday for free - no strings.xml entries needed. */
+private fun departureDayLabel(depEpochSec: Long?, nowSec: Long): String? {
+    val dep = depEpochSec ?: return null
+    val dayKey = java.text.SimpleDateFormat("yyyyDDD", java.util.Locale.US)
+    if (dayKey.format(java.util.Date(dep * 1000)) == dayKey.format(java.util.Date(nowSec * 1000))) return null
+    return java.text.SimpleDateFormat("EEE", java.util.Locale.getDefault()).format(java.util.Date(dep * 1000))
+}
+
+@Composable
+private fun departsInLabel(depEpochSec: Long?, nowSec: Long): String? {
+    val dep = depEpochSec ?: return null
+    val diff = dep - nowSec
+    if (diff < -60L || diff > 90L * 60L) return null
+    if (diff <= 60L) return stringResource(R.string.place_transit_now)
+    val mins = ((diff + 30L) / 60L).toInt()
+    // Past the hour, read as hours + minutes ("in 1 h 6 min"), not "in 66 min" (user 2026-07-13);
+    // formatDuration is the app-wide h/min formatter, so the units match the route rows.
+    if (mins >= 60) return stringResource(R.string.place_transit_in_duration, formatDuration(diff.toDouble()))
+    return stringResource(R.string.place_transit_in_min, mins)
+}
+
+@Composable
+private fun TransitRow(t: TransitItinerary, nowSec: Long, ink: Color, dim: Color, dark: Boolean, onWalkDirections: suspend (LatLng, LatLng) -> List<String> = { _, _ -> emptyList() }, onStartTransit: (TransitItinerary) -> Unit = {}, onPreview: (TransitItinerary, Boolean) -> Unit = { _, _ -> }) {
+    // Held outside the row (issue #812): the row leaves composition when the sheet drops to its
+    // card and came back collapsed, with its itinerary still drawn on the map.
+    val expandedKey = app.vela.ui.TransitExpanded.keyOf(t)
+    val expanded = app.vela.ui.TransitExpanded.open[expandedKey] == true
+    val canExpand = t.steps.isNotEmpty()
+    // "Departs in X min" from the parsed departure epoch, and the real-time signal (a leg
+    // carrying a live delay or a real-time-vs-timetable time) so the countdown can read green.
+    val countdown = departsInLabel(t.departureEpochSec, nowSec)
+    val live = t.steps.any { it.delayText != null || it.boardStop?.scheduledText != null }
+    val boardDelay = t.steps.firstOrNull { it.mode != TransitMode.WALK && it.delayText != null }?.delayText
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(SheetPalette.row(dark))
+            .then(if (canExpand) Modifier.dpadHighlight(RoundedCornerShape(12.dp)).clickable { app.vela.ui.TransitExpanded.open[expandedKey] = !expanded; onPreview(t, !expanded) } else Modifier)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (countdown != null || boardDelay != null) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                countdown?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (live) SheetPalette.TrafficGreen else ink,
+                    )
+                }
+                if (live) {
+                    Box(Modifier.size(6.dp).clip(CircleShape).background(SheetPalette.TrafficGreen))
+                    Text(
+                        stringResource(R.string.place_transit_live),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = SheetPalette.TrafficGreen,
+                    )
+                }
+                boardDelay?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = SheetPalette.TrafficRed,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                }
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            val range = listOfNotNull(t.departureText, t.arrivalText).joinToString(" – ")
+            Text(
+                range.ifEmpty { t.durationText.orEmpty() },
+                style = MaterialTheme.typography.titleSmall,
+                color = ink,
+                modifier = Modifier.weight(1f),
+            )
+            if (range.isNotEmpty()) {
+                t.durationText?.let { Text(it, style = MaterialTheme.typography.titleSmall, color = dim) }
+            }
+            if (canExpand) {
+                Icon(
+                    if (expanded) Sym.ExpandLess else Sym.ExpandMore,
+                    contentDescription = if (expanded) stringResource(R.string.place_hide_steps) else stringResource(R.string.place_show_steps),
+                    tint = dim,
+                    modifier = Modifier.padding(start = 4.dp).size(20.dp),
+                )
+            }
+        }
+        if (t.lines.isNotEmpty()) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                t.lines.take(4).forEachIndexed { i, line ->
+                    if (i > 0) Icon(
+                        Sym.ChevronRight,
+                        contentDescription = null,
+                        tint = dim,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    LinePill(line)
+                }
+            }
+        }
+        val sub = listOfNotNull(t.frequencyText?.let { stringResource(R.string.place_every, it) }, t.distanceText, t.agency).joinToString("  ·  ")
+        if (sub.isNotEmpty()) Text(sub, style = MaterialTheme.typography.bodySmall, color = dim)
+        if (expanded) {
+            HorizontalDivider(color = dim.copy(alpha = 0.25f))
+            // Step-by-step guidance (Moovit-style) for this itinerary.
+            if (t.steps.isNotEmpty()) {
+                Button(onClick = { onStartTransit(t) }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Sym.Navigation, contentDescription = null, modifier = Modifier.padding(end = 8.dp).size(18.dp))
+                    Text(stringResource(R.string.place_start))
+                }
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                t.steps.forEach { TransitStepRow(it, ink, dim, onWalkDirections) }
+            }
+            // Service alerts (detours / info) for the ridden lines.
+            if (t.alerts.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    t.alerts.take(4).forEach { alert ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.Top) {
+                            Icon(Sym.Info, contentDescription = null, tint = SheetPalette.TrafficAmber, modifier = Modifier.padding(top = 2.dp).size(15.dp))
+                            Text(alert, style = MaterialTheme.typography.labelSmall, color = dim)
+                        }
+                    }
+                }
+            }
+            // Tickets & info: fare (when the agency provides one) + agency name and a dialable phone
+            // (Google's "Tickets and information" footer).
+            if (t.fare != null || t.agencyPhone != null) {
+                val context = LocalContext.current
+                HorizontalDivider(color = dim.copy(alpha = 0.25f))
+                Text(stringResource(R.string.place_transit_tickets), style = MaterialTheme.typography.labelMedium, color = ink)
+                t.fare?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = ink) }
+                val info = listOfNotNull(t.agency, t.agencyPhone).joinToString("  ·  ")
+                if (info.isNotEmpty()) {
+                    val phone = t.agencyPhone
+                    Text(
+                        info,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (phone != null) MaterialTheme.colorScheme.primary else dim,
+                        modifier = if (phone != null) Modifier.dpadHighlight(RoundedCornerShape(6.dp)).clickable {
+                            val dialable = "tel:" + phone.filter { it.isDigit() || it == '+' }
+                            runCatching { context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse(dialable))) }
+                        } else Modifier,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** One leg in the expanded drill-down: a mode glyph + the line/"Walk" title and a
+ *  times·duration·distance subtitle ("Bus 42B / 5:48 AM – 6:41 AM · 53 min"). */
+@Composable
+private fun TransitStepRow(s: TransitStep, ink: Color, dim: Color, onWalkDirections: suspend (LatLng, LatLng) -> List<String> = { _, _ -> emptyList() }) {
+    // Walk leg — "Walk · 11 min · 0.5 mi", tap to expand turn-by-turn walking directions
+    // (fetched on demand via the walk router between this leg's endpoints).
+    if (s.line == null) {
+        val from = s.walkFrom; val to = s.walkTo
+        val canExpand = from != null && to != null
+        var open by remember { mutableStateOf(false) }
+        var steps by remember(from, to) { mutableStateOf<List<String>?>(null) }
+        if (open && canExpand) {
+            LaunchedEffect(from, to) { steps = onWalkDirections(from!!, to!!) }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
+            Icon(transitModeIcon(s.mode), null, tint = dim, modifier = Modifier.padding(top = 2.dp).size(18.dp))
+            Column(Modifier.fillMaxWidth()) {
+                Row(
+                    Modifier.then(if (canExpand) Modifier.dpadHighlight(RoundedCornerShape(8.dp)).clickable { open = !open } else Modifier),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.place_walk), style = MaterialTheme.typography.bodyMedium, color = ink)
+                        val sub = listOfNotNull(s.durationText, s.distanceText).joinToString("  ·  ")
+                        if (sub.isNotEmpty()) Text(sub, style = MaterialTheme.typography.bodySmall, color = dim)
+                    }
+                    if (canExpand) Icon(
+                        if (open) Sym.ExpandLess else Sym.ExpandMore,
+                        contentDescription = if (open) stringResource(R.string.place_hide_steps) else stringResource(R.string.place_show_steps),
+                        tint = dim, modifier = Modifier.size(18.dp),
+                    )
+                }
+                if (open && canExpand) {
+                    Column(Modifier.padding(start = 4.dp, top = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        when (val list = steps) {
+                            null -> CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                            else -> if (list.isEmpty()) {
+                                Text(stringResource(R.string.place_walk), style = MaterialTheme.typography.labelSmall, color = dim)
+                            } else list.forEach { instr ->
+                                Text("•  $instr", style = MaterialTheme.typography.labelSmall, color = dim)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return
+    }
+    val line = s.line ?: return // unreachable (walk branch returned) — re-narrows the cross-module type
+    val lineColor = parseHexColor(line.colorHex) ?: dim
+    var stopsOpen by remember { mutableStateOf(false) }
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
+        Icon(transitModeIcon(s.mode), null, tint = lineColor, modifier = Modifier.padding(top = 2.dp).size(18.dp))
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                LinePill(line)
+                s.headsign?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = ink, maxLines = 2) }
+            }
+            s.boardStop?.let { StopLine(it, ink, dim, emphasize = true, delay = s.delayText) }
+            val rideLabel = listOfNotNull(
+                s.durationText,
+                s.numStops?.let { pluralStringResource(R.plurals.place_transit_stops, it, it) },
+            ).joinToString("  ·  ")
+            if (s.intermediateStops.isNotEmpty()) {
+                Row(
+                    Modifier.dpadHighlight(RoundedCornerShape(6.dp)).clickable { stopsOpen = !stopsOpen }.padding(vertical = 1.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(rideLabel, style = MaterialTheme.typography.bodySmall, color = dim)
+                    Icon(
+                        if (stopsOpen) Sym.ExpandLess else Sym.ExpandMore,
+                        contentDescription = if (stopsOpen) stringResource(R.string.place_hide_steps) else stringResource(R.string.place_show_steps),
+                        tint = dim, modifier = Modifier.size(18.dp),
+                    )
+                }
+                if (stopsOpen) {
+                    Column(Modifier.padding(start = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        s.intermediateStops.forEach { StopLine(it, ink, dim, emphasize = false) }
+                    }
+                }
+            } else if (rideLabel.isNotEmpty()) {
+                Text(rideLabel, style = MaterialTheme.typography.bodySmall, color = dim)
+            }
+            s.alightStop?.let { StopLine(it, ink, dim, emphasize = true) }
+        }
+    }
+}
+
+/** One stop in the transit drill-down: its call time, name, and (for board/alight) the agency
+ *  stop code + any real-time delay. Emphasized for board/alight, lighter for the intermediate list. */
+@Composable
+private fun StopLine(stop: TransitStopTime, ink: Color, dim: Color, emphasize: Boolean, delay: String? = null) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+        stop.timeText?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (delay != null) SheetPalette.TrafficRed else dim,
+                modifier = Modifier.widthIn(min = 54.dp),
+            )
+        }
+        Column {
+            Text(
+                stop.name,
+                style = if (emphasize) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
+                color = ink,
+            )
+            val meta = listOfNotNull(
+                delay,
+                stop.scheduledText?.takeIf { emphasize },
+                stop.code?.takeIf { emphasize }?.let { stringResource(R.string.place_transit_stop_id, it) },
+            ).joinToString("  ·  ")
+            if (meta.isNotEmpty()) {
+                Text(
+                    meta,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (delay != null) SheetPalette.TrafficRed else dim,
+                )
+            }
+        }
+    }
+}
+
+/** A transit stop's live departure board - Google's "See departure board" for the station,
+ *  keyless from the place page. Each line/direction shows its next departures with a countdown
+ *  on the soonest (green + a Live dot when Google has a real-time fix) and the running frequency. */
+@Composable
+private fun StopDepartureBoard(
+    d: app.vela.core.model.StopDepartures?,
+    loading: Boolean,
+    ink: Color,
+    dim: Color,
+    dark: Boolean,
+    onTapRoute: (app.vela.core.model.StopDepartureLine) -> Unit = {},
+    cachedAt: Long? = null,
+) {
+    if (d == null && !loading) return
+    Spacer(Modifier.height(14.dp))
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Icon(Sym.DirectionsTransit, contentDescription = null, tint = dim, modifier = Modifier.size(18.dp))
+        Text(stringResource(R.string.place_departures), style = MaterialTheme.typography.titleSmall, color = ink)
+    }
+    // The offline copy says WHEN it was seen: the routes and colors are still right, the times
+    // are whatever they were then.
+    if (d != null && cachedAt != null) {
+        val ago = android.text.format.DateUtils.getRelativeTimeSpanString(cachedAt).toString()
+        Text(
+            stringResource(R.string.place_transit_cached, ago),
+            style = MaterialTheme.typography.bodySmall,
+            color = dim,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    }
+    if (d == null) {
+        Row(
+            Modifier.padding(top = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+            Text(stringResource(R.string.place_finding_transit), style = MaterialTheme.typography.bodyMedium, color = dim)
+        }
+        return
+    }
+    val nowSec by produceState(initialValue = app.vela.ui.DemoClock.nowSec()) {
+        while (true) { delay(30_000L); value = app.vela.ui.DemoClock.nowSec() }
+    }
+    // Google-style clean list: plain tappable rows separated by hairline dividers (no per-row
+    // chevron - the row itself opens the route, and its Material ripple is the affordance).
+    Column(Modifier.padding(top = 6.dp)) {
+        val lines = d.lines.take(24)
+        lines.forEachIndexed { i, line ->
+            DepartureLineRow(line, nowSec, ink, dim, onTapRoute)
+            if (i < lines.lastIndex) {
+                HorizontalDivider(
+                    color = SheetPalette.row(dark),
+                    thickness = 0.5.dp,
+                    modifier = Modifier.padding(start = 2.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DepartureLineRow(
+    line: app.vela.core.model.StopDepartureLine,
+    nowSec: Long,
+    ink: Color,
+    dim: Color,
+    onTapRoute: (app.vela.core.model.StopDepartureLine) -> Unit = {},
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .dpadHighlight(RoundedCornerShape(10.dp))
+            .clickable { onTapRoute(line) }
+            .padding(vertical = 10.dp, horizontal = 2.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (line.label != null) {
+                LinePill(TransitLine(name = line.label!!, mode = line.mode, colorHex = line.colorHex))
+            } else {
+                Icon(modeIcon(line.mode), contentDescription = null, tint = dim, modifier = Modifier.size(18.dp))
+            }
+            line.headsign?.let {
+                Text(it, style = MaterialTheme.typography.bodyMedium, color = ink, modifier = Modifier.weight(1f))
+            } ?: Spacer(Modifier.weight(1f))
+            line.headwayText?.let {
+                Text(stringResource(R.string.place_every, it), style = MaterialTheme.typography.labelMedium, color = dim)
+            }
+            // Explicit "Stops ›" action: the bare row ripple wasn't discoverable enough as "tap to see
+            // where this route goes" (user 2026-07-13, overruling the earlier chevron removal).
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.place_transit_view_stops),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Icon(
+                    Sym.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+        }
+        if (line.upcoming.isNotEmpty()) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                val next = line.upcoming.first()
+                val live = next.realtime
+                val countdown = departsInLabel(next.epochSec, nowSec)
+                Text(
+                    next.clockText.orEmpty(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (live) SheetPalette.TrafficGreen else ink,
+                )
+                countdown?.let {
+                    Text(
+                        "· $it",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (live) SheetPalette.TrafficGreen else dim,
+                    )
+                }
+                departureDayLabel(next.epochSec, nowSec)?.let {
+                    Text("· $it", style = MaterialTheme.typography.bodyMedium, color = dim)
+                }
+                if (live) Box(Modifier.size(6.dp).clip(CircleShape).background(SheetPalette.TrafficGreen))
+            }
+            // The rest of the upcoming departures as a VERTICAL LIST — one per line, each with its own
+            // countdown/day marker. Capped at a handful with an "N more" expander: an agency can embed 25+
+            // times, and the full wall scrolled the route pill + headsign clean out of view, which read as
+            // "the bus number is missing" (user 2026-07-13). Expanding shows everything.
+            val rest = line.upcoming.drop(1)
+            if (rest.isNotEmpty()) {
+                var showAll by remember(line.label, line.headsign) { mutableStateOf(false) }
+                val shown = if (showAll) rest else rest.take(5)
+                Column(Modifier.padding(top = 2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    shown.forEach { dep ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(dep.clockText.orEmpty(), style = MaterialTheme.typography.bodySmall, color = dim)
+                            departsInLabel(dep.epochSec, nowSec)?.let {
+                                Text("· $it", style = MaterialTheme.typography.bodySmall, color = dim)
+                            }
+                            departureDayLabel(dep.epochSec, nowSec)?.let {
+                                Text("· $it", style = MaterialTheme.typography.bodySmall, color = dim)
+                            }
+                        }
+                    }
+                    if (!showAll && rest.size > 5) {
+                        Text(
+                            stringResource(R.string.place_transit_more_times, rest.size - 5),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .dpadHighlight(RoundedCornerShape(6.dp))
+                                .clickable { showAll = true }
+                                .padding(vertical = 4.dp, horizontal = 2.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The tap-through stop timeline for one route off the departure board. Reuses the proven
+ * transit-itinerary parser: [MapViewModel.openRouteDetail] runs a keyless directions query
+ * from the tapped stop toward the route's headsign, and the returned ride leg carries the
+ * board / intermediate / alight stops with per-stop times. We render them as a vertical
+ * timeline; tapping any stop opens that stop's own board (via [onStopTap]) so the user can
+ * keep tapping down the line, mirroring Google's tap-through.
+ */
+@Composable
+fun RouteDetailSheet(
+    step: TransitStep?,
+    title: String?,
+    loading: Boolean,
+    onClose: () -> Unit,
+    onStopTap: (TransitStopTime) -> Unit,
+) {
+    BackHandler(enabled = app.vela.ui.LocalSheetActive.current, onBack = onClose)
+    // D-pad: place focus on the back arrow when the sheet opens (same convention as the reviews page),
+    // so a D-pad-only user can immediately scroll the timeline / step onto a stop with no wake-up press.
+    val backFocus = rememberDpadAutoFocus()
+    val dark = isAppInDarkTheme()
+    val ink = if (dark) InkDark else InkLight
+    val dim = if (dark) DimDark else DimLight
+    val lineColor = parseHexColor(step?.line?.colorHex) ?: MaterialTheme.colorScheme.primary
+    // The full ordered call list: the stops the run ALREADY passed (grayed above, Google-style),
+    // then board, the in-betweens, and alight. Board/alight are often absent from
+    // intermediateStops, so stitch them on the ends and de-dupe by name.
+    val prior = step?.priorStops ?: emptyList()
+    val stops = remember(step) {
+        val mid = step?.intermediateStops ?: emptyList()
+        buildList {
+            addAll(prior)
+            step?.boardStop?.let { add(it) }
+            addAll(mid)
+            step?.alightStop?.let { a -> if (mid.none { it.name == a.name } && step.boardStop?.name != a.name) add(a) }
+        }
+    }
+    Surface(Modifier.fillMaxSize(), color = if (dark) SheetDark else SheetLight) {
+        Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+            // Header: back + the route pill + headsign.
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                IconButton(onClick = onClose, modifier = Modifier.focusRequester(backFocus).dpadHighlight()) {
+                    Icon(Sym.ArrowBack, contentDescription = stringResource(R.string.place_close), tint = ink)
+                }
+                step?.line?.let { LinePill(it) }
+                Text(
+                    title ?: step?.headsign ?: step?.line?.name.orEmpty(),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = ink,
+                    maxLines = 2,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            step?.numStops?.let { n ->
+                Text(
+                    pluralStringResource(R.plurals.place_transit_stops, n, n),
+                    style = MaterialTheme.typography.labelMedium, color = dim,
+                    modifier = Modifier.padding(start = 16.dp, bottom = 4.dp),
+                )
+            }
+            HorizontalDivider(color = SheetPalette.row(dark))
+            if (stops.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    if (loading || step == null) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+                    else Text(stringResource(R.string.route_detail_unavailable), style = MaterialTheme.typography.bodyMedium, color = dim)
+                }
+                return@Column
+            }
+            // Open ON the boarding stop; the already-passed stops are a scroll-up away.
+            val listState = rememberLazyListState(initialFirstVisibleItemIndex = prior.size)
+            LazyColumn(Modifier.fillMaxSize().padding(horizontal = 4.dp), state = listState) {
+                itemsIndexed(stops) { i, stop ->
+                    val isBoard = i == prior.size
+                    val isLast = i == stops.lastIndex
+                    RouteStopRow(stop, lineColor, ink, dim, isBoard, isLast, dark, past = i < prior.size, isTop = i == 0, onClick = { onStopTap(stop) })
+                }
+            }
+        }
+    }
+}
+
+/** One stop in the [RouteDetailSheet] timeline: a colored connector rail with a node, the stop
+ *  name (board/alight emphasized), its call time in normal ink (the boarding stop's - the next
+ *  departure - a step bigger) and a small status word under the time: a green "Live" when the
+ *  agency feed adjusted this stop's time, else "Scheduled" (Google's treatment). The whole row
+ *  taps through; a hairline between rows (inset past the rail, so the line stays continuous)
+ *  separates the stops. */
+@Composable
+private fun RouteStopRow(
+    stop: TransitStopTime,
+    lineColor: Color,
+    ink: Color,
+    dim: Color,
+    isFirst: Boolean,
+    isLast: Boolean,
+    dark: Boolean,
+    past: Boolean = false, // the run already called here - grayed, no status word (Google-style)
+    isTop: Boolean = isFirst, // first VISIBLE row (no rail above); differs from isFirst when priors show
+    onClick: () -> Unit,
+) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .dpadHighlight(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(start = 6.dp, end = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Vertical rail + node, drawn so the line is continuous between rows. Board/alight get a
+            // bigger node; intermediate stops a smaller one - all solid in the line color so they read
+            // on any sheet background.
+            val big = isFirst || isLast
+            // Passed stops gray their node and the rail segments touching them, so the colored
+            // line visually STARTS at the boarding stop (Google's treatment).
+            val nodeColor = if (past) dim.copy(alpha = 0.45f) else lineColor
+            val topRail = if (past || isFirst) dim.copy(alpha = 0.45f) else lineColor
+            val bottomRail = if (past) dim.copy(alpha = 0.45f) else lineColor
+            Box(Modifier.width(24.dp).fillMaxHeight().heightIn(min = 64.dp), contentAlignment = Alignment.Center) {
+                if (!isTop) Box(Modifier.width(3.dp).fillMaxHeight(0.5f).align(Alignment.TopCenter).background(topRail))
+                if (!isLast) Box(Modifier.width(3.dp).fillMaxHeight(0.5f).align(Alignment.BottomCenter).background(bottomRail))
+                Box(Modifier.size(if (big) 14.dp else 9.dp).clip(CircleShape).background(nodeColor))
+            }
+            Spacer(Modifier.width(10.dp))
+            Text(
+                stop.name,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (isFirst || isLast) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (past) dim else ink,
+                maxLines = 2,
+                modifier = Modifier.weight(1f).padding(vertical = 14.dp),
+            )
+            stop.timeText?.let { time ->
+                // Realtime = the feed gave this stop an adjusted time distinct from the timetable.
+                val live = stop.scheduledText != null && stop.scheduledText != stop.timeText
+                Column(Modifier.padding(start = 8.dp), horizontalAlignment = Alignment.End) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Google's treatment for a moved time: the timetable time crossed out
+                        // beside the live one, green when on time or early, red when late.
+                        if (live && !past && !stop.canceled) {
+                            Text(
+                                stop.scheduledText!!,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = dim,
+                                textDecoration = TextDecoration.LineThrough,
+                                modifier = Modifier.padding(end = 6.dp),
+                            )
+                        }
+                        Text(
+                            time,
+                            style = if (isFirst) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (isFirst) FontWeight.SemiBold else FontWeight.Normal,
+                            color = when {
+                                stop.canceled || past -> dim
+                                live && (stop.delayMin ?: 0) > 0 -> SheetPalette.TrafficRed
+                                live -> SheetPalette.TrafficGreen
+                                else -> ink
+                            },
+                            textDecoration = if (stop.canceled) TextDecoration.LineThrough else null,
+                        )
+                    }
+                    // Passed stops carry no status word - the gray says it already.
+                    if (!past) {
+                        Text(
+                            stringResource(
+                                when {
+                                    stop.canceled -> R.string.place_transit_cancelled
+                                    live -> R.string.place_transit_live
+                                    else -> R.string.place_transit_scheduled
+                                },
+                            ),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = when {
+                                stop.canceled -> SheetPalette.TrafficRed
+                                live -> SheetPalette.TrafficGreen
+                                else -> dim
+                            },
+                        )
+                    }
+                }
+            }
+        }
+        // Separator between stops, drawn INSIDE the row's bottom edge and inset past the rail:
+        // an item-level divider would open a visible gap in the connector line.
+        if (!isLast) {
+            HorizontalDivider(
+                Modifier.align(Alignment.BottomCenter).padding(start = 40.dp),
+                // A step above the row-surface tint: SheetPalette.row was near-invisible on the
+                // dark sheet (user 2026-07-13).
+                color = dim.copy(alpha = 0.35f),
+            )
+        }
+    }
+}
+
+private fun modeIcon(mode: TransitMode) = when (mode) {
+    TransitMode.BUS -> Sym.DirectionsBus
+    TransitMode.SUBWAY -> Sym.DirectionsSubway
+    TransitMode.TRAIN -> Sym.Train
+    TransitMode.TRAM -> Sym.Tram
+    TransitMode.FERRY -> Sym.DirectionsBoat
+    else -> Sym.DirectionsTransit
+}
+
+/** A color-filled line badge (e.g. a blue "Amtrak Thruway"), mirroring Google's
+ *  transit pills; falls back to the theme primary when no color is supplied. */
+@Composable
+private fun LinePill(line: TransitLine) {
+    val fallback = MaterialTheme.colorScheme.primary
+    val bg = parseHexColor(line.colorHex) ?: fallback
+    val fg = parseHexColor(line.textColorHex) ?: if (bg.luminance() > 0.5f) Color(0xFF202124) else Color.White
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(bg)
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(transitModeIcon(line.mode), contentDescription = null, tint = fg, modifier = Modifier.size(14.dp))
+        Text(line.name, style = MaterialTheme.typography.labelMedium, color = fg, maxLines = 1)
+    }
+}
+
+private fun transitModeIcon(mode: TransitMode) = when (mode) {
+    TransitMode.BUS -> Sym.DirectionsBus
+    TransitMode.TRAM -> Sym.Tram
+    TransitMode.SUBWAY -> Sym.DirectionsSubway
+    TransitMode.TRAIN -> Sym.Train
+    TransitMode.FERRY -> Sym.DirectionsBoat
+    TransitMode.WALK -> Sym.DirectionsWalk
+    TransitMode.GENERIC -> Sym.DirectionsTransit
+}
+
+/** Parse a CSS hex color ("#rrggbb" / "#rgb"); null if absent/malformed. */
+private fun parseHexColor(hex: String?): Color? {
+    val h = hex?.trim()?.removePrefix("#") ?: return null
+    return runCatching {
+        when (h.length) {
+            6 -> Color(("FF$h").toLong(16))
+            8 -> Color(h.toLong(16))
+            3 -> Color(("FF" + h.map { "$it$it" }.joinToString("")).toLong(16))
+            else -> null
+        }
+    }.getOrNull()
+}
+
+/** A fade-in for a sheet section that was a loading skeleton: transparent while [skeleton], then
+ *  280 ms to opaque when the listing lands. A section that never was a skeleton stays opaque. */
+@Composable
+private fun rememberReveal(key: String, skeleton: Boolean): Modifier {
+    val a = remember(key) { Animatable(if (skeleton) 0f else 1f) }
+    LaunchedEffect(key, skeleton) {
+        if (skeleton) a.snapTo(0f) else if (a.value < 1f) a.animateTo(1f, tween(280))
+    }
+    return Modifier.graphicsLayer {
+        alpha = a.value
+        compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
+    }
+}
+
+/** Pulsing placeholder bars for the rows a tapped place is still loading (rating, details, body). */
+@Composable
+private fun SheetSkeleton(
+    base: Color,
+    widths: List<androidx.compose.ui.unit.Dp>,
+    height: androidx.compose.ui.unit.Dp = 14.dp,
+    gap: androidx.compose.ui.unit.Dp = 10.dp,
+    top: androidx.compose.ui.unit.Dp = 8.dp,
+) {
+    // Same pulse as the photo tiles, so the whole sheet breathes in step while it loads.
+    val transition = rememberInfiniteTransition(label = "sheetSkeleton")
+    val alpha by transition.animateFloat(
+        initialValue = 0.12f,
+        targetValue = 0.32f,
+        animationSpec = infiniteRepeatable(tween(750), RepeatMode.Reverse),
+        label = "sheetSkeletonAlpha",
+    )
+    Column(Modifier.padding(top = top), verticalArrangement = Arrangement.spacedBy(gap)) {
+        widths.forEach { w ->
+            Box(
+                Modifier
+                    .width(w)
+                    .height(height)
+                    .clip(RoundedCornerShape(height / 2))
+                    .background(base.copy(alpha = alpha)),
+            )
+        }
+    }
+}
+
+/** A photo-tile-sized placeholder that gently pulses while the full gallery scrapes in —
+ *  signals "more photos loading" at the end of the strip (or fills it when there's no preview yet). */
+@Composable
+private fun PhotoShimmerTile(base: Color) {
+    val transition = rememberInfiniteTransition(label = "photoShimmer")
+    val alpha by transition.animateFloat(
+        initialValue = 0.12f,
+        targetValue = 0.32f,
+        animationSpec = infiniteRepeatable(tween(750), RepeatMode.Reverse),
+        label = "photoShimmerAlpha",
+    )
+    Box(
+        Modifier
+            .size(width = 152.dp, height = 110.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(base.copy(alpha = alpha)),
+    )
+}
+
+/** Full-screen, swipeable photo viewer (tap a photo in the strip to open). */
+// ---- Activity-window full-screen overlays -------------------------------------------------------
+// A nested compose Dialog window can NOT reach the screen edges (window-dump-proven: it re-asserts
+// inset-fitted params) AND it re-captures stale display bounds on rotation (the "image floats,
+// background gone" report). The MAIN ACTIVITY window is already edge-to-edge, so these surfaces
+// render there instead — genuinely full-screen, and they re-lay-out on rotation for free. Deep call
+// sites push a request to a holder; [PlaceOverlays] (mounted at VelaRoot's root Box) renders it.
+
+object GalleryOverlay {
+    data class Req(val urls: List<String>, val dates: List<String?>, val start: Int, val onDismiss: () -> Unit)
+    var req by mutableStateOf<Req?>(null)
+        private set
+    fun show(urls: List<String>, dates: List<String?>, start: Int, onDismiss: () -> Unit) { req = Req(urls, dates, start, onDismiss) }
+    fun dismiss() { val r = req; req = null; r?.onDismiss?.invoke() }
+    fun clear() { req = null } // caller unmounted its own state — no callback
+}
+
+object FullReviewsOverlay {
+    data class Req(val featureId: String, val place: Place, val onDismiss: () -> Unit)
+    var req by mutableStateOf<Req?>(null)
+        private set
+    fun show(featureId: String, place: Place, onDismiss: () -> Unit) { req = Req(featureId, place, onDismiss) }
+    fun dismiss() { val r = req; req = null; r?.onDismiss?.invoke() }
+    fun clear() { req = null }
+}
+
+/** Rendered LAST in VelaRoot's root Box, so it sits above the map + sheet in the activity's own
+ *  edge-to-edge window. The gallery is drawn after the reviews page so a review-photo tap layers on top. */
+@Composable
+fun PlaceOverlays() {
+    FullReviewsOverlay.req?.let { r ->
+        val dark = isAppInDarkTheme()
+        FullScreenReviewsContent(r.featureId, r.place, if (dark) InkDark else InkLight, if (dark) DimDark else DimLight) { FullReviewsOverlay.dismiss() }
+    }
+    GalleryOverlay.req?.let { r ->
+        PhotoGalleryContent(r.urls, r.dates, r.start) { GalleryOverlay.dismiss() }
+    }
+}
+
+@Composable
+private fun PhotoGallery(urls: List<String>, dates: List<String?>, start: Int, onDismiss: () -> Unit) {
+    // Shim → the activity-window overlay (see GalleryOverlay). The call site keeps its own open/close
+    // state; unmounting clears the overlay without re-firing onDismiss.
+    DisposableEffect(urls, start) {
+        GalleryOverlay.show(urls, dates, start, onDismiss)
+        onDispose { GalleryOverlay.clear() }
+    }
+}
+
+@Composable
+private fun PhotoGalleryContent(urls: List<String>, dates: List<String?>, start: Int, onDismiss: () -> Unit) {
+    if (urls.isEmpty()) return
+    BackHandler(onBack = onDismiss)
+    // The viewer is always black, so force LIGHT status/nav icons while it's up (the map theme
+    // may have set them dark); MainActivity's theme effect restores them when this leaves.
+    val galleryView = LocalView.current
+    DisposableEffect(Unit) {
+        val ctx = galleryView.context
+        val win = (ctx as? android.app.Activity)?.window
+        val prevLight = win?.let { androidx.core.view.WindowCompat.getInsetsController(it, galleryView).isAppearanceLightStatusBars }
+        win?.let { androidx.core.view.WindowCompat.getInsetsController(it, galleryView).isAppearanceLightStatusBars = false }
+        onDispose {
+            if (win != null && prevLight != null) {
+                androidx.core.view.WindowCompat.getInsetsController(win, galleryView).isAppearanceLightStatusBars = prevLight
+            }
+        }
+    }
+        val pager = rememberPagerState(initialPage = start.coerceIn(0, urls.lastIndex)) { urls.size }
+        // D-pad (docs/dpad.md): the viewer grabs focus so LEFT/RIGHT page through the
+        // photos with no touch; BACK already dismisses (Dialog).
+        val galleryFocus = remember { FocusRequester() }
+        val keyScope = rememberCoroutineScope()
+        LaunchedEffect(Unit) { runCatching { galleryFocus.requestFocus() } }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .focusRequester(galleryFocus)
+                .onKeyEvent { ev ->
+                    val pageKey = ev.key == Key.DirectionLeft || ev.key == Key.DirectionRight
+                    when {
+                        !pageKey -> false
+                        ev.type != KeyEventType.KeyUp -> true
+                        ev.key == Key.DirectionRight -> {
+                            keyScope.launch { pager.animateScrollToPage(pager.currentPage + 1) }; true
+                        }
+                        else -> {
+                            keyScope.launch { pager.animateScrollToPage(pager.currentPage - 1) }; true
+                        }
+                    }
+                }
+                .focusable(),
+        ) {
+            // Google's diffuse backdrop: the current photo, blurred and dimmed, behind the pager
+            // (Android 12+; older devices keep plain black — Modifier.blur no-ops there and a
+            // sharp copy would read as a glitch, so it's gated).
+            if (android.os.Build.VERSION.SDK_INT >= 31) {
+                AsyncImage(
+                    model = urls[pager.currentPage].atWidth(240),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().blur(48.dp),
+                )
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)))
+            }
+            HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
+                // One gesture loop so pinch-zoom, pan-when-zoomed, swipe-down-to-
+                // dismiss, AND the pager's horizontal swipe between photos all work
+                // together: a pinch or a pan-while-zoomed consumes the pointers (so
+                // the pager stays put), a clearly-downward drag at 1× drives the
+                // dismiss, and a flat horizontal drag is left UNCONSUMED so the
+                // HorizontalPager pages. (Stacking two detectors stole both.)
+                var scale by remember { mutableStateOf(1f) }
+                var offset by remember { mutableStateOf(Offset.Zero) }
+                var dismissY by remember { mutableStateOf(0f) }
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        // Double-tap zooms 2.5x at the tap point / back out (user 2026-07-11).
+                        // Coexists with the custom loop below: bare taps are never consumed
+                        // there, so this detector sees the full down-up-down-up.
+                        .pointerInput(Unit) {
+                            detectTapGestures(onDoubleTap = { pos ->
+                                if (scale > 1f) {
+                                    scale = 1f; offset = Offset.Zero
+                                } else {
+                                    scale = 2.5f
+                                    offset = (Offset(size.width / 2f, size.height / 2f) - pos) * (2.5f - 1f)
+                                }
+                            })
+                        }
+                        .pointerInput(Unit) {
+                            awaitEachGesture {
+                                awaitFirstDown(requireUnconsumed = false)
+                                var dx = 0f
+                                var dy = 0f
+                                do {
+                                    val event = awaitPointerEvent()
+                                    val zoom = event.calculateZoom()
+                                    val pan = event.calculatePan()
+                                    dx += pan.x; dy += pan.y
+                                    when {
+                                        zoom != 1f || scale > 1f -> {
+                                            scale = (scale * zoom).coerceIn(1f, 5f)
+                                            offset = if (scale > 1f) offset + pan else Offset.Zero
+                                            dismissY = 0f
+                                            event.changes.forEach { if (it.positionChanged()) it.consume() }
+                                        }
+                                        dy > 0f && dy > kotlin.math.abs(dx) -> {
+                                            dismissY = dy
+                                            event.changes.forEach { if (it.positionChanged()) it.consume() }
+                                        }
+                                    }
+                                } while (event.changes.any { it.pressed })
+                                if (scale <= 1f) {
+                                    if (dismissY > 240f) onDismiss()
+                                    dismissY = 0f
+                                }
+                            }
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AsyncImage(
+                        model = urls[page].atWidth(1280),
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer(
+                                scaleX = scale,
+                                scaleY = scale,
+                                translationX = offset.x,
+                                translationY = offset.y + dismissY,
+                                alpha = (1f - dismissY / 1000f).coerceIn(0.4f, 1f),
+                            ),
+                    )
+                }
+            }
+            Box(Modifier.fillMaxSize()) {
+                // Gradient fade under the (visible) status bar, Google-style.
+                Box(
+                    Modifier.fillMaxWidth().height(140.dp).align(Alignment.TopCenter)
+                        .background(androidx.compose.ui.graphics.Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.55f), 1f to Color.Transparent)),
+                )
+                Text(
+                    stringResource(R.string.place_gallery_counter, pager.currentPage + 1, urls.size),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White,
+                    modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(12.dp),
+                )
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(4.dp),
+                ) {
+                    Icon(Sym.Close, contentDescription = stringResource(R.string.place_close), tint = Color.White)
+                }
+                // Per-photo caption ("Ele Campbell · a year ago" for reviews). On Android 15/16 a Dialog's
+                // window insets read ZERO and the bottom ~nav-bar strip is CLIPPED (undrawable) — proven on a
+                // Pixel 9 — so a normal bottom caption vanished. A FIXED bottom clearance keeps it in the
+                // drawable area regardless (harmlessly a touch higher on phones with no such clip).
+                dates.getOrNull(pager.currentPage)?.let { caption ->
+                    // Bottom-LEFT in every orientation (Google's stamp position). With the system
+                    // bars hidden the window owns the full screen, so a modest fixed clearance
+                    // works in both orientations (the old proportional clearance floated it).
+                    Text(
+                        caption,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White,
+                        modifier = Modifier.align(Alignment.BottomStart)
+                            .navigationBarsPadding()
+                            .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
+                            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(50))
+                            .padding(horizontal = 14.dp, vertical = 7.dp),
+                    )
+                }
+            }
+        }
+}
+
+// Google's gallery-tab name for the menu, per app language (the categories arrive localized via
+// hl=). Lowercase contains-match, so "Menu", "Menú", "Speisekarte & Getränke" all hit.
+private val MENU_TAB_WORDS = listOf("menu", "menú", "menù", "speisekarte", "cardápio", "menukaart", "меню", "meny")
+
+/** Whether the place has menu-tagged photos (drives the results' Menu button). */
+internal fun hasMenuPhotos(place: Place): Boolean =
+    place.photoCategories.any { cat -> cat != null && MENU_TAB_WORDS.any { cat.lowercase().contains(it) } }
+
+/** Canonical share URL for a place: the cid deep link when it has a feature id, else a query. */
+internal fun sharePlaceUrl(place: Place): String {
+    val lat = place.location.lat
+    val lng = place.location.lng
+    val cid = place.featureId?.substringAfter(":", "")?.removePrefix("0x")?.takeIf { it.isNotBlank() }
+        ?.let { runCatching { java.math.BigInteger(it, 16).toString() }.getOrNull() }
+    return if (cid != null) "https://www.google.com/maps?cid=$cid"
+    else "https://www.google.com/maps/search/?api=1&query=${Uri.encode(place.name)}%20$lat%2C$lng"
+}
+
+/** The Menu tab: the menu-tagged gallery photos as a browsable 2-up grid (tap → full-screen).
+ *  Only mounted when the place HAS menu photos, so no empty state is needed. Plain Column of
+ *  chunked rows, not a lazy grid — the sheet body already scrolls, and menu sets are tens of
+ *  photos at most. Each tile carries the photo's upload date as a corner stamp when the
+ *  gallery scrape had one — a menu shot's age says whether the prices still hold
+ *  (user 2026-07-11); the full-screen viewer shows the same date in its caption. */
+@Composable
+private fun MenuTab(place: Place, menuIndices: List<Int>, dim: Color, onOpen: (Int) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        menuIndices.chunked(2).forEach { rowIdx ->
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                rowIdx.forEach { i ->
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .height(150.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(dim.copy(alpha = 0.2f))
+                            .dpadHighlight(RoundedCornerShape(12.dp))
+                            .clickable { onOpen(i) },
+                    ) {
+                        AsyncImage(
+                            model = place.photoUrls.getOrNull(i),
+                            contentDescription = stringResource(R.string.place_photo_number, i + 1),
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        place.photoDates.getOrNull(i)?.let { date ->
+                            Text(
+                                date,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                maxLines = 1,
+                                modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .padding(6.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color.Black.copy(alpha = 0.55f))
+                                    .padding(horizontal = 7.dp, vertical = 3.dp),
+                            )
+                        }
+                    }
+                }
+                if (rowIdx.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+/** A header action: an 18dp icon in a fixed 36dp gray circle. A plain clickable Box, NOT an M3
+ *  IconButton — the IconButton's minimum-touch-target machinery kept re-inflating the layout
+ *  box past the visible circle, which is why the header circles overlapped through two rounds
+ *  of "make them smaller" (user 2026-07-10). Here the layout size IS the circle, full stop. */
+@Composable
+internal fun HeaderCircleButton(
+    icon: ImageVector,
+    contentDescription: String?,
+    tint: Color,
+    bg: Color,
+    size: androidx.compose.ui.unit.Dp = 36.dp,
+    onClick: () -> Unit,
+) {
+    Box(
+        Modifier
+            .size(size)
+            .clip(androidx.compose.foundation.shape.CircleShape)
+            .background(bg.copy(alpha = 0.12f))
+            .dpadHighlight(androidx.compose.foundation.shape.CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(size / 2))
+    }
+}
+
+/** Re-size a Google FIFE photo URL (…=w500-h350) to a target width for full view. */
+internal fun String.atWidth(w: Int): String = replace(Regex("=w\\d+(-h\\d+)?.*$"), "=w$w")
+
+/** Native search / sort / topic chips for the live reviews panel — Vela's own UI driving the
+ *  panel's hidden Google controls (the originals are carved out once the chips arrive). Search
+ *  is Google's server-side one (ALL reviews, not just those loaded); chips are Google's
+ *  auto-parsed review topics; sort mirrors Google's four orders. */
+@Composable
+private fun PanelControls(
+    chips: List<app.vela.web.PanelChip>?,
+    selected: String,
+    query: String,
+    onQuery: (String) -> Unit,
+    onSearch: () -> Unit,
+    onChip: (String) -> Unit,
+    onSort: (String) -> Unit,
+    ink: Color,
+    dim: Color,
+) {
+    if (chips == null) return // nothing to control yet — the panel is still booting
+    // NOTE: an EMPTY list is meaningful — the business has no auto-parsed topics; search + sort
+    // still render (they exist on every panel), only the chip row is skipped.
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQuery,
+            placeholder = { Text(stringResource(R.string.place_search_reviews), color = dim) },
+            leadingIcon = { Icon(Sym.Search, contentDescription = null, tint = dim, modifier = Modifier.size(18.dp)) },
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyMedium.copy(color = ink),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+            shape = RoundedCornerShape(24.dp),
+            // No fixed height: OutlinedTextField reserves internal padding for a label line, so a
+            // 52dp clamp clipped the text's descenders at the bottom. Natural height doesn't clip.
+            modifier = Modifier.weight(1f).dpadFieldEscape(),
+        )
+        Spacer(Modifier.width(6.dp))
+        var sortOpen by remember { mutableStateOf(false) }
+        Box {
+            IconButton(onClick = { sortOpen = true }) {
+                Icon(Sym.Sort, contentDescription = stringResource(R.string.place_sort_reviews), tint = dim)
+            }
+            // Display label localizes; the SECOND element stays the English LOGIC KEY - onSort
+            // drives the live Google panel (loaded hl=en) by clicking the option with that
+            // exact label, so the key must match Google's English UI (i18n follow-ups,
+            // 2026-07-14: the last dual-purpose literals split from their keys).
+            val sortOptions = listOf(
+                stringResource(R.string.place_sort_relevant) to "Most relevant",
+                stringResource(R.string.place_sort_newest) to "Newest",
+                stringResource(R.string.place_sort_highest) to "Highest rating",
+                stringResource(R.string.place_sort_lowest) to "Lowest rating",
+            )
+            VelaMenu(expanded = sortOpen, onDismissRequest = { sortOpen = false }) {
+                sortOptions.forEach { (label, key) ->
+                    item(label) { sortOpen = false; onSort(key) }
+                }
+            }
+        }
+    }
+    if (chips.isNotEmpty()) LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+    ) {
+        items(chips.size) { i ->
+            val c = chips[i]
+            FilterChip(
+                selected = selected == c.label,
+                onClick = { onChip(c.label) },
+                label = { Text(if (c.count != null) "${c.label}  ${c.count}" else c.label) },
+            )
+        }
+    }
+}
+
+/** Native rating distribution (Google-style amber bars), counts ordered [5★,4★,3★,2★,1★] —
+ *  scraped off the live reviews panel so the histogram renders in Vela's own UI. */
+@Composable
+private fun RatingHistogram(counts: List<Int>, dim: Color, modifier: Modifier = Modifier) {
+    val max = (counts.maxOrNull() ?: 0).coerceAtLeast(1)
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        counts.forEachIndexed { i, n ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "${5 - i}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = dim,
+                    modifier = Modifier.width(12.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(7.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(dim.copy(alpha = 0.22f)),
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth(n / max.toFloat())
+                            .height(7.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFFF9AB00)),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Reviews / About tabs. Only tabs with content show; the content area is
+ *  height-capped and scrolls (e.g. the reviews list). */
+@Composable
+private fun PlaceTabs(
+    place: Place,
+    reviews: List<Review>,
+    reviewsLoading: Boolean,
+    reviewsFound: Int,
+    onRetryReviews: () -> Unit,
+    ink: Color,
+    dim: Color,
+    onNeedReviews: () -> Unit = {},
+    onPanelOverscroll: (Float) -> Unit = {},
+    onPanelOverscrollEnd: (Float) -> Unit = {},
+    onPanelEngaged: () -> Unit = {},
+    panelEngaged: Boolean = false,
+    reviewsLimited: Boolean = false,
+    onMoreReviews: (() -> Unit)? = null,
+    reviewsMoreLoading: Boolean = false,
+    onShowReviews: (() -> Unit)? = null,
+    resolving: Boolean = false,
+    selectedKey: String? = null,
+    onSelect: (String) -> Unit = {},
+    onTabs: (List<String>) -> Unit = {},
+    onTabRowY: (Float) -> Unit = {},
+    photosLoading: Boolean = false,
+    morePhotos: Boolean = false,
+    onMorePhotos: () -> Unit = {},
+    onPhotoCategories: (() -> Unit)? = null,
+    photosHeld: Boolean = false,
+    overviewTail: @Composable () -> Unit = {},
+    overview: @Composable () -> Unit = {},
+) {
+    // A BARE bus stop (transit-category AND no rating, i.e. no real review content) shows only its
+    // departure board + stop timeline - Reviews/About are noise there. But a RATED transit CENTER
+    // (a real building people review) keeps both tabs: gate on the bare-stop signal, NOT category
+    // alone, or real buildings lose their reviews (user 2026-07-13 regression). Real buildings carry
+    // a Google rating / reviews / a featured review; bare stops carry none.
+    val isTransitCategory = place.category?.lowercase()?.let { c ->
+        listOf("station", "stop", "transit", "transport", "hub", "bus", "subway", "metro", "tram", "rail", "ferry", "terminal", "platform").any { it in c }
+    } == true
+    val isBareStop = isTransitCategory && place.rating == null && reviews.isEmpty() && place.featuredReview == null
+    // The LiveReviews clause summons a review tab for ANY Google place (valid feature id) even with
+    // zero reviews - that's the ONLY clause suppressed for a bare stop; real review content still shows.
+    val hasReviews = app.vela.ui.ShowReviews.on.value && (place.isListing() || reviews.isNotEmpty()) && (
+        onShowReviews != null || place.rating != null || reviews.isNotEmpty() || reviewsLoading || place.featuredReview != null ||
+            (app.vela.ui.LiveReviews.on.value && place.featureId?.contains(":") == true && !isBareStop)
+        )
+    val hasAbout = !isBareStop && (place.about.isNotEmpty() || place.editorialSummary != null || place.ownerDescription != null)
+    // Menu photos get their OWN TAB beside Reviews/About (user 2026-07-10) — the gallery's
+    // category chip buried them. Detection is by Google's own gallery-tab name (it arrives
+    // localized, so match a per-language keyword set; the matched name is reused as the tab
+    // title so it's localized for free). Indices are photoCategories↔photoUrls aligned.
+    val menuIndices = remember(place.photoCategories) {
+        place.photoCategories.withIndex()
+            .filter { (_, cat) -> cat != null && MENU_TAB_WORDS.any { cat.lowercase().contains(it) } }
+            .map { it.index }
+    }
+    val menuTabName = remember(place.photoCategories) {
+        place.photoCategories.firstOrNull { cat -> cat != null && MENU_TAB_WORDS.any { cat.lowercase().contains(it) } }
+    }
+    // Overview opens first; reviews load only once their tab is opened. Keyed by name, so a tab
+    // that arrives late never swaps the open one.
+    val tabs = buildList {
+        add("Overview")
+        if (!resolving && hasReviews) add("Reviews")
+        // Decided from the first reply (a rated or reviewed place will have a gallery), so the tab
+        // row never re-spaces itself when the photos land.
+        val photoWorthy = place.photoUrls.isNotEmpty() || place.rating != null || place.reviewCount != null
+        if (!resolving && !photosHeld && app.vela.ui.LoadPhotos.on.value && photoWorthy) add("Photos")
+        if (!resolving && place.updates.size > 1) add("Updates")
+        if (!resolving && menuIndices.isNotEmpty() && app.vela.ui.LoadPhotos.on.value) add("Menu")
+    }
+    androidx.compose.runtime.SideEffect { onTabs(tabs) }
+    val selected = tabs.indexOf(selectedKey).takeIf { it >= 0 } ?: 0
+
+    Column(Modifier.padding(top = 12.dp)) {
+        // In engaged reviews mode the panel takes the WHOLE sheet, so no tab bar above it.
+        if (!panelEngaged && tabs.size > 1) {
+            PlaceTabRow(
+                tabs, selected, menuTabName, ink, onSelect = onSelect,
+                modifier = Modifier.onGloballyPositioned { onTabRowY(it.positionInWindow().y) },
+            )
+        }
+        Column(Modifier.padding(top = 10.dp)) {
+            when (tabs[selected]) {
+                "Overview" -> {
+                    overview()
+                    if ("Reviews" in tabs && place.rating != null) {
+                        // Its Show reviews is the tap the reviews wait for (ReviewsOnTap), so the
+                        // tab opens loading them instead of asking a second time (issue #845).
+                        ReviewSummaryCard(place, ink, dim, onOpen = { onShowReviews?.invoke(); onSelect("Reviews") })
+                    }
+                    // The newest post only; the Updates tab has them all (Google's layout).
+                    if (place.updates.isNotEmpty()) {
+                        UpdatesSection(place.updates.take(1), ink, dim, title = true)
+                        if (place.updates.size > 1) {
+                            TextButton(onClick = { onSelect("Updates") }, modifier = Modifier.dpadHighlight(RoundedCornerShape(8.dp))) {
+                                Text(stringResource(R.string.place_updates_all, place.updates.size))
+                            }
+                        }
+                    }
+                    if (hasAbout) {
+                        Text(
+                            stringResource(R.string.place_tab_about),
+                            style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = ink,
+                            modifier = Modifier.padding(top = 20.dp, bottom = 4.dp),
+                        )
+                        AboutTab(place.about, place.editorialSummary, place.ownerDescription, ink, dim)
+                    }
+                    overviewTail()
+                }
+                "Reviews" -> {
+                    // Inline = the NATIVE scraped list (smooth, no nested WebView, no scroll seam).
+                    // Tapping a review photo opens the shared full-screen gallery; a "Read all
+                    // reviews" button opens the live Google panel FULL-SCREEN (its own screen, so
+                    // no nesting → Google's own infinite scroll + search + native photo/video).
+                    val fid = place.featureId
+                    var reviewPhotos by remember(place.id) { mutableStateOf<Triple<List<String>, List<String?>, Int>?>(null) }
+                    var showFullPanel by remember(place.id) { mutableStateOf(false) }
+                    // The reviews load once this area is actually on screen (MapViewModel.
+                    // requestReviews): its CLIPPED window bounds are empty while it sits below the
+                    // sheet's fold, and re-measured on every scroll and sheet move.
+                    val density = androidx.compose.ui.platform.LocalDensity.current
+                    val minVisiblePx = with(density) { 24.dp.toPx() }
+                    androidx.compose.foundation.layout.Box(
+                        Modifier.onGloballyPositioned { c ->
+                            if (c.isAttached && c.boundsInWindow().height > minVisiblePx) onNeedReviews()
+                        },
+                    ) {
+                    if (onShowReviews != null) {
+                        FilledTonalButton(onClick = onShowReviews, shape = CircleShape, modifier = Modifier.dpadHighlight(CircleShape)) {
+                            Text(stringResource(R.string.place_show_reviews))
+                        }
+                    } else
+                    ReviewsTab(
+                        place, reviews, reviewsLoading, reviewsFound, onRetryReviews, ink, dim,
+                        onPhotoTap = { urls, start, caption ->
+                            reviewPhotos = Triple(urls, urls.map { caption }, start)
+                        },
+                        onReadAll = if (app.vela.ui.LiveReviews.on.value && !app.vela.ui.GoogleFree.on.value && fid != null && fid.contains(":")) {
+                            { showFullPanel = true }
+                        } else null,
+                        limited = reviewsLimited,
+                        onMoreReviews = onMoreReviews,
+                        moreLoading = reviewsMoreLoading,
+                    )
+                    }
+                    reviewPhotos?.let { (urls, caps, start) ->
+                        PhotoGallery(urls, caps, start) { reviewPhotos = null }
+                    }
+                    if (showFullPanel && fid != null) {
+                        FullScreenReviews(fid, place, ink, dim) { showFullPanel = false }
+                    }
+                }
+                "Photos" -> {
+                    var photoStart by remember(place.id) { mutableStateOf<Int?>(null) }
+                    PhotosTab(place, dim, photosLoading, morePhotos, onMorePhotos, onPhotoCategories) { i -> photoStart = i }
+                    photoStart?.let { start ->
+                        PhotoGallery(
+                            place.photoUrls,
+                            place.photoDates.map { d -> d?.let { stringResource(R.string.place_photo_caption, it) } },
+                            start,
+                        ) { photoStart = null }
+                    }
+                }
+                "Updates" -> UpdatesSection(place.updates, ink, dim, title = false)
+                "Menu" -> {
+                    var menuStart by remember(place.id) { mutableStateOf<Int?>(null) }
+                    MenuTab(place, menuIndices, dim) { i -> menuStart = i }
+                    menuStart?.let { start ->
+                        PhotoGallery(
+                            place.photoUrls,
+                            place.photoDates.map { d -> d?.let { stringResource(R.string.place_photo_caption, it) } },
+                            start,
+                        ) { menuStart = null }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** The live Google reviews panel, FULL-SCREEN (the "Read all reviews" view). No nesting inside a
+ *  scroll → no scroll-sync, no jitter; Google's own infinite scroll, server-side search, and
+ *  native photo/video viewers all work. Back / the top-bar arrow closes it back to the sheet. */
+@Composable
+private fun FullScreenReviews(featureId: String, place: Place, ink: Color, dim: Color, onClose: () -> Unit) {
+    // Shim → the activity-window overlay (see FullReviewsOverlay).
+    DisposableEffect(featureId) {
+        FullReviewsOverlay.show(featureId, place, onClose)
+        onDispose { FullReviewsOverlay.clear() }
+    }
+}
+
+@Composable
+private fun FullScreenReviewsContent(featureId: String, place: Place, ink: Color, dim: Color, onClose: () -> Unit) {
+    val dark = isAppInDarkTheme()
+    var reviewPhotos by remember(featureId) { mutableStateOf<Triple<List<String>, List<String?>, Int>?>(null) }
+    BackHandler(onBack = { if (reviewPhotos != null) reviewPhotos = null else onClose() })
+    val reviewsBackFocus = rememberDpadAutoFocus()
+    val density = LocalDensity.current
+    // Swipe DOWN from the top to close (user 2026-07-10): the panel forwards a top-edge overscroll
+    // as `pull`; past the threshold at finger-up it dismisses, like a sheet. A sub-threshold
+    // release SPRINGS back instead of snapping.
+    val pull = remember { androidx.compose.animation.core.Animatable(0f) }
+    val pullScope = rememberCoroutineScope()
+    Surface(
+        Modifier.fillMaxSize().offset { IntOffset(0, pull.value.roundToInt()) },
+        color = if (dark) SheetDark else SheetLight,
+        contentColor = ink,
+    ) {
+            Column(Modifier.fillMaxSize().statusBarsPadding()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                ) {
+                    IconButton(onClick = onClose, modifier = Modifier.focusRequester(reviewsBackFocus)) {
+                        Icon(Sym.Close, contentDescription = stringResource(R.string.place_close), tint = ink)
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text(place.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = ink, maxLines = 1)
+                        Text(stringResource(R.string.place_reviews_title), style = MaterialTheme.typography.bodySmall, color = dim)
+                    }
+                }
+                // Google's limited view caps this page's feed (More reviews loads nothing) and the
+                // mark is set by that very stall, so the line appears here the moment it happens;
+                // issue #602's reporter was looking at this page, not the sheet.
+                if (app.vela.web.GoogleStanding.limited.value) {
+                    Text(
+                        stringResource(R.string.place_limited_view),
+                        style = MaterialTheme.typography.bodySmall, color = dim,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                }
+                val ctxForToast = androidx.compose.ui.platform.LocalContext.current
+                app.vela.web.GoogleReviewsPanel(
+                    featureId = featureId,
+                    dark = dark,
+                    fullScreen = true,
+                    modifier = Modifier.fillMaxSize(),
+                    // Can't carve (throttle / markup drift), or Google withheld the review feed
+                    // so the page never left the Overview: bounce back AND say why, or the close
+                    // reads as a crash (issue #359). The inline native list is still there.
+                    onFailed = {
+                        android.widget.Toast.makeText(ctxForToast, ctxForToast.getString(R.string.place_reviews_throttled), android.widget.Toast.LENGTH_LONG).show()
+                        onClose()
+                    },
+                    // Tapping a review photo opens Vela's own gallery (Google's photo viewer is a
+                    // page-nav the lockdown blocks + the carve can't host).
+                    onPhotos = { urls, caps, start -> reviewPhotos = Triple(urls, caps, start) },
+                    // Top-edge pull-down: move the whole panel with the finger; release past the
+                    // threshold closes it (Google's dismiss). Deltas come from the panel's
+                    // boundary scroll-sync (reviews at their top + dragging down).
+                    onOverscroll = { dy -> pullScope.launch { pull.snapTo((pull.value + dy).coerceAtLeast(0f)) } },
+                    onOverscrollEnd = { _ ->
+                        // DISTANCE ONLY, judged at release — the photo viewer's dismiss grammar
+                        // (user 2026-07-11): you have to really drag it; anything less springs
+                        // back up. No velocity escape: the old flick close (vel > 2500 px/s)
+                        // tripped on the release jerk of a medium pull and read as a hair
+                        // trigger next to the photo viewer.
+                        if (pull.value > with(density) { 120.dp.toPx() }) onClose()
+                        else pullScope.launch { pull.animateTo(0f, spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 350f)) }
+                    },
+                )
+            }
+    }
+    reviewPhotos?.let { (urls, caps, start) ->
+        PhotoGallery(urls, caps, start) { reviewPhotos = null }
+    }
+}
+
+@Composable
+private fun ReviewsTab(
+    place: Place,
+    reviews: List<Review>,
+    loading: Boolean,
+    found: Int,
+    onRetry: () -> Unit,
+    ink: Color,
+    dim: Color,
+    onPhotoTap: (List<String>, Int, String?) -> Unit = { _, _, _ -> },
+    onReadAll: (() -> Unit)? = null,
+    limited: Boolean = false,
+    onMoreReviews: (() -> Unit)? = null,
+    moreLoading: Boolean = false,
+) {
+    // Search within the loaded reviews (author or text, case-insensitive). Resets per place.
+    var reviewQuery by remember(place.id) { mutableStateOf("") }
+    // The local search hides behind a magnifier beside the All-reviews pill — a full text field
+    // stacked right under the pill read as clutter (user 2026-07-10); the panel's server-side
+    // search stays the headline way to get granular.
+    var reviewSearchOpen by remember(place.id) { mutableStateOf(false) }
+    // 0 = Google's order, 1 = highest first, 2 = lowest first (the loaded reviews only).
+    var reviewSort by remember(place.id) { mutableIntStateOf(0) }
+    Column {
+        place.rating?.let { r ->
+            // Google's summary block: the big number leads, stars + count stack beside it,
+            // left-aligned with the reviews below — the old centered strip floated oddly
+            // between the tabs and the button (user 2026-07-10).
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 10.dp),
+            ) {
+                Text(
+                    String.format(Locale.US, "%.1f", r),
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = ink,
+                )
+                Spacer(Modifier.width(14.dp))
+                Column {
+                    RatingStars(r)
+                    place.reviewCount?.let {
+                        Text(
+                            pluralStringResource(R.plurals.place_review_count, it, it),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = dim,
+                            modifier = Modifier.padding(top = 3.dp),
+                        )
+                    }
+                }
+                // The per-star distribution fills the block's empty right half, Google's layout
+                // (user 2026-07-11). Counts arrive in passing from the photo walk; absent = no bars.
+                place.ratingHistogram?.let { counts ->
+                    Spacer(Modifier.width(18.dp))
+                    RatingHistogram(counts, dim, Modifier.weight(1f))
+                } ?: run {
+                    // Held open while the reviews page may still send the breakdown.
+                    if (loading && (place.reviewCount ?: 0) > 0) {
+                        Spacer(Modifier.width(18.dp))
+                        Box(Modifier.weight(1f).height(92.dp))
+                    }
+                }
+            }
+        }
+        // Entry to the full-screen live Google reviews — all of them, plus Google's own SORT and
+        // server-side search. The label says so (the button used to just say "Read all").
+        // Google's limited view (issue #602): a short list and no more pages for this session or
+        // network. Say so, so a short list does not read as a broken sheet.
+        if (limited && !loading) {
+            Text(
+                stringResource(R.string.place_reviews_limited),
+                style = MaterialTheme.typography.bodySmall,
+                color = dim,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        }
+        // Sort (on the loaded list), local search, and Google's full page for everything else.
+        // Google's own page has every review with its sort and search: the headline way in.
+        onReadAll?.let { open ->
+            FilledTonalButton(
+                onClick = open, shape = CircleShape,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp).dpadHighlight(CircleShape),
+            ) {
+                Text(place.reviewCount?.let { stringResource(R.string.place_all_n_reviews_open, it) } ?: stringResource(R.string.place_all_reviews_short))
+                Spacer(Modifier.width(8.dp))
+                Icon(Sym.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+            }
+        }
+        val sortable = (place.reviewCount ?: 0) > 1 || reviews.size >= 3
+        if (sortable) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (sortable) {
+                    // The search chip leads: on a narrow phone the row's last chip sits off the edge
+                    // until a swipe (issue #788). A rule parts it from the sort choices.
+                    FilterChip(
+                        selected = reviewSearchOpen,
+                        onClick = {
+                            reviewSearchOpen = !reviewSearchOpen
+                            if (!reviewSearchOpen) reviewQuery = "" // a hidden filter must not keep filtering
+                        },
+                        label = { Icon(Sym.Search, contentDescription = stringResource(R.string.place_search_reviews), modifier = Modifier.size(18.dp)) },
+                        shape = CircleShape, modifier = Modifier.dpadHighlight(CircleShape),
+                    )
+                    VerticalDivider(modifier = Modifier.height(24.dp), color = dim.copy(alpha = 0.4f))
+                    listOf(
+                        0 to R.string.place_sort_relevant,
+                        1 to R.string.place_sort_highest,
+                        2 to R.string.place_sort_lowest,
+                    ).forEach { (k, label) ->
+                        FilterChip(
+                            selected = reviewSort == k, onClick = { reviewSort = k },
+                            label = { Text(stringResource(label)) }, shape = CircleShape,
+                            modifier = Modifier.dpadHighlight(CircleShape),
+                        )
+                    }
+                }
+            }
+        }
+        // Featured-review quote is only a TEASER while the real reviews are still streaming in —
+        // once they arrive it'd be a redundant "quote break" between the button and the list, so
+        // drop it then (the actual reviews below say it better).
+        if (reviews.isEmpty()) {
+            place.featuredReview?.let { rev ->
+                Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.Top) {
+                    Icon(Sym.FormatQuote, contentDescription = null, tint = dim, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(rev, style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic, color = ink, modifier = Modifier.weight(1f))
+                }
+            }
+        }
+        // The WebView scrape legitimately takes a while (~10-40 s on busy places), so show REAL
+        // progress the whole time it runs: the scraper streams its running count (the "N of ~M"
+        // bar) AND the reviews themselves, which fill the list BELOW this header as they're found
+        // — the wait reads as work arriving, not a hang.
+        if (loading) {
+            // What the scrape can at most deliver: the place's own count, capped like the scraper.
+            val target = (place.reviewCount ?: 0).coerceAtMost(50)
+            Column(Modifier.padding(vertical = 6.dp)) {
+                if (found > 0 && target > 0) {
+                    LinearProgressIndicator(progress = { found.toFloat() / maxOf(target, found) }, modifier = Modifier.fillMaxWidth())
+                } else {
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                }
+                Text(
+                    if (found > 0) stringResource(R.string.place_reviews_so_far, found) else stringResource(R.string.place_gathering_reviews),
+                    style = MaterialTheme.typography.bodySmall, color = dim, modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+        }
+        when {
+            // Still loading with nothing streamed yet — the header above is the whole story.
+            loading && reviews.isEmpty() -> {}
+            // The count says this place HAS reviews but we have none — the RPC flaked (it's
+            // intermittent), so this is a load FAILURE, not a review-less place. Say so and
+            // let the user retry instead of lying with "No reviews available."
+            reviews.isEmpty() && (place.reviewCount ?: 0) > 0 -> Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).dpadHighlight(RoundedCornerShape(8.dp)).clickable { onRetry() }.padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Sym.Refresh, contentDescription = null, tint = dim, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(10.dp))
+                Text(stringResource(R.string.place_reviews_load_failed), style = MaterialTheme.typography.bodyMedium, color = dim)
+            }
+            reviews.isEmpty() -> Text(stringResource(R.string.place_no_reviews), style = MaterialTheme.typography.bodyMedium, color = dim)
+            else -> {
+                // Reaches here DURING loading too — partials stream in and render under the
+                // progress header above, growing until the scrape completes.
+                // Search box (only once there's enough to be worth filtering) — matches text OR
+                // author. Held back until the scrape COMPLETES: popping a text field in above rows
+                // the user is reading mid-stream shifts everything under their finger; appearing at
+                // completion it takes the space the progress header just vacated (a near-swap).
+                if (reviewSearchOpen && reviews.isNotEmpty()) {
+                    OutlinedTextField(
+                        value = reviewQuery,
+                        onValueChange = { reviewQuery = it },
+                        placeholder = { Text(stringResource(R.string.place_search_reviews), color = dim) },
+                        leadingIcon = { Icon(Sym.Search, contentDescription = null, tint = dim, modifier = Modifier.size(18.dp)) },
+                        trailingIcon = if (reviewQuery.isNotEmpty()) {
+                            {
+                                Icon(
+                                    Sym.Close, contentDescription = stringResource(R.string.place_clear_review_search), tint = dim,
+                                    modifier = Modifier.size(18.dp).clip(CircleShape).dpadHighlight(CircleShape).clickable { reviewQuery = "" },
+                                )
+                            }
+                        } else null,
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).dpadFieldEscape(),
+                    )
+                }
+                val q = reviewQuery.trim()
+                val filtered = if (q.isEmpty()) reviews else reviews.filter {
+                    it.text?.contains(q, ignoreCase = true) == true || it.author.contains(q, ignoreCase = true)
+                }
+                val shown = when (reviewSort) {
+                    1 -> filtered.sortedByDescending { it.rating }
+                    2 -> filtered.sortedBy { it.rating }
+                    else -> filtered
+                }
+                if (shown.isEmpty()) {
+                    Text(
+                        stringResource(R.string.place_no_reviews_mention, q, reviews.size),
+                        style = MaterialTheme.typography.bodyMedium, color = dim,
+                        modifier = Modifier.padding(vertical = 8.dp),
+                    )
+                } else {
+                    shown.forEach { ReviewRow(it, ink, dim, onPhotoTap, q) }
+                    // The feed said there is a next page: one request, appended (no page load).
+                    if (onMoreReviews != null && q.isEmpty()) {
+                        if (moreLoading) {
+                            LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 12.dp))
+                        } else {
+                            TextButton(onClick = onMoreReviews, modifier = Modifier.fillMaxWidth().dpadHighlight(RoundedCornerShape(8.dp))) {
+                                Text(stringResource(R.string.place_more_reviews))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Emphasize every occurrence of [query] in [text] (case-insensitive) in bold — used to show
+ *  what a review search matched. Empty query → plain text. */
+private fun emphasize(text: String, query: String): androidx.compose.ui.text.AnnotatedString = buildAnnotatedString {
+    if (query.isBlank()) { append(text); return@buildAnnotatedString }
+    val lc = text.lowercase()
+    val q = query.lowercase()
+    var i = 0
+    while (true) {
+        val idx = lc.indexOf(q, i)
+        if (idx < 0) { append(text.substring(i)); break }
+        append(text.substring(i, idx))
+        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(text.substring(idx, idx + query.length)) }
+        i = idx + query.length
+    }
+}
+
+// Lines a review's body shows before it collapses behind a "More" toggle (Google shows ~4).
+private const val REVIEW_COLLAPSED_LINES = 4
+
+@Composable
+private fun ReviewRow(review: Review, ink: Color, dim: Color, onPhotoTap: (List<String>, Int, String?) -> Unit = { _, _, _ -> }, query: String = "") {
+    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (review.authorPhoto != null) {
+                AsyncImage(
+                    model = review.authorPhoto,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(32.dp).clip(CircleShape).background(dim.copy(alpha = 0.2f)),
+                )
+            } else {
+                Box(
+                    Modifier.size(32.dp).clip(CircleShape).background(dim.copy(alpha = 0.3f)),
+                    contentAlignment = Alignment.Center,
+                ) { Text(review.author.take(1), style = MaterialTheme.typography.bodyMedium, color = ink) }
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(emphasize(review.author, query), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = ink, maxLines = 1)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RatingStars(review.rating.toDouble(), starSize = 12.dp)
+                    review.relativeTime?.let {
+                        Spacer(Modifier.width(6.dp))
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = dim)
+                    }
+                }
+            }
+        }
+        review.text?.let { body ->
+            // Collapse a long review to a few lines with a tappable "More" (Google-style) so one wordy
+            // review doesn't force endless scrolling past the rest (user 2026-07-19). The full text is
+            // already captured (issue #181), so expanding is a pure display toggle, no extra fetch. The
+            // "More"/"Less" toggle shows ONLY when the body actually overflows the collapsed cap.
+            var expanded by remember(review.author, body) { mutableStateOf(false) }
+            var overflows by remember(review.author, body) { mutableStateOf(false) }
+            Text(
+                emphasize(body, query),
+                style = MaterialTheme.typography.bodyMedium,
+                color = ink,
+                maxLines = if (expanded) Int.MAX_VALUE else REVIEW_COLLAPSED_LINES,
+                overflow = TextOverflow.Ellipsis,
+                onTextLayout = { if (!expanded) overflows = it.hasVisualOverflow },
+                modifier = Modifier.padding(top = 6.dp)
+                    // Touch-only convenience: the More label below is the focusable D-pad path,
+                    // so the body tap must not become an invisible focus stop (dpad audit).
+                    .then(
+                        if (overflows && !expanded) {
+                            Modifier.pointerInput(Unit) {
+                                detectTapGestures { expanded = true }
+                            }
+                        } else Modifier,
+                    ),
+            )
+            if (overflows) {
+                Text(
+                    stringResource(if (expanded) R.string.place_review_less else R.string.place_review_more),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                    color = ink,
+                    modifier = Modifier.padding(top = 2.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .dpadHighlight(RoundedCornerShape(6.dp))
+                        .clickable { expanded = !expanded }
+                        .padding(vertical = 2.dp, horizontal = 2.dp),
+                )
+            }
+        }
+        // User-attached review photos (Google-style thumbnail strip) — tap to open the shared
+        // full-screen gallery, captioned "Author · date" (the whole review's photo set, opened
+        // at the tapped index).
+        if (review.photos.isNotEmpty()) {
+            val caption = listOfNotNull(review.author.ifBlank { null }, review.relativeTime).joinToString(" · ").ifBlank { null }
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                review.photos.forEachIndexed { i, url ->
+                    AsyncImage(
+                        model = url,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        // Subtle fill so the slot isn't a transparent gap while the
+                        // thumbnail loads (or if it fails).
+                        modifier = Modifier.size(104.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(dim.copy(alpha = 0.12f))
+                            .dpadHighlight(RoundedCornerShape(10.dp))
+                            .clickable { onPhotoTap(review.photos, i, caption) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AboutTab(
+    sections: List<AboutSection>,
+    editorialSummary: String?,
+    ownerDescription: String?,
+    ink: Color,
+    dim: Color,
+) {
+    Column {
+        // Google's editorial one-liner first, then the owner's "From the owner" blurb,
+        // then the attribute sections — the description before the rest, per request.
+        editorialSummary?.let {
+            Text(it, style = MaterialTheme.typography.bodyMedium, color = ink, modifier = Modifier.padding(bottom = 4.dp))
+        }
+        ownerDescription?.let {
+            Text(stringResource(R.string.place_from_the_owner), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium, color = dim, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+            Text(it, style = MaterialTheme.typography.bodyMedium, color = ink, modifier = Modifier.padding(bottom = 4.dp))
+        }
+        sections.forEach { sec ->
+            Text(
+                sec.title,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Medium,
+                color = dim,
+                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+            )
+            sec.items.forEach { item ->
+                Row(Modifier.padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Sym.Check, contentDescription = null, tint = dim, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(item, style = MaterialTheme.typography.bodyMedium, color = ink)
+                }
+            }
+        }
+    }
+}
+
+/** One Google-style action pill — a rounded chip with an icon + label, sized to its content so a row
+ *  of them scrolls horizontally. [emphasized] = the filled primary treatment (Directions). */
+@Composable
+private fun ActionPill(icon: ImageVector, label: String, emphasized: Boolean = false, onClick: () -> Unit) {
+    val bg = if (emphasized) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+    val fg = if (emphasized) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
+    Row(
+        Modifier
+            .clip(androidx.compose.foundation.shape.CircleShape)
+            .background(bg)
+            .dpadHighlight(androidx.compose.foundation.shape.CircleShape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(label, style = MaterialTheme.typography.labelLarge, color = fg, maxLines = 1)
+    }
+}
+
+/** The Share pill: opens a small menu with a Google Maps link, a keyless geo: pin
+ *  (opens in any maps app, incl. Vela), raw coordinates, or just the address. */
+@Composable
+private fun SharePill(place: Place) {
+    val context = LocalContext.current
+    var open by remember { mutableStateOf(false) }
+    val lat = place.location.lat
+    val lng = place.location.lng
+
+    fun share(text: String) {
+        runCatching {
+            context.startActivity(
+                Intent.createChooser(
+                    Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, text)
+                    },
+                    context.getString(R.string.place_share_place),
+                ),
+            )
+        }
+        open = false
+    }
+
+    // Open this exact place on the Google Maps website (in the browser), not share a link. Prefer the
+    // place's own cid deep-link (opens the real place page); fall back to a name+coords query.
+    // The place's own link: the cid deep link when the place has a feature id (opens THE STORE in
+    // Google Maps or Vela), else a name + coordinate search.
+    fun placeUrl(): String {
+        val cid = place.featureId?.substringAfter(":", "")?.removePrefix("0x")?.takeIf { it.isNotBlank() }
+            ?.let { runCatching { java.math.BigInteger(it, 16).toString() }.getOrNull() }
+        return if (cid != null) "https://www.google.com/maps?cid=$cid"
+            else "https://www.google.com/maps/search/?api=1&query=${Uri.encode(place.name)}%20$lat%2C$lng"
+    }
+
+    fun openWeb() {
+        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(placeUrl()))) }
+        open = false
+    }
+
+    // Copy the place's Google Maps link straight to the clipboard (a quiet toast confirms). The
+    // same link Open-on-web uses: this used to copy a bare coordinate query, so the recipient got
+    // a pin instead of the place (issue #359).
+    fun copyLink() {
+        val url = placeUrl()
+        runCatching {
+            val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            cm.setPrimaryClip(android.content.ClipData.newPlainText(place.name, url))
+            Toast.makeText(context, context.getString(R.string.place_link_copied), Toast.LENGTH_SHORT).show()
+        }
+        open = false
+    }
+
+    // Copy the bare business name (issue #169) — also the D-pad path for the name's long-press.
+    fun copyName() {
+        runCatching {
+            val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            cm.setPrimaryClip(android.content.ClipData.newPlainText(place.name, place.name))
+            Toast.makeText(context, context.getString(R.string.place_name_copied), Toast.LENGTH_SHORT).show()
+        }
+        open = false
+    }
+
+    // Hand the place to another map app (OsmAnd, Organic Maps, whatever handles geo:) for the
+    // people who want Vela for looking things up and a different app for the drive, so their
+    // route never leaves the offline app they trust (GrapheneOS forum ask, 2026-09-15). A
+    // chooser over ACTION_VIEW geo: with Vela's own activity excluded, since Vela handles geo:
+    // too and would otherwise list itself.
+    fun openInOtherApp() {
+        runCatching {
+            val view = Intent(Intent.ACTION_VIEW, Uri.parse("geo:$lat,$lng?q=$lat,$lng(${Uri.encode(place.name)})"))
+            val chooser = Intent.createChooser(view, context.getString(R.string.place_open_other_app)).apply {
+                putExtra(
+                    Intent.EXTRA_EXCLUDE_COMPONENTS,
+                    arrayOf(android.content.ComponentName(context, app.vela.MainActivity::class.java)),
+                )
+            }
+            context.startActivity(chooser)
+        }
+        open = false
+    }
+
+    Box {
+        ActionPill(Sym.Share, stringResource(R.string.place_share)) { open = true }
+        VelaMenu(expanded = open, onDismissRequest = { open = false }) {
+            item(stringResource(R.string.place_open_web)) { openWeb() }
+            item(stringResource(R.string.place_open_other_app)) { openInOtherApp() }
+            item(stringResource(R.string.place_copy_name)) { copyName() }
+            item(stringResource(R.string.place_copy_link)) { copyLink() }
+            // A geo: URI opens in ANY maps app (incl. Vela) — no google.com, the
+            // degoogled-friendly way to send a pin.
+            item(stringResource(R.string.place_share_map_pin)) { share("${place.name}\ngeo:$lat,$lng?q=$lat,$lng(${Uri.encode(place.name)})") }
+            item(stringResource(R.string.place_share_coordinates)) { share("$lat, $lng") }
+            place.fullAddress()?.let { addr ->
+                item(stringResource(R.string.place_share_address)) { share(if (addr.startsWith(place.name)) addr else "${place.name}\n$addr") }
+            }
+        }
+    }
+}
+
+/** Google-style "popular times": day chips + an hourly busyness bar chart, today's
+ *  current hour highlighted. */
+@Composable
+private fun PopularTimesSection(pt: app.vela.core.model.PopularTimes, ink: Color, dim: Color) {
+    val accent = MaterialTheme.colorScheme.primary
+    val today = remember { java.time.LocalDate.now().dayOfWeek.value } // 1=Mon..7=Sun
+    val currentHour = remember { java.time.LocalTime.now().hour }
+    // Keyed to pt so a different place's histogram resets the selected day (instead of
+    // carrying over the day tapped on the previous place). firstOrNull guards an empty
+    // days list — the `day` lookup below also returns early if nothing matches.
+    var selectedDow by remember(pt) {
+        mutableStateOf(
+            if (pt.days.any { it.dayOfWeek == today }) today
+            else pt.days.firstOrNull()?.dayOfWeek ?: today,
+        )
+    }
+    val day = pt.days.firstOrNull { it.dayOfWeek == selectedDow } ?: return
+    val isToday = selectedDow == today
+    val nowOcc = if (isToday) day.hours.firstOrNull { it.hour == currentHour }?.occupancy else null
+
+    Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+        Text(stringResource(R.string.place_popular_times), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = ink)
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()).padding(vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            pt.days.forEach { d ->
+                val sel = d.dayOfWeek == selectedDow
+                Text(
+                    java.time.DayOfWeek.of(d.dayOfWeek)
+                        .getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault()),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (sel) accent else dim,
+                    fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
+                    modifier = Modifier.clip(CircleShape).dpadHighlight(CircleShape).clickable { selectedDow = d.dayOfWeek }
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                )
+            }
+        }
+        if (nowOcc != null) {
+            Text(stringResource(R.string.place_busyness_right_now, busynessLabel(nowOcc)), style = MaterialTheme.typography.bodySmall, color = dim)
+        }
+        Canvas(Modifier.fillMaxWidth().height(64.dp).padding(top = 6.dp)) {
+            val hrs = day.hours
+            if (hrs.isEmpty()) return@Canvas
+            val bw = size.width / hrs.size
+            hrs.forEachIndexed { i, h ->
+                val bh = (h.occupancy / 100f).coerceIn(0.03f, 1f) * size.height
+                val now = isToday && h.hour == currentHour
+                drawRect(
+                    color = if (now) accent else dim.copy(alpha = 0.3f),
+                    topLeft = Offset(i * bw + bw * 0.12f, size.height - bh),
+                    size = Size(bw * 0.76f, bh),
+                )
+            }
+        }
+        val hrs = day.hours
+        if (hrs.size >= 3) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                listOf(hrs.first(), hrs[hrs.size / 2], hrs.last()).forEach {
+                    Text(hourLabel(it.hour), style = MaterialTheme.typography.labelSmall, color = dim)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun busynessLabel(occ: Int): String = stringResource(
+    when {
+        occ < 20 -> R.string.place_busy_not
+        occ < 40 -> R.string.place_busy_not_too
+        occ < 60 -> R.string.place_busy_little
+        occ < 85 -> R.string.place_busy_usually
+        else -> R.string.place_busy_very
+    },
+)
+
+private fun hourLabel(h: Int): String = when {
+    h == 0 -> "12a"
+    h < 12 -> "${h}a"
+    h == 12 -> "12p"
+    else -> "${h - 12}p"
+}
+
+/** The handful of attribute items worth a line on the place card under the hours (the
+ *  categories users scan for first), deduped and capped. The sheet shows no such row: its
+ *  overview carries the About sections in full, and a chip row above them showed the same
+ *  items twice (issue #832). */
+internal fun attributeHighlights(about: List<AboutSection>): List<String> {
+    if (about.isEmpty()) return emptyList()
+    val priority = listOf(
+        "Service options", "Dining options", "Offerings", "Highlights",
+        "Popular for", "Amenities", "Accessibility", "Atmosphere", "Planning",
+    )
+    return about
+        .sortedBy { s -> priority.indexOf(s.title).let { if (it < 0) priority.size else it } }
+        .flatMap { it.items }
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .distinct()
+        .take(6)
+}
+
+private data class HolidayHours(val label: String, val whenLabel: String, val hours: String, val daysAway: Int)
+
+private val HOLIDAY_DAY_NAMES = mapOf(
+    "monday" to java.time.DayOfWeek.MONDAY, "tuesday" to java.time.DayOfWeek.TUESDAY,
+    "wednesday" to java.time.DayOfWeek.WEDNESDAY, "thursday" to java.time.DayOfWeek.THURSDAY,
+    "friday" to java.time.DayOfWeek.FRIDAY, "saturday" to java.time.DayOfWeek.SATURDAY,
+    "sunday" to java.time.DayOfWeek.SUNDAY,
+)
+
+/** From weekly hours whose affected day is tagged " · <holiday label>" (e.g. "Thursday: Closed ·
+ *  Independence Day"), return the SOONEST upcoming special-hours day (today first) so the place card
+ *  can flag it Google-style instead of leaving it buried on one day's row. Null if none this week. */
+private fun upcomingHoliday(hours: List<String>, today: java.time.LocalDate): HolidayHours? {
+    val todayDow = today.dayOfWeek
+    return hours.mapNotNull { line ->
+        val dot = line.lastIndexOf(" · ")
+        if (dot < 0) return@mapNotNull null
+        // The parser collapses a repeated label; this catches hours kept from before it did (#838).
+        val label = app.vela.core.data.google.parse.SearchParser.dedupeHolidayLabel(line.substring(dot + 3).trim()).ifBlank { return@mapNotNull null }
+        val head = line.substring(0, dot)
+        val colon = head.indexOf(':')
+        if (colon < 0) return@mapNotNull null
+        val dow = HOLIDAY_DAY_NAMES[head.substring(0, colon).trim().lowercase()] ?: return@mapNotNull null
+        val hrs = head.substring(colon + 1).trim().ifBlank { "Hours may differ" }
+        val daysAway = ((dow.value - todayDow.value) + 7) % 7 // 0 = today, 1..6 = upcoming this week
+        val whenLabel = when (daysAway) {
+            0 -> "today"
+            1 -> "tomorrow"
+            else -> dow.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())
+        }
+        HolidayHours(label, whenLabel, hrs, daysAway)
+    }.minByOrNull { it.daysAway }
+}
+
+/** In-store departments (pharmacy, fuel, liquor, delivery windows): one collapsible row per
+ *  department — name + its own colored status collapsed, its weekly table expanded. Same
+ *  interaction/shape as [HoursSection] so the block reads as part of the hours area. */
+@Composable
+private fun DepartmentsSection(departments: List<app.vela.core.model.Department>, ink: Color, dim: Color) {
+    Column(Modifier.padding(top = 6.dp)) {
+        Text(
+            stringResource(R.string.place_departments),
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium,
+            color = dim,
+            modifier = Modifier.padding(start = 26.dp, top = 4.dp),
+        )
+        departments.forEach { dep ->
+            var expanded by remember(dep.name) { mutableStateOf(false) }
+            val days = remember(dep.hours) {
+                dep.hours.map {
+                    val i = it.indexOf(": ")
+                    if (i < 0) listOf(it, "") else listOf(it.substring(0, i), it.substring(i + 2))
+                }
+            }
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .dpadHighlight(RoundedCornerShape(8.dp))
+                    .clickable(enabled = days.isNotEmpty()) { expanded = !expanded }
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Spacer(Modifier.width(26.dp))
+                // Fixed columns so every row's status ends at the same x: name takes what's
+                // left, the status is RIGHT-aligned against a chevron slot that is always
+                // reserved (ragged status edges across rows read as misalignment).
+                Text(
+                    dep.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ink,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(0.8f),
+                )
+                if (!expanded) {
+                    dep.statusText?.let { status ->
+                        // Same treatment as the headline status: the Open/Closed word colored,
+                        // the time detail in the muted ink.
+                        val parts = status.split(Regex("\\s*[·⋅]\\s*"), limit = 2)
+                        val depInk = app.vela.ui.themedStatusColor(status, dep.openNow)
+                        Text(
+                            buildAnnotatedString {
+                                withStyle(SpanStyle(color = depInk, fontWeight = FontWeight.Medium)) {
+                                    append(parts[0])
+                                }
+                                if (parts.size > 1) withStyle(SpanStyle(color = dim)) { append(" · ${parts[1]}") }
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.weight(1.2f),
+                        )
+                    } ?: Spacer(Modifier.weight(1.2f))
+                } else {
+                    Spacer(Modifier.weight(1.2f))
+                }
+                Box(Modifier.width(28.dp), contentAlignment = Alignment.CenterEnd) {
+                    if (days.isNotEmpty()) {
+                        Icon(
+                            if (expanded) Sym.ExpandLess else Sym.ExpandMore,
+                            contentDescription = if (expanded) stringResource(R.string.place_collapse_hours) else stringResource(R.string.place_expand_hours),
+                            tint = dim,
+                        )
+                    }
+                }
+            }
+            AnimatedVisibility(expanded) {
+                Column(Modifier.padding(start = 40.dp, top = 2.dp, bottom = 2.dp)) {
+                    days.forEachIndexed { i, dt ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                            Text(
+                                dt[0],
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (i == 0) ink else dim,
+                                fontWeight = if (i == 0) FontWeight.Bold else FontWeight.Normal,
+                            )
+                            Text(
+                                dt[1],
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (i == 0) ink else dim,
+                                fontWeight = if (i == 0) FontWeight.Bold else FontWeight.Normal,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HoursSection(
+    hours: List<String>,
+    ink: Color,
+    dim: Color,
+    departments: List<app.vela.core.model.Department> = emptyList(),
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val days = remember(hours) {
+        hours.map {
+            val i = it.indexOf(": ")
+            if (i < 0) listOf(it, "") else listOf(it.substring(0, i), it.substring(i + 2))
+        }
+    }
+    Column(Modifier.padding(top = 12.dp)) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .dpadHighlight(RoundedCornerShape(8.dp))
+                .clickable { expanded = !expanded }
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Sym.Schedule,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = dim,
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                stringResource(R.string.place_hours),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = ink,
+                maxLines = 1,
+            )
+            Spacer(Modifier.weight(1f))
+            if (!expanded) {
+                days.firstOrNull()?.let {
+                    // Just the hours in the collapsed summary — strip any " · Holiday" suffix (it's
+                    // already shown in the amber callout above) so it can't squeeze the "Hours" label.
+                    Text(
+                        it[1].substringBefore("·").trim(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = dim,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 190.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                }
+            }
+            Icon(
+                if (expanded) Sym.ExpandLess else Sym.ExpandMore,
+                contentDescription = if (expanded) stringResource(R.string.place_collapse_hours) else stringResource(R.string.place_expand_hours),
+                tint = dim,
+            )
+        }
+        AnimatedVisibility(expanded) {
+            Column {
+                Column(Modifier.padding(start = 26.dp, top = 2.dp, bottom = 2.dp)) {
+                    days.forEachIndexed { i, dt ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                            Text(
+                                dt[0],
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (i == 0) ink else dim,
+                                fontWeight = if (i == 0) FontWeight.Bold else FontWeight.Normal,
+                            )
+                            Text(
+                                dt[1],
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (i == 0) ink else dim,
+                                fontWeight = if (i == 0) FontWeight.Bold else FontWeight.Normal,
+                            )
+                        }
+                    }
+                }
+                // Department schedules ride inside the same expansion, so the collapsed
+                // sheet stays one line and the full schedule story is one tap away.
+                if (departments.isNotEmpty()) {
+                    DepartmentsSection(departments, ink, dim)
+                }
+            }
+        }
+    }
+}
+
+/** "Times without live traffic. Show traffic" ([app.vela.ui.RouteTrafficOnTap]). */
+@Composable
+internal fun TrafficOnTapRow(onClick: () -> Unit, ink: Color, modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Icon(SymOutlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(stringResource(R.string.place_traffic_not_loaded), style = MaterialTheme.typography.bodyMedium, color = ink, modifier = Modifier.weight(1f))
+        TextButton(onClick = onClick, modifier = Modifier.dpadHighlight(CircleShape)) {
+            Text(stringResource(R.string.place_show_traffic))
+        }
+    }
+}
+
+/** Google's own name for the menu photo category, reused as the Menu tab title. */
+private fun menuTabNameOf(place: Place): String? =
+    place.photoCategories.firstOrNull { cat -> cat != null && MENU_TAB_WORDS.any { cat.lowercase().contains(it) } }
+
+@Composable
+private fun PlaceTabRow(
+    tabs: List<String>,
+    selected: Int,
+    menuTabName: String?,
+    ink: Color,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val tabContent: @Composable () -> Unit = {
+        tabs.forEachIndexed { i, key ->
+            val label = when (key) {
+                "Overview" -> stringResource(R.string.place_tab_overview)
+                "Reviews" -> stringResource(R.string.place_tab_reviews)
+                "Photos" -> stringResource(R.string.place_tab_photos)
+                "Updates" -> stringResource(R.string.place_updates)
+                "Menu" -> menuTabName ?: stringResource(R.string.place_tab_menu)
+                else -> key
+            }
+            Tab(selected = i == selected, onClick = { onSelect(key) }, text = { Text(label, maxLines = 1, softWrap = false) })
+        }
+    }
+    // Always the scrolling row, whose tabs are as wide as their labels (Google's layout). The
+    // fixed row gives each tab an equal share, and with three tabs on a large font a share is
+    // narrower than "Rezensionen": the labels lost their last letters (issue #692).
+    androidx.compose.material3.ScrollableTabRow(
+        selectedTabIndex = selected, containerColor = Color.Transparent, contentColor = ink,
+        edgePadding = 0.dp, modifier = modifier, tabs = tabContent,
+    )
+}
+
+/** Rating, star histogram and Google's featured snippet, with a link to the Reviews tab. */
+@Composable
+private fun ReviewSummaryCard(place: Place, ink: Color, dim: Color, onOpen: () -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().padding(top = 18.dp).clip(RoundedCornerShape(12.dp))
+            .background(dim.copy(alpha = 0.08f)).padding(start = 14.dp, top = 10.dp, bottom = 10.dp, end = 4.dp),
+    ) {
+        // A flow, not a row with a weighted middle: in German the button reads "Bewertungen
+        // anzeigen", and on a large font it took the row and squeezed the stars and the count
+        // into a column three letters wide (issue #692). The button drops to its own line
+        // when the two do not fit side by side.
+        @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+        androidx.compose.foundation.layout.FlowRow(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.align(Alignment.CenterVertically)) {
+                Text(String.format(Locale.US, "%.1f", place.rating ?: 0.0), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Medium, color = ink)
+                Spacer(Modifier.width(10.dp))
+                Column {
+                    app.vela.ui.RatingStars(place.rating ?: 0.0)
+                    place.reviewCount?.let {
+                        Text(pluralStringResource(R.plurals.place_review_count, it, it), style = MaterialTheme.typography.bodySmall, color = dim, maxLines = 1, softWrap = false)
+                    }
+                }
+            }
+            TextButton(onClick = onOpen, modifier = Modifier.align(Alignment.CenterVertically).dpadHighlight(CircleShape)) {
+                Text(stringResource(R.string.place_show_reviews), maxLines = 1, softWrap = false)
+            }
+        }
+        place.ratingHistogram?.takeIf { it.isNotEmpty() }?.let {
+            RatingHistogram(it, dim, Modifier.padding(top = 8.dp, end = 10.dp))
+        }
+        place.featuredReview?.let {
+            Text(
+                "\u201C$it\u201D", style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic, color = ink,
+                maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp, end = 10.dp),
+            )
+        }
+    }
+}
+
+/** Hairline between the place's info rows, inset past the row icons. */
+@Composable
+private fun InfoDivider(dim: Color) {
+    HorizontalDivider(Modifier.padding(start = 26.dp, top = 4.dp, bottom = 4.dp), thickness = 0.5.dp, color = dim.copy(alpha = 0.25f))
+}
+
+/** The gallery as a grid, filtered by Google's photo categories. With no categories yet, a food
+ *  place offers a Menu chip that walks the gallery for them (one page load, on tap only). */
+@Composable
+private fun PhotosTab(
+    place: Place,
+    dim: Color,
+    loading: Boolean,
+    more: Boolean,
+    onMore: () -> Unit,
+    onCategories: (() -> Unit)?,
+    onOpen: (Int) -> Unit,
+) {
+    val cats = remember(place.photoCategories) { place.photoCategories.filterNotNull().distinct() }
+    var cat by remember(place.id) { mutableStateOf<String?>(null) }
+    val food = remember(place.category) { app.vela.ui.map.PoiIcons.groupForCategory(place.category) == "food" }
+    Column {
+        if (cats.isNotEmpty() || (food && onCategories != null && !loading)) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (cats.isNotEmpty()) {
+                    FilterChip(selected = cat == null, onClick = { cat = null }, label = { Text(stringResource(R.string.place_photos_all)) }, shape = CircleShape, modifier = Modifier.dpadHighlight(CircleShape))
+                    cats.forEach { c ->
+                        FilterChip(selected = cat == c, onClick = { cat = c }, label = { Text(c) }, shape = CircleShape, modifier = Modifier.dpadHighlight(CircleShape))
+                    }
+                } else if (onCategories != null) {
+                    FilterChip(selected = false, onClick = onCategories, label = { Text(stringResource(R.string.place_tab_menu)) }, shape = CircleShape, modifier = Modifier.dpadHighlight(CircleShape))
+                }
+            }
+        }
+        val idx = place.photoUrls.indices.filter { cat == null || place.photoCategories.getOrNull(it) == cat }
+        if (idx.isEmpty() && !loading) {
+            Text(stringResource(R.string.place_no_photos), style = MaterialTheme.typography.bodyMedium, color = dim, modifier = Modifier.padding(vertical = 8.dp))
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            idx.chunked(3).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                    row.forEach { i ->
+                        Box(
+                            Modifier.weight(1f).height(110.dp).clip(RoundedCornerShape(8.dp))
+                                .background(dim.copy(alpha = 0.2f)).dpadHighlight(RoundedCornerShape(8.dp)).clickable { onOpen(i) },
+                        ) {
+                            AsyncImage(
+                                model = place.photoUrls.getOrNull(i)?.atWidth(360),
+                                contentDescription = stringResource(R.string.place_photo_number, i + 1),
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                    }
+                    repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        }
+        if (loading) {
+            LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 12.dp))
+        } else if (more) {
+            TextButton(onClick = onMore, modifier = Modifier.fillMaxWidth().dpadHighlight(RoundedCornerShape(8.dp))) {
+                Text(stringResource(R.string.place_more_photos))
+            }
+        }
+    }
+}
+
+/** The business's own posts, newest first. */
+@Composable
+private fun UpdatesSection(updates: List<app.vela.core.model.PlaceUpdate>, ink: Color, dim: Color, title: Boolean) {
+    val context = LocalContext.current
+    if (title) {
+        Text(
+            stringResource(R.string.place_updates),
+            style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = ink,
+            modifier = Modifier.padding(top = 20.dp, bottom = 4.dp),
+        )
+    }
+    updates.forEach { u ->
+        var open by remember(u) { mutableStateOf(false) }
+        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                u.postedEpochSec?.let {
+                    Text(
+                        android.text.format.DateUtils.getRelativeTimeSpanString(it * 1000).toString(),
+                        style = MaterialTheme.typography.bodySmall, color = dim,
+                    )
+                }
+                Text(
+                    remember(u.text) { u.text.replace(Regex("\\n\\s*\\n+"), "\n") }, style = MaterialTheme.typography.bodyMedium, color = ink,
+                    maxLines = if (open) Int.MAX_VALUE else 4, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.dpadHighlight(RoundedCornerShape(4.dp)).clickable { open = !open },
+                )
+                if (u.url != null && !app.vela.ui.HideExternalLinks.on.value) {
+                    TextButton(
+                        onClick = { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(u.url))) } },
+                        contentPadding = PaddingValues(0.dp),
+                        modifier = Modifier.dpadHighlight(RoundedCornerShape(8.dp)),
+                    ) { Text(u.linkLabel ?: stringResource(R.string.place_open)) }
+                }
+            }
+            if (u.imageUrl != null && app.vela.ui.LoadPhotos.on.value && !app.vela.ui.PhotosOnTap.on.value) {
+                Spacer(Modifier.width(12.dp))
+                AsyncImage(
+                    model = u.imageUrl, contentDescription = null, contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(72.dp).clip(RoundedCornerShape(10.dp)).background(dim.copy(alpha = 0.2f)),
+                )
+            }
+        }
+    }
+}
+
+/** A business or landmark listing rather than a bare address or dropped pin: an address has no
+ *  category, rating or reviews, so it gets no Reviews tab and no popular-times space. */
+internal fun Place.isListing(): Boolean =
+    !category.isNullOrBlank() || rating != null || reviewCount != null || featuredReview != null
+
+/** Lay a child out wider than its parent's padding allows, by [start] and [end], so a row can run
+ *  edge to edge inside a padded column. */
+private fun Modifier.bleed(start: androidx.compose.ui.unit.Dp, end: androidx.compose.ui.unit.Dp): Modifier = layout { m, c ->
+    if (!c.hasBoundedWidth) {
+        val p = m.measure(c)
+        return@layout layout(p.width, p.height) { p.place(0, 0) }
+    }
+    val s = start.roundToPx()
+    val w = c.maxWidth + s + end.roundToPx()
+    val p = m.measure(c.copy(minWidth = w, maxWidth = w))
+    layout(c.maxWidth, p.height) { p.place(-s, 0) }
+}

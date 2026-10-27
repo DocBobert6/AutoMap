@@ -1,0 +1,278 @@
+/* Vela site. Plain CSS, no build step, no fonts or scripts loaded from anywhere else. */
+
+:root {
+  --paper: #fafaf8;
+  --paper-2: #f0f2ef;
+  --ink: #111a1c;
+  --ink-2: #46545a;
+  --ink-3: #75828a;
+  --rule: #e2e5e1;
+  --teal: #0f7f75;
+  --teal-deep: #0d3d43;
+  --warn: #9a4a12;
+  --card: #ffffff;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --serif: var(--sans);
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --text: 41rem;
+  --wide: 62rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0c1416;
+    --paper-2: #131d20;
+    --ink: #eef2f1;
+    --ink-2: #b4c0c2;
+    --ink-3: #7f8d90;
+    --rule: #223033;
+    --teal: #3fd0bd;
+    --teal-deep: #0f5a57;
+    --warn: #e8a56a;
+    --card: #121c1f;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  text-rendering: optimizeLegibility;
+}
+
+a { color: var(--teal); text-underline-offset: 0.15em; text-decoration-thickness: 0.06em; }
+a:hover { text-decoration-thickness: 0.12em; }
+
+img { max-width: 100%; height: auto; }
+
+.col { max-width: var(--text); margin: 0 auto; padding: 0 1.25rem; }
+.wide { max-width: var(--wide); margin: 0 auto; padding: 0 1.25rem; }
+
+/* ---- top bar ---- */
+
+.top {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  max-width: var(--wide); margin: 0 auto; padding: 0.9rem 1.25rem;
+  font-family: var(--sans); font-size: 0.95rem;
+}
+body > .top { position: sticky; top: 0; z-index: 5; max-width: none; padding-left: max(1.25rem, calc((100% - var(--wide)) / 2 + 1.25rem)); padding-right: max(1.25rem, calc((100% - var(--wide)) / 2 + 1.25rem)); background: color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--rule); }
+.top .brand { display: flex; align-items: center; gap: 0.6rem; color: var(--ink); text-decoration: none; font-weight: 650; font-size: 1.05rem; }
+.top .brand img { width: 34px; height: 34px; }
+.top nav { margin-left: auto; display: flex; gap: 1.1rem; flex-wrap: wrap; }
+.top nav a { color: var(--ink-2); text-decoration: none; }
+@media (max-width: 40rem) { .top nav { margin-left: 0; width: 100%; gap: 0.5rem 1rem; } }
+.top nav a:hover, .top nav a[aria-current] { color: var(--ink); text-decoration: underline; }
+
+/* ---- type ---- */
+
+h1 { font-size: clamp(2.2rem, 6vw, 3.4rem); line-height: 1.06; letter-spacing: -0.03em; margin: 0 0 1.25rem; font-weight: 700; text-wrap: balance; }
+h2 { font-size: clamp(1.5rem, 3.4vw, 1.9rem); line-height: 1.2; letter-spacing: -0.02em; margin: 0 0 1rem; text-wrap: balance; }
+h3 { font-size: 1.05rem; line-height: 1.3; margin: 0 0 0.3rem; }
+p { margin: 0 0 1.1rem; }
+.lede { font-size: 1.25rem; line-height: 1.5; color: var(--ink-2); }
+.small { font-family: var(--sans); font-size: 0.9rem; color: var(--ink-3); line-height: 1.5; }
+.wavy { font-weight: 650; }
+mark { background: none; color: inherit; font-weight: 650; }
+code, .mono { font-family: var(--mono); font-size: 0.85em; }
+
+section { padding: 3.75rem 0; }
+section.tint { background: var(--paper-2); }
+html { scroll-padding-top: 4.5rem; }
+/* On a phone the nav wraps to two rows, which is too much screen to keep pinned. */
+@media (max-width: 40rem) { body > .top { position: static; } html { scroll-padding-top: 0.5rem; } }
+section + section { border-top: 1px solid var(--rule); }
+.tubsec { padding: 1rem 0 2.75rem; }
+.shots + section { margin-top: 2rem; border-top: 1px solid var(--rule); }
+
+/* ---- hero ---- */
+
+.hero { padding-top: 3.5rem; padding-bottom: 2.5rem; }
+@media (max-width: 40rem) { .hero { padding-top: 2.25rem; padding-bottom: 1.75rem; } }
+.hero .kicker { font-family: var(--sans); font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--teal); margin-bottom: 0.9rem; font-weight: 600; }
+
+.get { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin: 1.6rem 0 0.75rem; }
+.btn {
+  display: inline-block; font-family: var(--sans); font-size: 1rem; font-weight: 600;
+  padding: 0.7rem 1.15rem; border-radius: 0.6rem; text-decoration: none;
+  background: var(--teal-deep); color: #fff; border: 1px solid var(--teal-deep);
+}
+.btn:hover { background: #12545b; }
+.btn.plain { background: transparent; color: var(--ink); border-color: var(--ink-3); }
+.btn.plain:hover { background: var(--paper-2); }
+
+/* ---- screenshots ---- */
+
+.shots {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(165px, 1fr); gap: 1rem;
+  overflow-x: auto; scroll-snap-type: x proximity; padding: 0.5rem 1.25rem 1.25rem;
+  max-width: var(--wide); margin: 0 auto;
+}
+.shots figure { margin: 0; scroll-snap-align: center; }
+.shots img { display: block; width: 100%; border-radius: 1.2rem; border: 1px solid var(--rule); }
+.shots figcaption { font-family: var(--sans); font-size: 0.85rem; color: var(--ink-3); margin-top: 0.55rem; text-align: center; }
+
+/* ---- the note ---- */
+
+.sig { color: var(--ink-3); font-size: 0.95rem; }
+
+/* ---- the tub ---- */
+
+.tub { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; align-items: center; }
+@media (min-width: 46rem) { .tub { grid-template-columns: 20rem minmax(0, 1fr); gap: 2.5rem; } }
+.polaroid { background: #fff; padding: 1rem; margin: 0 auto; max-width: 20rem; border-radius: 1rem; border: 1px solid var(--rule); }
+.polaroid img { display: block; width: 100%; }
+.polaroid figcaption { font-family: var(--sans); font-size: 0.8rem; color: #6b6b6b; text-align: center; padding: 0.5rem 0 0.2rem; }
+
+/* ---- feature list ---- */
+
+.things { display: grid; grid-template-columns: 1fr; gap: 1.4rem 2.5rem; margin-top: 1.5rem; }
+@media (min-width: 46rem) { .things { grid-template-columns: 1fr 1fr; } }
+.things p { margin: 0; color: var(--ink-2); font-size: 1rem; line-height: 1.55; }
+
+/* ---- tables ---- */
+
+.tablewrap { overflow-x: auto; margin: 1.25rem 0; }
+table { border-collapse: collapse; width: 100%; font-size: 1rem; line-height: 1.5; }
+th, td { text-align: left; vertical-align: top; padding: 0.7rem 0.9rem 0.7rem 0; border-bottom: 1px solid var(--rule); }
+th { font-family: var(--sans); font-size: 0.8rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+td:first-child { white-space: nowrap; font-weight: 600; padding-right: 1.5rem; }
+@media (max-width: 34rem) { td:first-child { white-space: normal; } }
+.nothing { color: var(--teal); font-weight: 700; }
+
+/* ---- boxes ---- */
+
+.box { background: var(--card); border: 1px solid var(--rule); border-left: 3px solid var(--teal); border-radius: 0.5rem; padding: 1rem 1.25rem; margin: 1.5rem 0; }
+.box > :last-child { margin-bottom: 0; }
+.box.warn { border-left-color: var(--warn); }
+.box.warn strong:first-child { color: var(--warn); }
+.todo { background: #ffe58a; color: #111; font-family: var(--sans); font-size: 0.9rem; padding: 0.1em 0.4em; border-radius: 3px; }
+
+ul.plain { padding-left: 1.2rem; margin: 0 0 1.1rem; }
+ul.plain li { margin-bottom: 0.5rem; }
+
+.ways { display: grid; grid-template-columns: 1fr; gap: 1rem; margin: 1.5rem 0; }
+@media (min-width: 46rem) { .ways { grid-template-columns: repeat(3, 1fr); } }
+.way { background: var(--card); border: 1px solid var(--rule); border-radius: 0.7rem; padding: 1.1rem 1.2rem; }
+.way p { font-size: 1rem; line-height: 1.5; color: var(--ink-2); margin: 0 0 0.8rem; }
+.way a.go { font-family: var(--sans); font-weight: 600; font-size: 0.95rem; }
+
+details { margin: 1rem 0; }
+summary { cursor: pointer; font-family: var(--sans); font-size: 0.95rem; color: var(--ink-2); }
+pre { background: var(--paper-2); border: 1px solid var(--rule); border-radius: 0.5rem; padding: 0.8rem 1rem; overflow-x: auto; font-family: var(--mono); font-size: 0.8rem; line-height: 1.5; }
+
+/* ---- press page ---- */
+
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: 0.45rem 1.5rem; margin: 1.25rem 0; font-size: 1.02rem; }
+.facts dt { font-family: var(--sans); font-size: 0.85rem; color: var(--ink-3); padding-top: 0.2rem; }
+.facts dd { margin: 0; }
+@media (max-width: 30rem) { .facts { grid-template-columns: 1fr; gap: 0.1rem; } .facts dd { margin-bottom: 0.6rem; } }
+
+.say { display: grid; grid-template-columns: 1fr; gap: 1rem; margin: 1.25rem 0; }
+@media (min-width: 46rem) { .say { grid-template-columns: 1fr 1fr; } }
+.say > div { background: var(--card); border: 1px solid var(--rule); border-radius: 0.7rem; padding: 1rem 1.2rem; }
+.say h3 { font-family: var(--sans); font-size: 0.85rem; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 0.6rem; }
+.say .yes h3 { color: var(--teal); }
+.say .no h3 { color: var(--warn); }
+.say ul { margin: 0; padding-left: 1.1rem; font-size: 1.02rem; }
+.say li { margin-bottom: 0.4rem; }
+
+blockquote.copy { margin: 1rem 0 1.5rem; padding: 0.2rem 0 0.2rem 1.1rem; border-left: 3px solid var(--teal); color: var(--ink); }
+blockquote.copy p:last-child { margin-bottom: 0; }
+
+.kit { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 0.9rem; margin: 1.25rem 0; }
+.kit a { display: block; text-decoration: none; font-family: var(--sans); font-size: 0.82rem; color: var(--ink-2); text-align: center; }
+.kit img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; object-position: top; border-radius: 0.6rem; border: 1px solid var(--rule); margin-bottom: 0.4rem; background: var(--card); }
+.kit img.contain { object-fit: contain; padding: 0.8rem; }
+
+/* ---- footer ---- */
+
+footer { border-top: 1px solid var(--rule); padding: 2rem 0 3rem; font-family: var(--sans); font-size: 0.88rem; color: var(--ink-3); line-height: 1.6; }
+footer a { color: var(--ink-2); }
+footer p { margin: 0 0 0.5rem; }
+
+/* ---- hero with a phone ---- */
+
+.herogrid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2rem; align-items: center; }
+.herogrid h1 { max-width: 15ch; }
+.herogrid .lede { max-width: 36rem; }
+.herophone { display: none; }
+@media (min-width: 56rem) {
+  .herogrid { grid-template-columns: minmax(0, 1fr) 17rem; gap: 3.5rem; padding-top: 4rem; padding-bottom: 3rem; }
+  .herophone { display: block; position: relative; }
+  /* A soft wash of the brand color behind the phone, so it does not float on blank paper. */
+  .herophone::before { content: ""; position: absolute; inset: -12% -22%; z-index: -1; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--teal) 22%, transparent), transparent); }
+}
+
+/* A phone: the screenshot inside a thin dark bezel. */
+.phone { margin: 0; }
+.phone img { display: block; width: 100%; height: auto; border-radius: 1.5rem; border: 5px solid #10181a; outline: 1px solid var(--rule); box-shadow: 0 18px 40px -22px rgba(0, 0, 0, .55); background: #10181a; }
+.shots .phone img { border-radius: 1.25rem; border-width: 4px; }
+
+/* ---- feature list: ruled entries ---- */
+
+.things > div { border-top: 2px solid var(--teal); padding-top: 0.85rem; }
+.things h3 { margin-bottom: 0.35rem; }
+.more { margin: 1.75rem 0 0; }
+.more a, .way a.go, .doc h3 { font-weight: 650; }
+
+/* ---- cards ---- */
+
+.card { background: var(--card); border: 1px solid var(--rule); border-radius: 0.9rem; padding: 0.4rem 1.25rem; }
+.card table { margin: 0; }
+.card tr:last-child td { border-bottom: 0; }
+.nothing { display: inline-block; background: color-mix(in srgb, var(--teal) 14%, transparent); border-radius: 999px; padding: 0 0.6em; margin-right: 0.15em; }
+
+/* ---- install band ---- */
+
+section.band { background: var(--teal-deep); color: #eef5f4; border-top: 0; }
+section.band + section { border-top: 0; }
+.band h2, .band h3 { color: #fff; }
+.band > .wide > p { color: #c9dcda; }
+.band .way { background: rgba(255, 255, 255, .07); border-color: rgba(255, 255, 255, .16); }
+.band .way p { color: #d3e3e1; }
+.band a { color: #7fe3d3; }
+.band summary { color: #c9dcda; }
+.band .small { color: #c9dcda; }
+.band pre { background: rgba(0, 0, 0, .25); border-color: rgba(255, 255, 255, .16); color: #eef5f4; }
+
+/* ---- docs ---- */
+
+.docs { display: grid; grid-template-columns: 1fr; gap: 1rem; margin-top: 1.5rem; }
+@media (min-width: 40rem) { .docs { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 60rem) { .docs { grid-template-columns: 1fr 1fr 1fr; } }
+a.doc { display: block; background: var(--card); border: 1px solid var(--rule); border-radius: 0.8rem; padding: 1.1rem 1.25rem; text-decoration: none; color: inherit; transition: border-color .15s, transform .15s; }
+a.doc:hover { border-color: var(--teal); transform: translateY(-2px); }
+a.doc h3 { color: var(--teal); margin-bottom: 0.3rem; }
+a.doc p { margin: 0; color: var(--ink-2); font-size: 0.98rem; line-height: 1.5; }
+@media (prefers-reduced-motion: reduce) { a.doc { transition: none; } a.doc:hover { transform: none; } }
+
+/* ---- a long document page (privacy) ---- */
+
+.doc .hero { padding-bottom: 0.5rem; }
+.prose { padding-bottom: 3.5rem; }
+.prose h2 { margin-top: 2.75rem; padding-top: 1.75rem; border-top: 1px solid var(--rule); }
+.prose li { margin-bottom: 0.55rem; }
+.prose ul ul { margin-top: 0.55rem; }
+.prose table { font-size: 0.93rem; }
+.prose td:first-child { white-space: normal; min-width: 9rem; }
+.prose .tablewrap { margin: 1.5rem calc((var(--text) - min(var(--wide), 100vw - 2.5rem)) / 2); }
+@media (max-width: 62rem) { .prose .tablewrap { margin-left: 0; margin-right: 0; } }
+.prose code { background: var(--paper-2); padding: 0.05em 0.3em; border-radius: 4px; }
+
+/* ---- footer columns ---- */
+
+.footgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.75rem 2rem; padding-bottom: 1.5rem; }
+@media (min-width: 46rem) { .footgrid { grid-template-columns: 1.4fr 1fr 1fr 1fr; } }
+.footgrid .brand { display: flex; align-items: center; gap: 0.6rem; color: var(--ink); text-decoration: none; font-weight: 650; font-size: 1.05rem; margin-bottom: 0.6rem; }
+.footgrid .brand img { width: 30px; height: 30px; }
+.footgrid h4 { font-size: 0.78rem; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 0.6rem; font-weight: 600; }
+.footgrid div > a:not(.brand) { display: block; text-decoration: none; padding: 0.15rem 0; }
+.footgrid div > a:not(.brand):hover { text-decoration: underline; }
+.legal { border-top: 1px solid var(--rule); padding-top: 1.1rem; }

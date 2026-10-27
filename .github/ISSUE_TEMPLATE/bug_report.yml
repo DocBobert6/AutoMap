@@ -1,0 +1,116 @@
+name: Bug report
+description: Something broke or behaves wrong
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please write in English so everyone on the thread can follow.
+
+        The first fields are required because almost every bug comes down to which version you are on and how you installed it. Filling them in up front saves a few rounds of back and forth.
+  - type: input
+    id: version
+    attributes:
+      label: Vela version
+      description: Open Vela, go to Settings, then About. Use the exact number.
+      placeholder: "0.5.2420"
+    validations:
+      required: true
+  - type: dropdown
+    id: channel
+    attributes:
+      label: Which build is it?
+      description: Settings, then About, says which. Stable is the numbered release most people run; nightly and canary are the daily builds.
+      options:
+        - Stable
+        - Nightly
+        - Canary
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: install-source
+    attributes:
+      label: How did you install Vela?
+      options:
+        - Obtainium
+        - In-app updater (the update card inside Vela)
+        - F-Droid repo
+        - Manual APK download
+        - Other or not sure
+    validations:
+      required: true
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before you report
+      options:
+        - label: I am on the current stable or newer, and the problem still happens
+          required: true
+        - label: I searched open and closed issues and did not find a duplicate
+          required: true
+        - label: This report is about one problem. A second problem gets its own report.
+          required: true
+        - label: I have read how reports are handled in CONTRIBUTING.md and filled in the steps below. A report that cannot be reproduced from what is written here is closed.
+          required: true
+        - label: If an AI assistant helped write this, it read CONTRIBUTING.md and CLAUDE.md first, I checked every claim it makes about Vela, and I name it below.
+          required: true
+  - type: input
+    id: ai_model
+    attributes:
+      label: AI assistant, if any
+      description: The model and version that helped write this, so the reviewer knows what to check.
+      placeholder: Claude Opus 5.5, ChatGPT 5, none
+  - type: input
+    id: device
+    attributes:
+      label: Device and Android version
+      description: Model number and Android version, from Settings then About on the phone.
+      placeholder: "Pixel 8, Android 15"
+    validations:
+      required: true
+  - type: input
+    id: rom
+    attributes:
+      label: ROM (if not stock)
+      description: GrapheneOS, LineageOS, CalyxOS, and the like. Leave blank for stock.
+      placeholder: "GrapheneOS"
+    validations:
+      required: false
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What went wrong, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: What you did, in order, so a maintainer can do the same thing and see it. For anything about routes, places or the map, name the start, the destination or the place, or use the built-in location simulator (Settings, Diagnostics) with the Davis, CA test area and say so. For heat, battery or lag, give a number (battery percentage used over a stated time, how long it ran, or a screen recording). "It happens sometimes" is not reproducible.
+      placeholder: |
+        1. Search "Mikuni Davis", open the result
+        2. Tap Directions, pick the second route
+        3. Tap Start; the line drawn is the first route
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Crash report or diagnostics
+      description: |
+        This is the single most useful thing you can add. If Vela crashed, reopen it and go to Settings, then Diagnostics. If a crash report card is there, tap share and paste it here. It is anonymized (coordinates are rounded to about 1 km).
+
+        If there is no crash card, say so. That means the crash is happening at a lower level, which is useful to know by itself.
+      render: text
+    validations:
+      required: false
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: |
+        Screenshots help. If search or places broke for everyone at once, that is usually Google reshaping a response, so say when it started. For a navigation issue, whether you can reproduce it with Simulate driving (Settings, then Navigation) is very useful.
+    validations:
+      required: false

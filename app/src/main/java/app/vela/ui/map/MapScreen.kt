@@ -1,0 +1,7334 @@
+package app.vela.ui.map
+
+import app.vela.ui.icons.Sym
+import app.vela.ui.icons.SymOutlined
+
+import android.Manifest
+import android.app.Activity
+import android.content.ContextWrapper
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.view.WindowManager
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import android.widget.Toast
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material3.surfaceColorAtElevation
+import app.vela.ui.theme.isAppInDarkTheme
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.runtime.collectAsState
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedAssistChip
+import androidx.compose.material3.ElevatedButton
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
+import androidx.compose.material3.ElevatedFilterChip
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import kotlin.math.roundToInt
+import androidx.compose.ui.geometry.Offset
+import kotlinx.coroutines.flow.debounce
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.calculateTargetValue
+import androidx.compose.animation.core.exponentialDecay
+import androidx.compose.animation.core.spring
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
+import app.vela.R
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.vela.BuildConfig
+import app.vela.core.config.Notice
+import app.vela.core.model.LatLng
+import app.vela.core.model.distanceTo
+import app.vela.core.model.ManeuverType
+import app.vela.core.model.Place
+import app.vela.core.model.areaZoom
+import app.vela.core.data.RecentPlace
+import app.vela.core.data.RecentQuery
+import app.vela.core.model.SavedPlace
+import app.vela.core.model.ShortcutKind
+import app.vela.ui.RatingStars
+import app.vela.ui.SheetPalette
+import app.vela.ui.formatDistance
+import app.vela.ui.formatSpeed
+import app.vela.ui.formatSpeedLimit
+import app.vela.ui.formatDuration
+import app.vela.ui.Units
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.sp
+import app.vela.ui.nav.ArrivalSummary
+import app.vela.ui.nav.ManeuverBanner
+import app.vela.ui.nav.NavControls
+import app.vela.ui.nav.StepsSheet
+import app.vela.ui.StatusText
+import app.vela.ui.Traffic
+import app.vela.ui.place.DirectionsPanel
+import app.vela.ui.place.PlaceSheet
+import app.vela.ui.place.atWidth
+import app.vela.ui.place.sheetDragGestures
+import app.vela.ui.search.SearchBar
+import java.util.Locale
+// D-pad-only operation (docs/dpad.md) — kept as one import block so upstream merges stay clean.
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.border
+import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.focusable
+import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import app.vela.ui.dpadHighlight
+import app.vela.ui.dpadLongClick
+import app.vela.ui.dpadFieldEscape
+import app.vela.ui.rememberDpadMode
+import app.vela.ui.theme.isAppInDarkTheme
+import app.vela.ui.theme.isAppInAmoled
+import app.vela.ui.rememberDpadFirstDevice
+import app.vela.ui.VelaMenu // D-pad-first menu (docs/dpad.md)
+import app.vela.ui.item
+
+// Basemap provider. Keyless OpenFreeMap (loaded by URL — the setup that always
+// worked) is active; POI markers + colors are applied at runtime. Flip to true
+// for MapTiler Streets (needs the MAPTILER_KEY secret). Both paths stay wired.
+private const val USE_MAPTILER = false
+
+// Landscape side-panel width for the place/results sheets (Google's landscape treatment):
+// wide enough for the sheet content, narrow enough that a phone landscape (~730dp+) keeps a
+// real map strip with all the right-side buttons beside it.
+// Landscape side-panel width: half the screen up to a cap, floored at the old 400dp - the fixed
+// 400 read too narrow on wide screens (user 2026-07-23); Google's landscape panel takes roughly
+// half a phone's width too. Computed per-configuration in sidePanelWidth().
+private val SIDE_PANEL_WIDTH_MIN = 400.dp
+private val SIDE_PANEL_WIDTH_MAX = 600.dp
+
+/** Gap in px between the puck glyph's center and the current-road pill below it (issue #288).
+ *  The nav puck bitmap is 202px drawn at ~half that on screen, so this clears its lower edge. */
+private const val PUCK_LABEL_GAP_PX = NavFraming.ARROW_BELOW_PX
+
+/** How far the OpenStreetMap credit lifts to clear the free-drive speed box, which sits in the same
+ *  bottom-left corner: the box's height plus its 16 dp margin and a couple of dp of air. */
+private val SPEED_BOX_LIFT_DP = 78.dp
+
+/** The nav FAB column: a stack of 56 dp buttons hard against the right edge with this much air
+ *  outside it. VelaMapView steps MapLibre's compass in by [NAV_FAB_COLUMN_DP] in landscape so the
+ *  two cannot overlap, which is the only reason these are shared constants rather than literals. */
+internal val NAV_FAB_EDGE_DP = 16.dp
+internal val NAV_FAB_COLUMN_DP = 56.dp + NAV_FAB_EDGE_DP
+
+// The route chooser's body cap on short screens (issue #400): the map strip that must stay
+// visible between the endpoints card and the chooser, the chooser's own header (handle + mode
+// chips) above the body, and the least the body may shrink to.
+private const val CHOOSER_MAP_STRIP_DP = 96f
+private const val CHOOSER_HEADER_DP = 84f
+// Landscape leaves a thinner strip of map: the column is short, and the endpoints card above it is
+// what the panel must not reach.
+private const val CHOOSER_MAP_STRIP_LAND_DP = 16f
+// Landscape floors: the expandable body may shrink to one row, and the card itself never gets
+// squeezed below a usable height even if the endpoints card is unusually tall.
+private const val CHOOSER_BODY_MIN_LAND_DP = 64f
+private val CHOOSER_CARD_MIN_LAND_DP = 170.dp
+// How far down the ramp the exit callout sits, past the maneuver point where the ramp leaves.
+private const val EXIT_CALLOUT_AHEAD_M = 70.0
+// The blue turn bubble's tail sits on the corner itself; the steps below move it into the new
+// street only when a light, stop sign or camera stands there.
+private const val TURN_CALLOUT_AHEAD_M = 0.0
+/** Extra steps along the new street, tried in order, until no drawn light, stop sign or camera is
+ *  within [TURN_CALLOUT_CLEAR_M] of the callout's anchor. */
+private val TURN_CALLOUT_STEPS_M = doubleArrayOf(0.0, 15.0, 30.0, 45.0, 60.0)
+private const val TURN_CALLOUT_CLEAR_M = 30.0
+private val TURN_CALLOUT_TYPES = setOf(
+    app.vela.core.model.ManeuverType.TURN_LEFT, app.vela.core.model.ManeuverType.TURN_RIGHT,
+    app.vela.core.model.ManeuverType.SLIGHT_LEFT, app.vela.core.model.ManeuverType.SLIGHT_RIGHT,
+    app.vela.core.model.ManeuverType.SHARP_LEFT, app.vela.core.model.ManeuverType.SHARP_RIGHT,
+    app.vela.core.model.ManeuverType.EXIT_ROUNDABOUT,
+)
+
+/** The street a turn maneuver enters, named the way the bubble shows it, or null when the
+ *  maneuver is not a turn or names no street. */
+private fun turnCalloutRoadOf(m: app.vela.core.model.Maneuver?): String? =
+    if (m == null || m.type !in TURN_CALLOUT_TYPES) null
+    else m.road?.takeIf { it.isNotBlank() } ?: m.ref?.takeIf { it.isNotBlank() }
+private const val CHOOSER_BODY_MIN_DP = 120f
+
+/** Density-aware default for the POI icon size: 1 at hdpi and above (every phone), scaling down
+ *  with the density below that so fixed-pixel bitmaps keep a phone's physical size on ldpi/mdpi
+ *  screens (car units, tiny phones). Floored so icons stay tappable. */
+internal fun lowDensityIconScale(density: Float): Float =
+    if (density >= 1.75f) 1f else (density / 2.625f).coerceIn(0.4f, 1f)
+
+@Composable
+internal fun sidePanelWidth(): androidx.compose.ui.unit.Dp {
+    val w = LocalConfiguration.current.screenWidthDp
+    // 0.56 of the width: with the cutout's margin taken off, that is the 47% Google's panel covers.
+    return (w * 0.56f).dp.coerceIn(SIDE_PANEL_WIDTH_MIN, SIDE_PANEL_WIDTH_MAX)
+
+}
+
+/**
+ * The OpenStreetMap credit in the map's bottom-left corner (issue #302), [start] and [bottom] in
+ * from it. The basemap is OSM data and the ODbL asks for a visible credit wherever the map is
+ * shown, so it stays up in every map state, browse and nav alike. The short form is deliberate:
+ * the OSMF attribution guidelines accept "\u00a9 OpenStreetMap contributors" and "\u00a9 OpenStreetMap"
+ * alike, and require that the credit make the ODbL findable, which the tap-through to
+ * openstreetmap.org/copyright does. Do not shorten it further. MapLibre's own button is off (it
+ * covered the scale bar and read as a control).
+ *
+ * It fades out while the speaker's three voice choices are slid open: that row runs across the
+ * same strip and was drawn under the credit (issue #840). The row closes on its own in seconds.
+ * Its own composable because MapScreen is at the verifier's limit.
+ */
+@Composable
+private fun androidx.compose.foundation.layout.BoxScope.OsmCredit(
+    darkTheme: Boolean,
+    start: androidx.compose.ui.unit.Dp,
+    bottom: androidx.compose.ui.unit.Dp,
+    movingFree: Boolean,
+) {
+    val context = LocalContext.current
+    val shown by androidx.compose.animation.core.animateFloatAsState(
+        if (app.vela.ui.nav.VoiceSlideOutOpen.value) 0f else 1f,
+        label = "osmCredit",
+    )
+    Text(
+        stringResource(R.string.map_osm_attribution),
+        style = MaterialTheme.typography.labelSmall,
+        color = if (darkTheme) Color(0xFFB8C2CC) else Color(0xFF4A4A4A),
+        modifier = Modifier
+            .align(Alignment.BottomStart)
+            .navigationBarsPadding()
+            .padding(start = start, bottom = bottom + speedBoxLift(movingFree))
+            .alpha(shown)
+            .dpadHighlight(RoundedCornerShape(6.dp))
+            .clickable {
+                runCatching {
+                    context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://www.openstreetmap.org/copyright")))
+                }
+            }
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+    )
+}
+
+@Composable
+fun MapScreen(
+    vm: MapViewModel,
+    onOpenSettings: () -> Unit,
+    onOpenVoiceSettings: () -> Unit = {},
+) {
+    val state by vm.state.collectAsStateWithLifecycle()
+    val darkTheme = isAppInDarkTheme()
+    val amoled = isAppInAmoled()
+    val hasMapTiler = USE_MAPTILER && BuildConfig.MAPTILER_KEY.isNotBlank()
+    // When the place sheet is the active bottom UI it covers ~the bottom 56% of the
+    // screen, so push the map's optical center up by that much to keep the focused
+    // pin visible above it.
+    val screenHeightPx = with(LocalDensity.current) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
+    val placeSheetUp = state.selected != null && !state.directionsOpen && !state.navigating
+    // Street View pose [lat, lng, compassYaw] while the half-screen pano viewer is up - drives the
+    // rotating view cone + camera hold on the map underneath. Cleared when the viewer closes.
+    var svPose by remember { mutableStateOf<DoubleArray?>(null) }
+    LaunchedEffect(state.streetView == null && !state.streetViewLoading) {
+        if (state.streetView == null && !state.streetViewLoading) svPose = null
+    }
+    // Push the optical center up so the place sheet / directions panel doesn't sit on
+    // top of the pin or the route (the directions panel is tall — fit the route above it).
+    // Bumped by the in-nav Overview button; VelaMapView fits the whole route on each bump.
+    var navOverviewTick by remember { mutableStateOf(0) }
+    var navRecenterTick by remember { mutableStateOf(0) }
+    // Coming back from picture-in-picture re-centers the drive: the surface changed size twice
+    // under the follow camera, and whatever that did to it, the driver expects to land back on
+    // the arrow (user 2026-09-13).
+    val pipActiveNow = app.vela.ui.PipMode.active.value
+    // ...and ENTERING it re-centers too (user drive 2026-09-16): the home swipe that sends the app
+    // to PiP starts as a touch on the map, which reads as a pan and detaches the camera just before
+    // the window shrinks, so the mini map came up off the arrow.
+    // The tick alone only clears pinch overrides; re-attaching the follow camera is the VM call the
+    // Re-center button makes, which this effect was missing.
+    LaunchedEffect(pipActiveNow) { if (state.navigating) { vm.recenterNav(); navRecenterTick++ } }
+    // A pinch/shove during nav sets a zoom/tilt override WITHOUT detaching the camera, so
+    // navCameraDetached never flips and no Re-center showed (issue #238); the map reports the
+    // override up so the button appears for that case too.
+    var navZoomOverride by remember { mutableStateOf(false) }
+    // The route chooser reports its minimized state up: with only the Start bar left on
+    // screen the route fit gets nearly the whole map back, so it re-frames closer instead
+    // of staying at the zoomed-out framing the full-height panel needed (user 2026-07-14).
+    var dirMinimized by remember { mutableStateOf(false) }
+    // The chooser's MEASURED top edge, sampled once it settles: the route fit used a fraction of the
+    // screen height for the panel, and the real panel is taller than that fraction, so the trip's
+    // start sat behind it in the overview (user 2026-09-17). Debounced, because the panel animates
+    // its height and every intermediate value would re-run the fit.
+    var dirPanelTopRaw by remember { mutableStateOf(0) }
+    var dirPanelTopPx by remember { mutableStateOf(0) }
+    // The map fills the whole window (behind the status and nav bars), so the panel's top must be
+    // read in WINDOW coordinates and measured against the window height, not the configuration's
+    // screen height, which leaves the bars out and understated the panel by about 130 px.
+    val rootView = LocalView.current
+    val windowHeightPx = rootView.height.takeIf { it > 0 } ?: screenHeightPx.toInt()
+    val windowWidthPx = rootView.width.takeIf { it > 0 } ?: 1080
+    LaunchedEffect(Unit) {
+        snapshotFlow { dirPanelTopRaw }.debounce(140).collect { dirPanelTopPx = it }
+    }
+    LaunchedEffect(state.directionsOpen) { if (!state.directionsOpen) { dirPanelTopRaw = 0; dirPanelTopPx = 0 } }
+    // The Google-style chooser's alternates pane: the list slides in over the panel's body and BACK
+    // brings the Google view back. While it is open the map's bubbles carry the same detail.
+    var altsOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(state.directionsOpen) { if (!state.directionsOpen) altsOpen = false }
+    // Landscape (width > height): the browse top chrome collapses to ONE line (half-width search
+    // bar + the chips beside it, Google's landscape layout) and the top-right corner stack
+    // (layers button, compass) rises a row - on a phone's ~390dp landscape height the stacked
+    // layout pushed the compass down into the parking/locate FABs (user 2026-07-15).
+    val landscapeChrome = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
+    // Mirrored into the VM too: the route-through-here press is gated on the chooser being
+    // minimized (stray building taps while the full picker covered the map added stops).
+    LaunchedEffect(dirMinimized) { vm.onDirectionsCollapsed(dirMinimized) }
+    LaunchedEffect(state.directionsOpen) { if (!state.directionsOpen) dirMinimized = false }
+    // Landscape: the place/results sheets render as a LEFT SIDE PANEL (Google's landscape
+    // layout, user 2026-07-20) - width-capped, so the right-side chrome (layers, parking,
+    // locate) never collides with them. The camera inset moves to the LEFT axis to match:
+    // a focused pin frames in the map strip beside the panel, not squeezed into a top sliver.
+    val sidePanelWidthDp = sidePanelWidth()
+    val sidePanelWidthPx = with(LocalDensity.current) { sidePanelWidthDp.toPx() }.toInt()
+    val cameraBottomInset = when {
+        // Street View pane up: the sheet yields, so no bottom inset (the SV top inset takes over).
+        state.streetView != null || state.streetViewLoading -> 0
+        // Transit step-by-step guidance (issue #232): the bottom pane covers ~48%, so the per-leg
+        // camera fit frames the guided leg in the visible top strip, not behind the pane.
+        state.transitNav != null -> (screenHeightPx * 0.48f).toInt()
+        placeSheetUp -> if (landscapeChrome) 0 else (screenHeightPx * 0.56f).toInt()
+        // Landscape: the chooser is a LEFT side panel (see its modifier), so it costs no bottom
+        // inset - the route frames beside it instead of being squeezed into a sliver above it.
+        state.directionsOpen && !state.navigating -> when {
+            landscapeChrome -> 0
+            // The measured panel, when it has reported and settled; the fractions are the fallback
+            // for the frame before that.
+            dirPanelTopPx > 0 -> (windowHeightPx - dirPanelTopPx).coerceIn(0, (windowHeightPx * 0.72f).toInt())
+            else -> (screenHeightPx * (if (dirMinimized) 0.14f else 0.58f)).toInt()
+        }
+        // Results bottom sheet at peek covers ~the bottom half: frame the result pins
+        // in the visible top half, not behind the sheet.
+        state.results.isNotEmpty() && state.selected == null && !state.resultsCollapsed &&
+            !state.navigating -> if (landscapeChrome) 0 else (screenHeightPx * 0.50f).toInt()
+        else -> 0
+    }
+    val cameraLeftInset = if (!landscapeChrome) 0 else when {
+        state.streetView != null || state.streetViewLoading -> 0
+        placeSheetUp -> sidePanelWidthPx
+        // Nav chrome is a left column in landscape, so the puck must sit clear of it.
+        state.navigating -> sidePanelWidthPx
+        // The route chooser is a left panel in landscape too (issue #297), so the route it is
+        // asking you to choose has to be framed clear of it.
+        state.directionsOpen && !state.navigating && !dirMinimized -> sidePanelWidthPx
+        state.results.isNotEmpty() && state.selected == null && !state.resultsCollapsed &&
+            !state.navigating -> sidePanelWidthPx
+        else -> 0
+    }
+    val context = LocalContext.current
+
+    // Keep the display awake during turn-by-turn so a driver glancing at the next
+    // turn never has to tap to wake it. Gated by the "Keep screen on while
+    // navigating" toggle (Settings → Navigation, default on); the flag is cleared
+    // the instant nav ends, the setting is turned off, or this screen leaves
+    // composition, so the screen sleeps normally again everywhere else.
+    // Not while the drive is paused: a car pulled over with the drive held kept the screen on
+    // for as long as it sat there.
+    val keepAwakeOn = remember(state.navigating, state.navPaused) {
+        state.navigating && !state.navPaused &&
+            context.getSharedPreferences("vela_settings", android.content.Context.MODE_PRIVATE)
+                .getBoolean("keep_screen_on_nav", true)
+    }
+    val activityWindow = remember(context) {
+        var c: android.content.Context? = context
+        while (c is ContextWrapper && c !is Activity) c = c.baseContext
+        (c as? Activity)?.window
+    }
+    DisposableEffect(keepAwakeOn, activityWindow) {
+        if (keepAwakeOn) {
+            activityWindow?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            activityWindow?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose { activityWindow?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    }
+
+    var searchFocused by remember { mutableStateOf(false) }
+    // The ribbon button's own menu: Your lists live here now, not inside the search page.
+    var listsSheetOpen by remember { mutableStateOf(false) }
+
+    // --- D-pad-only operation (docs/dpad.md) -------------------------------------
+    // dpadMode = user is driving with keys right now (always true with no touchscreen);
+    // the map gets a focusable center target (arrows pan, OK selects, hold-OK = pin) and
+    // on-screen zoom buttons. mapDpad is the key→camera seam into VelaMapView.
+    val dpadMode = rememberDpadMode()
+    val dpadFirst = rememberDpadFirstDevice()
+    // What the nav bar's right slot carries. The step-list button shows whenever it was asked for
+    // (Prefer buttons, or a keypad-first phone). Pause takes the slot too when "Pause in the bar"
+    // is on, so someone with Prefer buttons gets BOTH and the figures shrink to fit (FitText); a
+    // silent choice between them meant the pause default never reached the people who asked for
+    // buttons. A keypad-first phone keeps pause in the right-edge stack, where the key path is.
+    val navListButton = app.vela.ui.PreferButtons.on.value || dpadFirst
+    val navPauseInBar = app.vela.ui.PauseInBar.on.value && !dpadFirst
+    val mapDpad = remember { MapDpadController() }
+    var mapFocused by remember { mutableStateOf(false) }
+    var mapEngaged by remember { mutableStateOf(false) } // arrows pan only while engaged (docs/dpad.md)
+    // Focuses the center map target. Used ONLY for Choose-on-map (entered mid-session, so
+    // requestFocus lands) — the cold-open bare map deliberately does not auto-focus it (docs/dpad.md).
+    val mapFocusRequester = remember { FocusRequester() }
+    // D-pad (docs/dpad.md): under touch the overlay tracks field focus (blur = close), but
+    // under D-pad focus must be able to WALK the overlay's rows without it snapping shut the
+    // instant the field blurs — AND back must be able to definitively close it. A derived
+    // focus-latch could do the first but got STUCK on the second (focus never fully left the
+    // overlay tree, so it never closed — the "no way to go back from search" bug). So the
+    // entry overlay is an EXPLICIT boolean instead: opened on field focus, closed on
+    // touch-blur / BACK / once a search runs or a place is picked (the effect below).
+    var searchExpanded by remember { mutableStateOf(false) }
+    // A search producing results, or any place selection, ends the entry page in BOTH input
+    // modes (under touch clearFocus already did; under D-pad clearFocus leaves focus in the
+    // tree, so close it here). Pick-mode keeps the overlay up (handled via searchOpen below).
+    LaunchedEffect(state.results.size, state.selected, state.pickingOrigin, state.pickingDest, state.pickingStop) {
+        if (!state.pickingOrigin && !state.pickingDest && !state.pickingStop &&
+            (state.results.isNotEmpty() || state.selected != null)
+        ) {
+            searchExpanded = false
+        }
+    }
+    // The search overlay is open when the entry page is expanded, whenever the field actually
+    // holds focus, OR while we're picking a custom directions origin/stop (that opens the same
+    // overlay WITHOUT focusing the field). The `searchFocused` term is the invariant that stops
+    // a stuck state: the collapse effect above force-clears `searchExpanded` the moment a search
+    // yields results or a place is picked, but a long-press-menu interaction can trip that while
+    // the field never loses focus — leaving you typing into a focused field with no overlay, and
+    // no way back (re-tapping an already-focused field fires no focus change, so `searchExpanded`
+    // never flips true again; only a full app exit cleared it). Tying `searchOpen` to live focus
+    // means a focused field always shows its overlay, which both prevents and self-heals that.
+    // Under D-pad the field blurs when focus walks the rows, so `searchExpanded` still carries the
+    // overlay there (blur must not close it); BACK clears both and closes as before.
+    val gates = SearchGates.of(state, searchExpanded, searchFocused)
+    val searchOpen = gates.searchOpen
+    // The results panel is open (not collapsed to the "N results" pill) → hide the bottom map
+    // chrome (scale bar / locate FAB / Search this area) so it never draws on top of the list at
+    // ANY size, not just full screen. The panel and the chrome are siblings in the same Box and the
+    // chrome is declared later, so it stacks above the panel unless gated out (user 2026-07-08).
+    // Which result ids survive the results sheet's filters (null = filters off) - feeds the
+    // map markers so filtered-out places lose their pins, not just their rows.
+    var filteredResultIds by remember { mutableStateOf<Set<String>?>(null) }
+    // True while the place sheet sits at its EXPANDED detent (covers the search bar).
+    var placeSheetExpanded by remember { mutableStateOf(false) }
+    // The sheet's live TOP edge in root px (0 = not measured). The layers button keys its
+    // visibility off this: shown while a POI is minimized whenever the button's own corner
+    // actually clears the sheet - a measured overlap test, not an orientation/height guess,
+    // so a tablet or portrait car screen keeps the button and a phone-landscape peek (where
+    // the sheet reaches the corner) drops it, continuously as the sheet is dragged.
+    val sheetEdge = remember { SheetEdge() }
+    sheetEdge.screenH = screenHeightPx
+    // Row-level Menu button target: the place id whose sheet should open onto its
+    // Menu tab. Consumed once (a normal pick, a close or Back clears it) so reopening the
+    // place later doesn't stick on Menu.
+    var sheetMenuAsk by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(state.selected?.id) {
+        if (state.selected == null) { placeSheetExpanded = false; sheetEdge.set(0); sheetMenuAsk = null }
+    }
+    LaunchedEffect(state.results) { filteredResultIds = null }
+    // Street View gates the panel too: opening the viewer clears `selected`, which used to flip
+    // this back ON and draw the results list over the bottom-half mini map (user 2026-07-18).
+    // A typed query SUBMITTED while picking an origin, destination or stop (issue #405,
+    // 2026-09-13): the overlay stays "open" for the pick and the chosen place stays selected, so
+    // the results sheet's two gates both held and a search for "Coffee" from Add stop showed
+    // nothing at all. The sheet shows for a pick once the field is blurred and results exist;
+    // a tap on a row goes through selectPlace, which already adds it as the stop / endpoint.
+    val pickingResults = gates.pickingResults
+    val resultsShown = gates.resultsShown
+    // Free-drive follow (Google's "the map tracks you as you drive, no route needed"). On by
+    // default so an open, unobstructed map glides to your fix; a user pan drops it and the locate
+    // tap raises it again. Suppressed whenever a focus surface owns the camera (search, a place,
+    // directions, the results list) so it never fights that framing. Nav has its own follow.
+    // A holder, so driving mode's locate button can re-arm it (issue #727).
+    var followMe by app.vela.ui.FollowMe.on
+    // A programmatic camera jump far from the fix (a recents pick, a search hit, a pasted
+    // coordinate, a deep link) means the user went to look somewhere else - drop follow exactly
+    // like a pan would. Without this, follow was only SUSPENDED while the place sheet owned the
+    // camera, so closing the sheet resumed it and the map glided all the way home (device report
+    // 2026-07-13). A POI tapped near the fix keeps follow; 1 km is the "somewhere else" line.
+    LaunchedEffect(state.center) {
+        val c = state.center ?: return@LaunchedEffect
+        val me = state.myLocation ?: return@LaunchedEffect
+        if (followMe && c.distanceTo(me) > 1_000.0) followMe = false
+    }
+    val driveFollowing = followMe && !state.navigating && !resultsShown && state.selected == null &&
+        !state.directionsOpen && !state.showSteps && !searchOpen && state.pickOnMap == null
+    // The posted-limit ("Speed B") overlay is armed by ACTUAL MOTION, never by the bare browse map.
+    // driveFollowing alone is true whenever you're just looking at the map (followMe defaults on), and
+    // keying the overlay off it mounted the maxspeed PMTiles sources on the browse map - native tile
+    // fetch + tessellation on every pan/zoom - AND ripped them out of the style MID-GESTURE the moment
+    // a pan dropped followMe. That style churn was the post-0.4.542 "atrocious panning" regression
+    // (device A/B 2026-07-13: 542 smooth, wave builds janky; 542 has no maxspeed overlay). Motion arms
+    // it instantly; stillness disarms after 2 min so stoplights/parking don't churn sources either.
+    var speedOverlayArmed by remember { mutableStateOf(false) }
+    val movingNow = state.navigating || (state.mySpeed ?: 0f) > 3f
+    LaunchedEffect(movingNow) {
+        if (movingNow) speedOverlayArmed = true
+        else if (speedOverlayArmed) {
+            kotlinx.coroutines.delay(120_000)
+            speedOverlayArmed = false
+        }
+    }
+    // Bumped when the user grabs the map with a sheet open — each sheet glides down to its
+    // minimized form on its bump (see onUserPan below).
+    var sheetPanTick by remember { mutableStateOf(0) }
+    var resultsPanTick by remember { mutableStateOf(0) }
+    var dirPanTick by remember { mutableStateOf(0) }
+    // Expanded detent of the results bottom sheet, hoisted here so the BACK gesture can step it
+    // one detent (expanded -> peek) before collapsing to the minimized bar (user 2026-07-09).
+    var resultsExpanded by remember { mutableStateOf(false) }
+    LaunchedEffect(state.results) { if (state.results.isEmpty()) resultsExpanded = false }
+    // The results sheet minimized to its short bottom bar — the chrome shows again then, but
+    // lifted above the bar so the FAB / scale bar / Search this area never sit on top of it.
+    val resultsMinimized = gates.resultsMinimized
+    val chromeLift = if (resultsMinimized) 76.dp else 0.dp
+    val metersPerPixelState = remember { mutableStateOf(0.0) }
+    // Building-overlay debug badge: the last state VelaMapView's idle gate reported
+    // ("none" / "hidden" / "drawing"). Only surfaced when the developer toggle is on.
+    var overlayDebugState by remember { mutableStateOf("none") }
+    // Measured screen-Y of the maneuver banner's bottom edge → so VelaMapView can sit the compass just below
+    // it during nav (the banner's height varies with lane guidance + a "then" row, so it can't be guessed).
+    var navBannerBottomPx by remember { mutableStateOf(0) }
+    // Where the nav puck sits on screen, for the current-road label under it (issue #288).
+    // Null until the nav ticker reports one; reset when a drive ends.
+    // The arrow's screen position, written by the ticker's rare real moves and READ IN THE
+    // LAYOUT LAMBDA of the road pill only, so a report re-lays-out one Surface rather than
+    // recomposing this screen (review 2026-09-06). Cleared when a drive ends.
+    val puckScreen = remember { PuckScreen() }
+    LaunchedEffect(state.navigating) { if (!state.navigating) puckScreen.set(null) }
+    // The endpoints card's bottom edge, so the notification column can sit under it in
+    // directions mode instead of printing over it (user 2026-07-13).
+    var topCardBottomPx by remember { mutableStateOf(0) }
+    // In-nav search-along-route: the map search FAB arms a panel (text field + chips) above
+    // the bar. Reset when nav ends so a stale-open panel can't greet the next drive.
+    var navSearchOpen by remember { mutableStateOf(false) }
+    // Issue #629: the saved place whose own map icon is being picked.
+    var iconPickFor by remember { mutableStateOf<app.vela.core.model.Place?>(null) }
+    iconPickFor?.let { p ->
+        val list = vm.listsContaining(p).firstOrNull()
+        PlaceIconDialog(
+            placeName = p.name,
+            initial = vm.placeIcon(p) ?: list?.icon,
+            color = list?.color ?: 0xFF1A73E8,
+            onSave = { vm.setPlaceIcon(p, it); iconPickFor = null },
+            onDismiss = { iconPickFor = null },
+        )
+    }
+    // Ending a drive. Back (a swipe from the edge, easy to make by accident) always asks first; the
+    // red X ends it straight away unless Settings > Navigation asks for a confirm there too
+    // (NavEndConfirm, off by default, issue #624).
+    var confirmEndNav by remember { mutableStateOf(false) }
+    val requestEndNav: () -> Unit = { if (app.vela.ui.NavEndConfirm.on.value) confirmEndNav = true else vm.stopNav() }
+    if (confirmEndNav && state.navigating) {
+        app.vela.ui.VelaDialog(
+            onDismissRequest = { confirmEndNav = false },
+            title = stringResource(R.string.nav_end_confirm_title),
+            confirmText = stringResource(R.string.nav_end_confirm_end),
+            onConfirm = { confirmEndNav = false; vm.stopNav() },
+            dismissText = stringResource(R.string.nav_end_confirm_keep),
+            onDismiss = { confirmEndNav = false },
+            text = { Text(stringResource(R.string.nav_end_confirm_body)) },
+        )
+    }
+    var navSearchQuery by remember { mutableStateOf("") }
+    LaunchedEffect(state.navigating) {
+        // (The End prompt too: left up when a drive ended by itself, it opened on the next drive.)
+        if (!state.navigating) { navSearchOpen = false; navSearchQuery = ""; confirmEndNav = false }
+    }
+    // Measured height of the nav BOTTOM bar (ETA + End) → everything stacked above it (speedometer,
+    // speed-limit sign, re-center FAB, GPS-lost chip) offsets from the REAL height instead of a fixed
+    // 132dp guess. The bar grows with the system font size, and at a larger font scale the fixed offset
+    // left the speedo half-covered by the bar (GitHub issue #2). Falls back to the old constant until
+    // the first layout pass measures it.
+    var navBarHeightPx by remember { mutableStateOf(0) }
+    var navBarTopPx by remember { mutableStateOf(0f) } // the bar's top edge in window px; passed street bubbles fade out above it
+    // The step sheet is the nav bar with its list well open: a committing drag hands over the
+    // lift (how far the well is already open) and the sheet grows the rest of the way; closing
+    // shrinks the well to nothing before the bar takes over again.
+    var stepsEnterFromPx by remember { mutableStateOf(0f) }
+    var stepsCloseTick by remember { mutableStateOf(0) }
+    // The list may grow until the sheet's top sits just under the turn banner: the screen
+    // minus the banner's measured bottom, the bar's margins and the header row (~110dp).
+    val stepsListMax = with(LocalDensity.current) {
+        val bannerBottom = if (navBannerBottomPx > 0) navBannerBottomPx.toDp() else 140.dp
+        // A landscape phone has no 200 dp to give: there the floor let the list run up over the banner.
+        val cfg = LocalConfiguration.current
+        (cfg.screenHeightDp.dp - bannerBottom - 150.dp).coerceAtLeast(if (cfg.screenWidthDp > cfg.screenHeightDp) 64.dp else 200.dp)
+    }
+    val navBarClearance = with(LocalDensity.current) {
+        // bar height + its 16dp bottom padding + a 16dp gap — reproduces the old 132dp at default font scale
+        if (navBarHeightPx > 0) navBarHeightPx.toDp() + 32.dp else 132.dp
+    }
+    val focusManager = LocalFocusManager.current
+
+    // Back peels one layer at a time — steps → navigation → route preview →
+    // place sheet → results list — so it behaves like Google Maps instead of
+    // dropping straight out of the app. Only the bare map (or collapsed pins,
+    // which a back already peeled down to) lets the system handle back and exit.
+    // ONE back handler (docs/dpad.md): folding the D-pad "disengage map" case in here
+    // (rather than a second BackHandler) keeps a single, well-ordered precedence — a
+    // separate handler would win by registration order and could swallow BACK while the
+    // search overlay is up over an engaged map. Order: cancel map-pick → disengage map →
+    // close search → peel nav/route/place/results.
+    BackHandler(
+        enabled = mapEngaged || searchOpen || state.showSteps || state.navigating || state.transitNav != null || state.areaPicking ||
+            state.directionsOpen || state.activeRoute != null || state.routes.isNotEmpty() ||
+            state.selected != null || state.drawing != null ||
+            state.results.isNotEmpty(),
+    ) {
+        when {
+            state.areaPicking -> vm.cancelAreaPick()
+            // Drawing: BACK takes the last point off, then leaves drawing.
+            state.drawing != null && !searchOpen && state.selected == null -> if (state.drawing!!.pts.isEmpty()) vm.cancelDrawing() else vm.drawUndo()
+            state.transitNav != null -> vm.endTransitNav()
+            state.pickOnMap != null -> vm.cancelChooseOnMap()
+            altsOpen && state.directionsOpen && !searchOpen && !state.navigating && !state.showSteps && !state.editingStops -> altsOpen = false
+            // Disengage map control only when nothing more prominent is open (a sheet /
+            // search / route sitting on top should peel first).
+            mapEngaged && !searchOpen && !state.showSteps && !state.navigating &&
+                !state.directionsOpen && state.activeRoute == null && state.routes.isEmpty() &&
+                state.selected == null &&
+                (state.results.isEmpty() || state.resultsCollapsed) -> mapEngaged = false
+            searchOpen -> { searchExpanded = false; focusManager.clearFocus(); vm.cancelPickOrigin(); vm.cancelPickDestination(); vm.cancelPickStop() }
+            state.editingStops -> vm.closeStopsEditor()
+            // During nav the sheet animates back into the bar first (StepsSheet closeTick).
+            state.showSteps -> if (state.navigating) stepsCloseTick++ else vm.closeSteps()
+            // In-nav search: BACK peels the results list / the chip row before it can end the
+            // whole drive - ending nav because you browsed gas stations would be brutal.
+            state.navigating && state.results.isNotEmpty() -> vm.clearSearch()
+            state.navigating && navSearchOpen -> { navSearchOpen = false; focusManager.clearFocus() }
+            state.navigating -> confirmEndNav = true
+            state.directionsOpen || state.activeRoute != null || state.routes.isNotEmpty() ||
+                state.transit.isNotEmpty() || state.transitLoading -> vm.clearRoute()
+            state.selected != null -> vm.clearSelection()
+            // Results sheet: BACK exits the search outright - the drag gestures, the handle and
+            // the X already cover stepping between sizes, so back-stepping detents just made
+            // leaving take three presses (user 2026-07-11).
+            else -> { resultsExpanded = false; vm.clearSearch() }
+        }
+    }
+    // The map target is the focus surface ONLY when the map is primary — hidden while any
+    // list/sheet/panel/search owns the screen (those own focus; a crosshair over them stole
+    // DOWN traversal into their rows). Nav keeps the map primary (the banner is an overlay).
+    // EXCEPTION: "Choose on map" (pickOnMap) — the crosshair pick REQUIRES the map be
+    // pannable (arrows) so the user can position the pin, so the map target stays active even
+    // though directionsOpen is still true underneath (measured: without this, arrows only
+    // moved focus to the cancel X and the pin couldn't be moved). OK then confirms the pick.
+    val mapTargetHidden = gates.mapTargetHidden
+    // Reset engagement the moment a panel takes over (the target unmounts under it).
+    LaunchedEffect(mapTargetHidden) { if (mapTargetHidden) mapEngaged = false }
+    // D-pad-first, the bare map (docs/dpad.md): the map does NOT auto-focus or auto-engage on open.
+    // The user asked for the search bar to be the landing focus, not the engaged map (which used to
+    // force a BACK press to move). Compose won't let us programmatically pre-place focus on the
+    // SEARCH BAR on the app's opening screen (verified ~13 ways: requestFocus no-ops with no prior
+    // focus; moveFocus lands only on the center map target; moveFocus(Up)/Enter and synthetic
+    // KeyEvents don't take), so instead nothing is focused on open and the user's first arrow
+    // lands on the search bar — Compose's real-first-key initial focus picks the first focusable,
+    // which IS the search bar (measured). Net: no map engage, no BACK, one arrow reaches search.
+    // This is the ONE screen that intentionally opens un-focused (the map is ambient; the first key
+    // isn't wasted — it goes straight to search). (Was: auto-engage the map — user report 2026-07-08.)
+    // Choose-on-map (pickOnMap) is the EXCEPTION to the exception: there the whole task IS moving the
+    // map to place a pin, so we DO auto-focus + engage the map target the moment pick mode opens, so
+    // arrows pan immediately and OK confirms (the crosshair/pill are suppressed in pick mode because
+    // the ChooseOnMapOverlay draws the pin + "Move the map" banner). This is entered mid-session (from
+    // the search entry), so focus already exists and requestFocus lands — unlike the cold-open bare map.
+    val pickingOnMap = state.pickOnMap != null
+    LaunchedEffect(pickingOnMap, dpadFirst) {
+        if (dpadFirst && pickingOnMap) {
+            repeat(20) {
+                if (runCatching { mapFocusRequester.requestFocus() }.isSuccess) { mapEngaged = true; return@LaunchedEffect }
+                kotlinx.coroutines.delay(50)
+            }
+        }
+    }
+
+    // When the request comes back fully denied (including Android's instant deny after a permanent
+    // "don't ask again"), the locate button used to just do nothing. Explain and point at settings.
+    var showLocationOff by remember { mutableStateOf(false) }
+    // A coarse-only grant looks broken later (a wide circle for a dot, navigation that can't start),
+    // so the locate button's re-ask explains it ONCE when it happens; "Allow precise" re-runs the
+    // request, which Android shows as its approximate-to-precise choice.
+    var showApproxNotice by remember { mutableStateOf(false) }
+    var approxNoticed by remember { mutableStateOf(false) }
+    val permLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { result ->
+        val fineNow = result[Manifest.permission.ACCESS_FINE_LOCATION] == true
+        val coarseNow = result[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (fineNow || coarseNow) vm.startLocation() else showLocationOff = true
+        if (!fineNow && coarseNow && !approxNoticed) {
+            approxNoticed = true
+            showApproxNotice = true
+        }
+    }
+    // Only START location if it's already granted. The raw system dialog is NOT fired here anymore:
+    // the onboarding rationale (VelaRoot) owns the first ask so it comes with an explanation, and the
+    // locate FAB (below) re-asks for anyone who declined. Firing it unconditionally here was the
+    // "permission pops the instant the map loads, no context" problem.
+    fun hasLocation() = ContextCompat.checkSelfPermission(
+        context, Manifest.permission.ACCESS_FINE_LOCATION,
+    ) == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
+        context, Manifest.permission.ACCESS_COARSE_LOCATION,
+    ) == PackageManager.PERMISSION_GRANTED
+    LaunchedEffect(Unit) {
+        if (hasLocation()) vm.startLocation()
+    }
+    // Voice search has TWO paths (see VoiceSearch): tier-1 records + transcribes on-device with Vela's
+    // own Whisper model (needs RECORD_AUDIO, asked at point of use); tier-2 hands off to an installed
+    // voice-input app via the RECOGNIZE_SPEECH intent (that app records, so no mic permission). Which
+    // runs is the engine pref, resolved against what's actually available; NONE hides the mic.
+    val voiceLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val heard = result.data
+                ?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
+                ?.firstOrNull()
+                // Providers write prose too ("Okay."): strip the trailing sentence punctuation the
+                // same way the on-device path does, so no voice query searches with a period.
+                ?.trim()?.trimEnd('.', '!', '?', ',', ';', ':')?.trim()
+            if (!heard.isNullOrEmpty()) {
+                focusManager.clearFocus()
+                vm.fillQuery(heard)
+                vm.search()
+            }
+        }
+    }
+    // Tier-1 capture state: the listening dialog, live loudness, an early-stop flag (Done) and an
+    // abort flag (Back/cancel → don't apply the partial transcript).
+    val voiceScope = rememberCoroutineScope()
+    var voiceListening by remember { mutableStateOf(false) }
+    var voiceStarted by remember { mutableStateOf(false) }
+    var voiceLevel by remember { mutableStateOf(0f) }
+    var voiceStop by remember { mutableStateOf(false) }
+    var voiceAbort by remember { mutableStateOf(false) }
+    // Non-null while a voice failure is being explained. Before this existed every failure closed
+    // the listening sheet and said nothing (the fork's issue #81; ported 2026-07-23).
+    var voiceError by remember { mutableStateOf<app.vela.voice.VoiceResult.Reason?>(null) }
+    fun startLocalVoice() {
+        voiceStop = false; voiceAbort = false; voiceStarted = false; voiceLevel = 0f; voiceListening = true
+        voiceScope.launch {
+            val result = vm.voiceListen(
+                onLevel = { voiceLevel = it },
+                onListening = { voiceStarted = true },
+                canceled = { voiceStop },
+            )
+            voiceListening = false
+            if (voiceAbort) return@launch // the user backed out; never talk back at them
+            when (result) {
+                is app.vela.voice.VoiceResult.Text -> {
+                    focusManager.clearFocus()
+                    vm.applyVoiceQuery(result.query)
+                }
+                // Heard nothing: the sheet closing IS the feedback. An error here would scold
+                // someone who simply changed their mind.
+                app.vela.voice.VoiceResult.NoSpeech -> Unit
+                // Anything else used to close the sheet silently and identically - the user could
+                // not tell a missing model from a mic this phone would not open, and neither could we.
+                is app.vela.voice.VoiceResult.Failed -> voiceError = result.reason
+            }
+        }
+    }
+    val recordAudioLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        // A DENIED prompt used to do nothing whatsoever - the same dead silence, and the likeliest
+        // shape of it on a locked-down ROM that answers the prompt on the user's behalf.
+        if (granted) startLocalVoice() else voiceError = app.vela.voice.VoiceResult.Reason.PERMISSION
+    }
+    voiceError?.let { reason ->
+        // One dialog, the real reason, and a route to the fix. VelaDialog is already D-pad-correct.
+        app.vela.ui.VelaDialog(
+            onDismissRequest = { voiceError = null },
+            title = stringResource(R.string.voice_error_title),
+            // "Try again" is the confirm because most of these are transient (a mic another app was
+            // holding, a recording that dropped); the message names the Settings route for the two
+            // that are not. Dismiss auto-focuses, so one OK just closes.
+            confirmText = stringResource(R.string.voice_error_retry),
+            onConfirm = {
+                voiceError = null
+                if (vm.voiceMicGranted()) startLocalVoice()
+                else recordAudioLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+            },
+            dismissText = stringResource(R.string.mapscreen_got_it),
+            onDismiss = { voiceError = null },
+            text = {
+                Text(
+                    stringResource(
+                        when (reason) {
+                            app.vela.voice.VoiceResult.Reason.MODEL -> R.string.voice_error_model
+                            app.vela.voice.VoiceResult.Reason.PERMISSION -> R.string.voice_error_permission
+                            app.vela.voice.VoiceResult.Reason.VAD -> R.string.voice_error_vad
+                            app.vela.voice.VoiceResult.Reason.AUDIO_INIT -> R.string.voice_error_audio
+                            app.vela.voice.VoiceResult.Reason.RECORDING -> R.string.voice_error_recording
+                        },
+                    ),
+                )
+            },
+        )
+    }
+
+    val voiceProviderAvailable = remember { app.vela.ui.VoiceSearch.hasProvider(context) }
+    val voicePrompt = stringResource(R.string.search_voice_prompt)
+    // Reactive resolve (mirrors VoiceSearch.resolvedMode but keyed on vm state so the mic reflects a
+    // just-downloaded model without a relaunch): enabled/engine are mutableState, local rides state.
+    val micMode = when {
+        !app.vela.ui.VoiceSearch.enabled.value -> app.vela.ui.VoiceSearch.Mode.NONE
+        app.vela.ui.VoiceSearch.engine.value == app.vela.ui.VoiceSearch.Engine.LOCAL ->
+            if (state.asrInstalledIds.isNotEmpty()) app.vela.ui.VoiceSearch.Mode.LOCAL else app.vela.ui.VoiceSearch.Mode.NONE
+        app.vela.ui.VoiceSearch.engine.value == app.vela.ui.VoiceSearch.Engine.SYSTEM ->
+            if (voiceProviderAvailable) app.vela.ui.VoiceSearch.Mode.SYSTEM else app.vela.ui.VoiceSearch.Mode.NONE
+        state.asrInstalledIds.isNotEmpty() -> app.vela.ui.VoiceSearch.Mode.LOCAL       // Auto: on-device wins
+        voiceProviderAvailable -> app.vela.ui.VoiceSearch.Mode.SYSTEM
+        else -> app.vela.ui.VoiceSearch.Mode.NONE
+    }
+    // With nothing installed the mic still shows (when the toggle is on) and tapping it OFFERS the
+    // Vela voice download - a hidden mic made the whole feature undiscoverable on a fresh install.
+    var showAsrOffer by remember { mutableStateOf(false) }
+    val onMic: (() -> Unit)? = if (app.vela.ui.VoiceSearch.enabled.value) {
+        {
+            when (micMode) {
+                app.vela.ui.VoiceSearch.Mode.NONE -> showAsrOffer = true
+                app.vela.ui.VoiceSearch.Mode.SYSTEM -> {
+                    val intent = Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                        // Pin the voice app the user picked in Settings; with no pick, defer to
+                        // Android's own default app, and only pin the first installed one when
+                        // Android has no default either (else its chooser interrupts dictation).
+                        app.vela.ui.VoiceSearch.launchComponent(context)?.let { component = it }
+                        putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                        putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, app.vela.ui.AppLocale.effective().toLanguageTag())
+                        putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, voicePrompt)
+                    }
+                    // The resolver check can go stale (provider uninstalled since launch); catch so a
+                    // tap can never crash - it just does nothing.
+                    runCatching { voiceLauncher.launch(intent) }
+                }
+                app.vela.ui.VoiceSearch.Mode.LOCAL ->
+                    if (vm.voiceMicGranted()) startLocalVoice()
+                    else recordAudioLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+            }
+        }
+    } else {
+        null
+    }
+    // One-time routing offer for the home area (MapViewModel.maybeOfferRouting).
+    state.routingOffer?.let { region ->
+        val pack = state.poiPackRegions.firstOrNull { it.id == region.id }
+        app.vela.ui.VelaDialog(
+            onDismissRequest = { vm.answerRoutingOffer(false) },
+            title = stringResource(R.string.routing_offer_title, region.name),
+            confirmText = stringResource(R.string.routing_offer_download),
+            onConfirm = { vm.answerRoutingOffer(true) },
+            dismissText = stringResource(R.string.root_not_now),
+            onDismiss = { vm.answerRoutingOffer(false) },
+            dismissLowEmphasis = true,
+            text = {
+                Text(stringResource(R.string.routing_offer_body, app.vela.ui.settings.sections.fmtMb(app.vela.ui.settings.sections.regionInstalledMb(region, pack, state.regionExtrasMb[region.id] ?: 0))))
+            },
+        )
+    }
+    if (showAsrOffer) {
+        app.vela.ui.VelaDialog(
+            onDismissRequest = { showAsrOffer = false },
+            title = stringResource(R.string.map_asr_offer_title),
+            confirmText = stringResource(R.string.settings_voice_search_download, app.vela.voice.AsrEngine.DEFAULT.sizeMb),
+            onConfirm = { showAsrOffer = false; vm.downloadAsrModel() },
+            dismissText = stringResource(R.string.root_not_now),
+            onDismiss = { showAsrOffer = false },
+            dismissLowEmphasis = true,
+            text = { Text(stringResource(R.string.map_asr_offer_body)) },
+        )
+    }
+    // Reflect whether the on-device model is present, so the mic + Settings update without a relaunch.
+    LaunchedEffect(Unit) { vm.refreshAsr() }
+    // POI visibility prefs act immediately (clear + re-resolve), not on the next pan.
+    LaunchedEffect(
+        app.vela.ui.MapPoiPrefs.showPois.value,
+        app.vela.ui.MapPoiPrefs.showTransit.value,
+        app.vela.ui.MapPoiPrefs.showCivic.value,
+    ) { vm.onPoiPrefsChanged() }
+    if (voiceListening) {
+        app.vela.ui.VoiceCaptureDialog(
+            level = voiceLevel,
+            listening = voiceStarted,
+            onDone = { voiceStop = true },                    // stop early, keep + search what was heard
+            onCancel = { voiceAbort = true; voiceStop = true }, // Back/outside: abort, don't apply
+        )
+    }
+
+    // Tapping the locate button with no permission is an unambiguous "I want my location" - request
+    // it (no rationale screen needed, the tap IS the intent). Granted → normal recenter.
+    val onRecenter: () -> Unit = {
+        if (hasLocation()) {
+            followMe = true // re-arm free-drive follow: the locate tap means "track me again"
+            vm.recenter()
+        } else {
+            permLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                ),
+            )
+        }
+    }
+
+    val notifPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { vm.startNav() }
+    fun proceedStartNav() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                context, Manifest.permission.POST_NOTIFICATIONS,
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            vm.startNav()
+        }
+    }
+    fun fineGranted() = ContextCompat.checkSelfPermission(
+        context, Manifest.permission.ACCESS_FINE_LOCATION,
+    ) == PackageManager.PERMISSION_GRANTED
+    // Turn-by-turn follows you with GPS, which needs PRECISE location: coarse fixes are ~2 km and
+    // the nav engine (correctly) refuses them, so starting nav without precise just sat forever at
+    // "Searching for GPS" with no explanation. Gate the Start button on it instead - the request
+    // doubles as Android's approximate-to-precise upgrade dialog. Demo drive simulates and skips this.
+    var showPreciseNeeded by remember { mutableStateOf(false) }
+    val finePermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { result ->
+        if (result[Manifest.permission.ACCESS_FINE_LOCATION] == true) {
+            vm.startLocation()
+            proceedStartNav()
+        } else {
+            android.widget.Toast.makeText(context, context.getString(R.string.nav_precise_toast), android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+    val onStartNav: () -> Unit = {
+        if (!fineGranted() && !vm.demoDriveOn()) showPreciseNeeded = true else proceedStartNav()
+    }
+    // Name-this-drive prompt (opt-in, Settings > Diagnostics). Shown on the MAP right after a
+    // recorded drive ends, because that is when you remember what the drive was; a name applied
+    // later from the trips list is the same rename, just harder to recall.
+    state.tripToName?.let { justRecorded ->
+        var draft by remember(justRecorded.id) { mutableStateOf(justRecorded.label) }
+        app.vela.ui.VelaDialog(
+            onDismissRequest = { vm.dismissTripNaming() },
+            title = stringResource(R.string.trip_name_prompt_title),
+            confirmText = stringResource(R.string.trip_name_prompt_save),
+            onConfirm = {
+                val name = draft.trim()
+                // An empty box means "leave it alone", not "call it blank".
+                if (name.isNotEmpty()) vm.nameRecordedTrip(justRecorded.id, name) else vm.dismissTripNaming()
+            },
+            dismissText = stringResource(R.string.trip_name_prompt_skip),
+            onDismiss = { vm.dismissTripNaming() },
+        ) {
+            androidx.compose.material3.OutlinedTextField(
+                value = draft,
+                onValueChange = { draft = it },
+                singleLine = true,
+                label = { Text(stringResource(R.string.settings_trip_rename_hint)) },
+                modifier = Modifier.fillMaxWidth().dpadHighlight().dpadFieldEscape(),
+            )
+        }
+    }
+    // A downloaded update that would cost this phone its Android Auto listing (issue #179). The
+    // install source is what the head unit keys on and a self-install overwrites it, so the file
+    // is offered instead: installing it through AAEnabler or King Installer keeps the car.
+    state.updateApkPending?.let {
+        app.vela.ui.VelaDialog(
+            onDismissRequest = { vm.dismissPendingUpdate() },
+            title = stringResource(R.string.update_car_title),
+            confirmText = stringResource(R.string.update_car_save),
+            onConfirm = { vm.sharePendingUpdate() },
+            dismissText = stringResource(R.string.update_car_anyway),
+            onDismiss = { vm.installPendingUpdate() },
+            dismissLowEmphasis = true,
+        ) {
+            Text(stringResource(R.string.update_car_body), style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+    // START from the place sheet (issue #272): the pill routes, and guidance begins the moment a
+    // route exists. It goes through onStartNav, NOT straight to the ViewModel, so the precise-
+    // location and notification gates still get their say - a one-tap Start must not be a way to
+    // skip the permission prompts that the picker's Start button honors. Consumed once, so a
+    // later refetch (mode change, added stop) cannot silently launch a drive.
+    LaunchedEffect(state.activeRoute, state.navigating) {
+        // The route's follow-up work (road features along it, the camera count and detours) runs
+        // on the CPU right after the route lands; starting the fly-in on top of it dropped the map
+        // to 5-7 fps on a 4a. From the chooser it has long finished by the time Start is tapped.
+        // The flag is taken after the wait: the wait can end this effect, because the work it
+        // waits for changes the route (a saved route, a camera re-rank, the naming), and a start
+        // taken before it was then lost.
+        if (state.activeRoute != null && !state.navigating && vm.autoStartPending()) { vm.awaitRouteWork(); if (vm.consumeAutoStart()) onStartNav() }
+    }
+    if (showPreciseNeeded) {
+        app.vela.ui.VelaDialog(
+            onDismissRequest = { showPreciseNeeded = false },
+            title = stringResource(R.string.nav_precise_title),
+            confirmText = stringResource(R.string.nav_precise_allow),
+            onConfirm = {
+                showPreciseNeeded = false
+                finePermLauncher.launch(
+                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+                )
+            },
+            dismissText = stringResource(R.string.root_not_now),
+            onDismiss = { showPreciseNeeded = false },
+            dismissLowEmphasis = true,
+            text = { Text(stringResource(R.string.nav_precise_body)) },
+        )
+    }
+    if (showLocationOff) {
+        app.vela.ui.VelaDialog(
+            onDismissRequest = { showLocationOff = false },
+            title = stringResource(R.string.loc_off_title),
+            confirmText = stringResource(R.string.loc_off_settings),
+            onConfirm = {
+                showLocationOff = false
+                runCatching {
+                    context.startActivity(
+                        Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = android.net.Uri.fromParts("package", context.packageName, null)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        },
+                    )
+                }
+            },
+            dismissText = stringResource(R.string.root_not_now),
+            onDismiss = { showLocationOff = false },
+            dismissLowEmphasis = true,
+            text = { Text(stringResource(R.string.loc_off_body)) },
+        )
+    }
+    if (showApproxNotice) {
+        app.vela.ui.VelaDialog(
+            onDismissRequest = { showApproxNotice = false },
+            title = stringResource(R.string.loc_approx_title),
+            confirmText = stringResource(R.string.loc_approx_allow),
+            onConfirm = {
+                showApproxNotice = false
+                permLauncher.launch(
+                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+                )
+            },
+            dismissText = stringResource(R.string.loc_approx_keep),
+            onDismiss = { showApproxNotice = false },
+            dismissLowEmphasis = true,
+            text = { Text(stringResource(R.string.loc_approx_body)) },
+        )
+    }
+
+    // Toggling the Flock layer in Settings refetches for the current view right away (otherwise the
+    // cameras wouldn't appear until the next pan). Clears the layer when turned off.
+    LaunchedEffect(app.vela.ui.Flock.on.value) { vm.refreshFlockNow() }
+    LaunchedEffect(app.vela.ui.SpeedCams.on.value) { vm.refreshSpeedCamsNow() }
+    Box(Modifier.fillMaxSize()) {
+        MapSurface(
+            state = state,
+            vm = vm,
+            hasMapTiler = hasMapTiler,
+            darkTheme = darkTheme,
+            amoled = amoled,
+            hasLocation = { hasLocation() },
+            altsOpen = altsOpen,
+            driveFollowing = driveFollowing,
+            speedOverlayArmed = speedOverlayArmed,
+            filteredResultIds = filteredResultIds,
+            cameraBottomInset = cameraBottomInset,
+            cameraLeftInset = cameraLeftInset,
+            topCardBottomPx = topCardBottomPx,
+            navBannerBottomPx = navBannerBottomPx,
+            navBarTopPx = navBarTopPx,
+            navOverviewTick = navOverviewTick,
+            navRecenterTick = navRecenterTick,
+            onNavRecenter = { vm.recenterNav(); navRecenterTick++ },
+            screenHeightPx = screenHeightPx,
+            svPose = svPose,
+            metersPerPixelState = metersPerPixelState,
+            puckScreen = puckScreen,
+            mapDpad = mapDpad,
+            onMapTap = {
+                // Tapping the map with the along-route panel up dismisses it, same as a pan
+                // ("tap off of it should close it", user 2026-07-14).
+                if (navSearchOpen) { navSearchOpen = false; focusManager.clearFocus() }
+            },
+            onUserPan = {
+                // Grabbing the map is an explicit "let me look around" - stop tracking until the
+                // locate tap re-arms it (Google drops follow the moment you pan). Not in
+                // picture-in-picture: nothing the user does to a PiP window is a pan, and the
+                // system's taps on it arrived here as one (2026-09-13).
+                if (app.vela.ui.PipMode.active.value) return@MapSurface
+                followMe = false
+                vm.onUserPanned() // and the first fix, if it has not landed yet, must not fly the camera
+                // Bump ticks, don't flip state here: each sheet GLIDES down first and only then
+                // flips its collapsed state, so the bar/card swap happens invisibly (flipping
+                // straight away unmounted the content mid-drop — the "pops down" report).
+                if (navSearchOpen) { navSearchOpen = false; focusManager.clearFocus() }
+                if (resultsShown) resultsPanTick++
+                if (state.selected != null && !searchOpen) sheetPanTick++
+                if (state.directionsOpen && !searchOpen) dirPanTick++
+            },
+            onOverlayState = { overlayDebugState = it },
+            onNavZoomOverride = { navZoomOverride = it },
+        )
+        // Picture-in-picture strips the UI to the bare map + the turn strip below: the whole
+        // chrome tree composes only when the window is a real screen (MainActivity flips the
+        // holder). One gate around everything after the map keeps the diff merge-friendly.
+        val pipUi = app.vela.ui.PipMode.active.value
+        if (!pipUi) {
+
+        // --- Debug badge (Settings → Developer → Building overlay debug) ---
+        // Canary aid: fill-buildings auto-suppression state at a glance + a UI-thread FPS readout.
+        // The FPS is the Compose/Choreographer frame rate (what the main thread achieves), so it
+        // drops exactly when panning janks - the number to watch while chasing map smoothness.
+        if (app.vela.ui.BuildingDebug.on.value) BuildingDebugBadge(overlayDebugState)
+
+        // --- D-pad map target (docs/dpad.md) -------------------------------
+        // TWO-STAGE so the chrome stays reachable (v1 trapped focus on the map):
+        //  · FOCUSED (ring + "OK" pill): a normal focus stop — arrows traverse to the
+        //    search bar / chips / zoom buttons / FABs like any other element; OK engages.
+        //  · ENGAGED (crosshair + edge ring): arrows pan, OK "taps" the crosshair (or
+        //    confirms a Choose-on-map pick), holding OK long-presses (pin / direct pick),
+        //    +/−/zoom keys zoom, BACK disengages (focus stays on the target).
+        // Shown only when the MAP is the primary surface — with a list/sheet/panel open the
+        // panel owns focus (a center crosshair + focus stop over the results list stole DOWN
+        // traversal into the rows). Closing a panel returns to the bare map un-engaged (the first
+        // arrow reaches the search bar); only Choose-on-map auto-engages the target (see above).
+        if (dpadMode && !mapTargetHidden) {
+            if (mapEngaged) {
+                // Screen-edge ring: unmistakable "the MAP has the keys now" signal.
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .border(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)),
+                )
+            }
+            val centerHeld = remember { booleanArrayOf(false) } // long-press fired for the held OK
+            Box(
+                Modifier
+                    .align(Alignment.Center)
+                    .size(140.dp)
+                    .focusRequester(mapFocusRequester)
+                    .onFocusChanged {
+                        mapFocused = it.isFocused
+                        if (!it.isFocused) mapEngaged = false
+                    }
+                    .onKeyEvent { ev ->
+                        if (!mapFocused) return@onKeyEvent false
+                        val isOk = ev.key == Key.DirectionCenter || ev.key == Key.Enter || ev.key == Key.NumPadEnter
+                        if (!mapEngaged) {
+                            // Plain focus stop: only OK does anything (engage); arrows fall
+                            // through to normal focus traversal so the chrome is reachable.
+                            return@onKeyEvent when {
+                                isOk && ev.type == KeyEventType.KeyDown -> true
+                                isOk && ev.type == KeyEventType.KeyUp -> { mapEngaged = true; true }
+                                else -> false
+                            }
+                        }
+                        val pan = 0.22f // fraction of the view per press; holds auto-repeat
+                        when (ev.type) {
+                            KeyEventType.KeyDown -> when (ev.key) {
+                                Key.DirectionUp -> { mapDpad.panBy(0f, -pan); true }
+                                Key.DirectionDown -> { mapDpad.panBy(0f, pan); true }
+                                Key.DirectionLeft -> { mapDpad.panBy(-pan, 0f); true }
+                                Key.DirectionRight -> { mapDpad.panBy(pan, 0f); true }
+                                Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                                    val n = ev.nativeKeyEvent
+                                    if (n.repeatCount == 0) {
+                                        centerHeld[0] = false
+                                    } else if (!centerHeld[0] && n.eventTime - n.downTime >= 500) {
+                                        centerHeld[0] = true
+                                        mapDpad.longPressAtCenter()
+                                    }
+                                    true
+                                }
+                                Key.ZoomIn, Key.Plus, Key.Equals -> { mapDpad.zoomBy(1.0); true }
+                                Key.ZoomOut, Key.Minus -> { mapDpad.zoomBy(-1.0); true }
+                                else -> false
+                            }
+                            KeyEventType.KeyUp -> when (ev.key) {
+                                Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight,
+                                Key.ZoomIn, Key.Plus, Key.Equals, Key.ZoomOut, Key.Minus,
+                                -> true
+                                Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                                    if (!centerHeld[0]) {
+                                        // In Choose-on-map mode OK = the crosshair confirm;
+                                        // otherwise it's a tap at the crosshair.
+                                        if (state.pickOnMap != null) vm.confirmMapPick() else mapDpad.selectAtCenter()
+                                    }
+                                    centerHeld[0] = false
+                                    true
+                                }
+                                else -> false
+                            }
+                            else -> false
+                        }
+                    }
+                    .focusable(),
+                contentAlignment = Alignment.Center,
+            ) {
+                when {
+                    // Crosshair only while the map is key-driven; Choose-on-map draws its own.
+                    mapEngaged && state.pickOnMap == null -> {
+                        val crossColor = MaterialTheme.colorScheme.primary
+                        Canvas(Modifier.size(36.dp)) {
+                            val cx = size.width / 2f
+                            val cy = size.height / 2f
+                            drawCircle(Color.White, radius = size.minDimension * 0.30f, style = Stroke(7f))
+                            drawCircle(crossColor, radius = size.minDimension * 0.30f, style = Stroke(3.5f))
+                            drawLine(crossColor, Offset(cx, 0f), Offset(cx, cy - 8f), 3.5f)
+                            drawLine(crossColor, Offset(cx, cy + 8f), Offset(cx, size.height), 3.5f)
+                            drawLine(crossColor, Offset(0f, cy), Offset(cx - 8f, cy), 3.5f)
+                            drawLine(crossColor, Offset(cx + 8f, cy), Offset(size.width, cy), 3.5f)
+                        }
+                    }
+                    // Focused but not engaged: a visible stop + how to enter map control.
+                    // In Choose-on-map mode draw NOTHING here — the ChooseOnMapOverlay
+                    // supplies the pin + "Move the map to set…" banner, and the target is
+                    // auto-engaged so arrows already pan; the "OK: move the map" pill would
+                    // be wrong there (OK confirms the pick, it doesn't enter map control).
+                    mapFocused && state.pickOnMap == null -> Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        shadowElevation = 4.dp,
+                        border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
+                    ) {
+                        Text(
+                            stringResource(R.string.mapscreen_dpad_engage),
+                            style = MaterialTheme.typography.labelLarge,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+            }
+        }
+
+        // --- top overlay: nav banner while navigating, else search ----------
+        // Route bar (issue #228): the road ahead as a strip down the LEFT edge, opposite the
+        // right-edge FAB stack so it competes with nothing. Portrait only and never in PiP - issue
+        // #297 is already about landscape being crowded, and adding a permanent strip there would
+        // make that worse rather than better.
+        state.routeBar?.let { bar ->
+            if (state.navigating && !landscapeChrome && !pipUi && !bar.isEmpty) {
+                app.vela.ui.nav.RouteBarStrip(
+                    model = bar,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 8.dp)
+                        .fillMaxHeight(0.46f),
+                )
+            }
+        }
+        // Current road, in a pill under the puck (issue #288) - Google's treatment. The road you
+        // are ON is the one entered by the last maneuver you passed, which is what the banner's
+        // shield already uses; prefer its ref ("US-23 S") and fall back to the street name.
+        // Hidden while previewing a step (previewing must not change where you "are"), in PiP,
+        // and until the ticker has reported a puck position.
+        val roadLabelMode = app.vela.ui.RoadLabel.mode.value
+        if (state.navigating && !pipUi && state.previewStepIndex == null && roadLabelMode != app.vela.ui.RoadLabel.OFF && roadLabelMode != app.vela.ui.RoadLabel.IN_BAR) {
+            val onRoad = navRoadLabel(state)
+            // Composition reads only "do we have a position"; the value itself is read in layout.
+            val havePuck = puckScreen.have.value
+            // It gives way while the camera is away from the car: above the bar the Re-center
+            // pill takes that strip, and under the arrow the reported car position stops moving
+            // with the map, so the label sat where the car had been.
+            val yields = state.navCameraDetached || navZoomOverride
+            if (onRoad != null && !yields && (havePuck || roadLabelMode == app.vela.ui.RoadLabel.BAR)) {
+                val uiLang = app.vela.ui.AppLocale.effective().language
+                val shownRoad =
+                    if (state.roadNameLatin.isEmpty()) onRoad
+                    else app.vela.core.voice.SpokenScript.forDisplay(onRoad, uiLang, state.roadNameLatin)
+                // Two placements: Google's fixed spot centered above the bottom bar (default: it
+                // can always be centered, whatever the name's length) or pinned under the arrow
+                // (issue #288's mockup; long names clamp to the screen edge there).
+                val abovePill = roadLabelMode == app.vela.ui.RoadLabel.BAR
+                Surface(
+                    shape = CircleShape,
+                    border = if (amoled) BorderStroke(1.dp, SheetPalette.BorderAmoled) else null,
+                    color = if (amoled) SheetPalette.Amoled else MaterialTheme.colorScheme.surface,
+                    shadowElevation = 3.dp,
+                    modifier = if (abovePill) Modifier
+                        .align(if (landscapeChrome) Alignment.BottomStart else Alignment.BottomCenter)
+                        // Landscape: beside the left column, past the speed box, on the bottom edge.
+                        // The column is too short to hold the banner, both pills and the bar.
+                        .then(if (landscapeChrome) Modifier.padding(start = sidePanelWidthDp + NAV_LAND_ROAD_START_DP) else Modifier)
+                        .navigationBarsPadding()
+                        .padding(bottom = if (landscapeChrome) 20.dp else with(LocalDensity.current) { navBarHeightPx.toDp() } + 16.dp + 10.dp)
+                        // Never reaches the speed readout (left) or the FAB column (right). The
+                        // room is MEASURED: the readout is wider with a limit sign in it than
+                        // the fixed 88 dp a side this used to allow, and a long name ran under
+                        // it (user 2026-10-02). Centered on the screen while that fits, else
+                        // centered in the gap.
+                        .then(
+                            if (landscapeChrome) Modifier.widthIn(max = 260.dp)
+                            else Modifier.layout { measurable, constraints ->
+                                val gap = 8.dp.roundToPx()
+                                val left = (if (speedBoxRightPx.intValue > 0) speedBoxRightPx.intValue else 0) + gap
+                                val right = (NAV_FAB_COLUMN_DP + 8.dp).roundToPx()
+                                val w = constraints.maxWidth
+                                val room = (w - left - right).coerceAtLeast(96.dp.roundToPx())
+                                val p = measurable.measure(constraints.copy(minWidth = 0, maxWidth = room))
+                                layout(p.width, p.height) {
+                                    val centered = (w - p.width) / 2
+                                    val x = centered.coerceIn(left, maxOf(left, w - right - p.width))
+                                    p.place(x - centered, 0)
+                                }
+                            },
+                        )
+                    else Modifier
+                        // Long names would otherwise run off the screen when the puck sits near an edge.
+                        .widthIn(max = 260.dp)
+                        // Centered under the puck, then CLAMPED into the viewport: measured so the
+                        // pill can be any width and still sit centered, offset below the puck glyph
+                        // rather than over it.
+                        .layout { measurable, constraints ->
+                            val placeable = measurable.measure(constraints)
+                            layout(placeable.width, placeable.height) {
+                                val at = puckScreen.at.value ?: Offset(constraints.maxWidth / 2f, 0f)
+                                val margin = 8.dp.roundToPx()
+                                // Clamped to the SCREEN, not to this slot: in landscape the slot is
+                                // the left column, and the label was pushed back into it, behind
+                                // the bar, while the car was out on the map.
+                                val origin = coordinates?.positionInWindow() ?: Offset.Zero
+                                val maxX = (windowWidthPx - placeable.width - margin).coerceAtLeast(margin)
+                                val top = (at.y + PUCK_LABEL_GAP_PX).roundToInt()
+                                // Beside the speed readout, never under it: with large text the
+                                // readout is wide and the car low enough that a long name slid
+                                // behind it. The pill gives up being centered on the car there.
+                                val speedTop = NavChromeEdges.speedTopPx
+                                val besideSpeed = speedBoxRightPx.intValue > 0 && speedTop > 0 && top + placeable.height > speedTop
+                                val minX = if (besideSpeed) minOf(speedBoxRightPx.intValue + margin, maxX) else margin
+                                placeable.place(
+                                    (at.x - placeable.width / 2f).roundToInt().coerceIn(minX, maxX) - origin.x.roundToInt(),
+                                    top - origin.y.roundToInt(),
+                                )
+                            }
+                        },
+                ) {
+                    RoadPillText(shownRoad)
+                }
+            }
+        }
+        NavigationChromeTransition(state) { state ->
+        if (state.navigating) {
+            NavTurnBanner(state, vm, landscapeChrome, sidePanelWidthDp) { navBannerBottomPx = it }
+        } else if (state.pickOnMap == null && state.transitNav == null && !state.areaPicking) {
+            // (Hidden during transit step-by-step guidance too — its bottom pane owns the screen
+            // with the map above it, and a floating search bar over the guided map read as
+            // browse-mode clutter once the pane stopped being full-screen, issue #232.)
+            // While the search box is focused the whole thing becomes a full-screen
+            // page (recent searches over an opaque background, like Google Maps);
+            // otherwise it's the floating bar over the map. Running a search clears
+            // focus, which drops back to the map + results-list + red pins.
+            Box(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .then(
+                        // Not while a search submitted during a stop or endpoint pick shows its
+                        // results: the entry page is gone then, and the full-size sheet gray sat
+                        // over the map as a black screen under the results (issue 737).
+                        if (searchOpen && !pickingResults) {
+                            // Same fixed sheet gray as the place sheet / results rows,
+                            // not the wallpaper-tinted Material surface (which read as a
+                            // slightly different shade).
+                            Modifier.fillMaxSize().background(SheetPalette.bg(darkTheme))
+                        } else {
+                            Modifier.fillMaxWidth()
+                        },
+                    ),
+            ) {
+                // Landscape: the open search page keeps clear of the camera cutout's strip, in line
+                // with the keyboard and the status bar, which the system already insets.
+                Column(
+                    Modifier.statusBarsPadding()
+                        .then(if (searchOpen && landscapeChrome) Modifier.windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Start)) else Modifier)
+                        .padding(12.dp),
+                ) {
+                    // Landscape bare-map chrome collapses to one line (bar | chips) below. NB the
+                    // condition must NOT include !searchOpen: focusing the bar flips searchOpen,
+                    // and if that moved the SearchBar to a different subtree the remount blurred
+                    // the field, which flipped searchOpen right back - the search page could
+                    // never open. Instead the Row stays and only the MODIFIERS change (bar grows
+                    // full width, chips drop out after it), so the field node never moves.
+                    val landscapeOneLine = landscapeChrome && state.selected == null &&
+                        state.results.isEmpty() && !state.directionsOpen
+                    // Directions mode: the search bar swaps for the Google-style endpoints card
+                    // (origin / stops / destination, swap, back) — the rows that used to sit in
+                    // the bottom chooser. Hidden while the search overlay is up (picking an
+                    // origin/stop runs the normal search page) and while the steps preview or
+                    // stops editor own the screen.
+                    if (state.directionsOpen && !searchOpen && state.pickOnMap == null && !state.showSteps && !state.editingStops) {
+                        app.vela.ui.place.RouteTopCard(
+                            // Landscape: capped to the side-panel width and start-aligned, so the
+                            // card sits ABOVE the chooser in the left column instead of spanning
+                            // the screen (issue #297). Full width, the chooser panel covered its
+                            // left half and the visible remainder read as an empty dark slab
+                            // floating over the map.
+                            modifier = Modifier
+                                .then(
+                                    if (landscapeChrome) Modifier
+                                        .align(Alignment.Start)
+                                        .widthIn(max = sidePanelWidthDp)
+                                    else Modifier,
+                                )
+                                .onGloballyPositioned {
+                                topCardBottomPx = (it.positionInRoot().y + it.size.height).roundToInt()
+                            },
+                            originName = if (state.directionsReversed) (state.selected?.name ?: stringResource(R.string.mapscreen_place))
+                            else (state.directionsOrigin?.name ?: stringResource(R.string.mapscreen_your_location)),
+                            originIsMe = !state.directionsReversed && state.directionsOrigin == null,
+                            destinationName = if (state.directionsReversed) (state.directionsOrigin?.name ?: stringResource(R.string.mapscreen_your_location))
+                            else (state.selected?.name ?: stringResource(R.string.mapscreen_destination)),
+                            stops = state.directionsWaypoints.map { it.name },
+                            showStopControls = state.travelMode != app.vela.core.model.TravelMode.TRANSIT,
+                            // Both ends are editable now (issue #170): the your-location end keeps the
+                            // origin picker; the PLACE end swaps the destination in place, keeping the
+                            // origin and stops (backing out used to lose the custom origin).
+                            onEditOrigin = if (state.directionsReversed) vm::beginPickDestination else vm::beginPickOrigin,
+                            onEditDestination = if (state.directionsReversed) vm::beginPickOrigin else vm::beginPickDestination,
+                            onEditStops = vm::openStopsEditor,
+                            onAddStop = vm::openStopsEditor,
+                            onSwap = vm::swapDirections,
+                            onClose = vm::clearRoute,
+                            googleStyle = app.vela.ui.RoutePicker.googleStyle.value,
+                            onSaveRoute = if (state.activeRoute != null && state.travelMode != app.vela.core.model.TravelMode.TRANSIT) vm::saveActiveRoute else null,
+                            defaultRouteName = vm.defaultSavedRouteName(),
+                            editingRouteName = state.openSavedRouteId?.let { id -> state.savedRoutes.firstOrNull { it.id == id }?.name },
+                            onUpdateRoute = vm::updateOpenSavedRoute,
+                        )
+                    }
+                    // The bar hides while an expanded place sheet covers it: the visible sliver
+                    // still took taps and opened search OVER the card (user 2026-07-11) — and
+                    // while the endpoints card above replaces it in directions mode.
+                    val searchBar: @Composable () -> Unit = {
+                    SearchBar(
+                        query = state.query,
+                        searching = state.searching,
+                        onQueryChange = vm::onQueryChange,
+                        fillTick = state.queryEdits,
+                        onSearch = {
+                            focusManager.clearFocus()
+                            vm.search()
+                        },
+                        onOpenSettings = onOpenSettings,
+                        onClear = vm::clearSearch,
+                        onFocusChange = {
+                            searchFocused = it
+                            if (it) vm.warmAsrForSearch() // the speech model loads when you reach for search, not at launch
+                            // Focus opens the entry page; a touch blur closes it. Under
+                            // D-pad, blur must NOT close (focus walks the rows) — BACK /
+                            // a run search / a pick close it instead.
+                            if (it) searchExpanded = true else if (!dpadMode) searchExpanded = false
+                        },
+                        onBack = if (searchOpen) ({ searchExpanded = false; focusManager.clearFocus(); vm.cancelPickOrigin(); vm.cancelPickDestination(); vm.cancelPickStop() }) else null,
+                        offline = state.offline,
+                        onOfflineTap = vm::recheckConnectivity,
+                        dpadMode = dpadMode,
+                        onMic = onMic,
+                        // Your lists sits beside the gear now (issue #290). Bare map only: with a
+                        // place or results on screen the bar has other work to do.
+                        onOpenLists = if (state.selected == null && state.results.isEmpty()) {
+                            { listsSheetOpen = true }
+                        } else null,
+                    )
+                    }
+                    if (landscapeOneLine) {
+                        // Landscape browse chrome is ONE line, Google-style (user 2026-07-15):
+                        // the search bar takes half the width and the category chips scroll
+                        // beside it, so the top-right corner stack (layers button, compass)
+                        // starts a whole row higher on screens that are already short. With the
+                        // search page open the bar grows to full width IN PLACE (see the
+                        // landscapeOneLine note above - the field must not remount) and the
+                        // chips step aside; the entry page renders full-width below as usual.
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(if (searchOpen) Modifier.fillMaxWidth() else Modifier.weight(1f)) { searchBar() }
+                            if (!searchOpen) {
+                                Spacer(Modifier.width(10.dp))
+                                CategoryChips(
+                                    onPick = vm::quickSearch,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
+                    } else if (!(state.selected != null && placeSheetExpanded && !searchOpen && !landscapeChrome &&
+                        sheetEdge.above40.value) &&
+                        // Landscape: an open place panel takes the bar's place, as on Google's;
+                        // minimized, the bar is back.
+                        !(landscapeChrome && state.selected != null && !searchOpen && !sheetEdge.below55.value) &&
+                        // The results list does the same: pulled up, it ran over the bar.
+                        !(landscapeChrome && resultsShown && !searchOpen) &&
+                        !(state.directionsOpen && !searchOpen)
+                    ) {
+                        // The expanded-sheet hide is PORTRAIT-only AND measured (2026-07-23): a
+                        // short-content place (no photos, wrap-capped card) flips the LOGICAL
+                        // expanded flag on a pill swipe while the card never grows, and the bar
+                        // vanished for no visible reason (user report, "thought we killed this").
+                        // The 0.40-screen top test only hides the bar when the sheet actually
+                        // reaches up the screen (a real expanded sheet tops out near 0.08).
+                        // In landscape the sheet is the side panel, which caps BELOW the bar
+                        // (PlaceSheet's landscape detents), so the bar deliberately stays -
+                        // hiding it would strand the map strip with no
+                        // search while nothing actually covers the bar.
+                        searchBar()
+                    }
+                    when {
+                        // Show the entry page (Your location, Choose on map, Home/Work, saved, recents)
+                        // when the field is focused, when there are no results yet, OR while picking an
+                        // origin/stop with a blank query. That last case matters: tapping "From" when the
+                        // destination search still had results (plus a place selected) matched NO branch,
+                        // so the picker was BLANK and "Choose on map" was unreachable. Typing a query then
+                        // fills the entry page with suggestions as usual.
+                        searchOpen && (
+                            searchFocused || state.results.isEmpty() ||
+                                ((state.pickingOrigin || state.pickingDest || state.pickingStop) && state.query.isBlank())
+                            ) -> SearchEntryHost(state, vm, focusManager)
+
+                        // Results now live in a BOTTOM sheet (rendered with the other bottom
+                        // surfaces below, Google-style); the top bar keeps only the category
+                        // chips, and only on the bare map (in landscape they already rendered
+                        // beside the bar above).
+                        !landscapeOneLine && state.selected == null && state.results.isEmpty() -> CategoryChips(
+                            onPick = vm::quickSearch,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
+
+                    // Quiet offline marker: a small globe-with-a-slash chip tucked just under the category
+                    // chips, near the search box (pairs with the grayed "Offline" in the bar). Only on the
+                    // bare map — the same state the chips show in — so it never trails a results list.
+                    if (state.offline && !searchOpen && !state.navigating && !state.replaying &&
+                        state.selected == null && state.results.isEmpty()
+                    ) {
+                        Surface(
+                            onClick = vm::recheckConnectivity,
+                            color = SheetPalette.bg(darkTheme).copy(alpha = 0.82f),
+                            shape = CircleShape,
+                            shadowElevation = 2.dp,
+                            modifier = Modifier.padding(top = 8.dp, start = 2.dp).size(34.dp).dpadHighlight(CircleShape),
+                        ) {
+                            Icon(
+                                Sym.PublicOff,
+                                contentDescription = stringResource(R.string.search_offline_recheck),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(7.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        }
+
+        // (The faster-route offer renders in the stacked notification column below, so it can
+        // never sit under the turn card or on top of another card.)
+
+        // Right-edge nav FAB stack: volume + search live ON THE MAP (the bottom bar was
+        // cramming four controls - user 2026-07-14; Google floats these there too), with the
+        // re-center button joining the stack when panned away / previewing a step. Hidden
+        // while the along-route results own the bottom slot, and while the step list is open
+        // (the sheet reaches the turn banner; they would sit on top of it).
+        if (state.navigating && state.results.isEmpty() && !state.showSteps && !state.editingStops) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                // END, not centered: the hold control grows to the LEFT when its mute button slides
+                // out, and a centered column re-centers every sibling on the new width - so opening
+                // it slid the recenter, overview and search buttons sideways (user 2026-09-18).
+                // Pinned to the right edge they stay where they are; every other child is 56 dp
+                // wide, so nothing else changes. (Keeping the pop-out INSIDE the column's bounds
+                // matters as well: Compose does not hit-test a child drawn outside its parent.)
+                horizontalAlignment = Alignment.End,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    // Landscape: the bar is in the left column, so the buttons go to the bottom edge.
+                    .padding(end = NAV_FAB_EDGE_DP, bottom = if (landscapeChrome) 16.dp else navBarClearance)
+                    .popIn()
+                    .onGloballyPositioned { navFabTopPx.intValue = it.boundsInWindow().top.toInt() },
+            ) {
+                // Whole-route overview (Google's fly-over): camera only, the drive keeps
+                // navigating; Re-center (above, it appears the moment this detaches the
+                // camera) glides straight back into the follow.
+                // A second press while the overview shows goes back to the follow (issue #631: it
+                // re-ran the fit, which read as the map jerking and then settling again).
+                app.vela.ui.nav.NavFab(
+                    onClick = {
+                        if (state.inNavOverview) { vm.recenterNav(); navRecenterTick++ }
+                        else { vm.navOverview(); navOverviewTick++ }
+                    },
+                    modifier = Modifier.dpadHighlight(CircleShape),
+                ) {
+                    if (state.inNavOverview) Icon(Sym.ZoomInMap, contentDescription = stringResource(R.string.mapscreen_recenter))
+                    else Icon(Sym.ZoomOutMap, contentDescription = stringResource(R.string.nav_overview))
+                }
+                // With pause in the bar, this slot is plain mute: one button, one meaning, no
+                // pop-out to reach past. Otherwise the two hold controls share one button here
+                // (tap opens, second tap pauses, long press mutes).
+                if (navPauseInBar) {
+                    // The glyph is the state; a tap opens the three voice choices (issue 735).
+                    app.vela.ui.nav.NavVoiceButton(muted = state.voiceMuted, onVoice = vm::setVoiceMode)
+                } else {
+                    app.vela.ui.nav.NavHoldControls(
+                        paused = state.navPaused,
+                        muted = state.voiceMuted,
+                        onPause = vm::toggleNavPause,
+                        onVoice = vm::setVoiceMode,
+                    )
+                }
+                app.vela.ui.nav.NavFab(
+                    onClick = {
+                        // Three things have to line up for this panel to appear, and when it does
+                        // not the driver just sees a button that does nothing (user 2026-09-18).
+                        android.util.Log.d(
+                            "VelaNavSearch",
+                            "search FAB: opening=${!navSearchOpen} navigating=${state.navigating} " +
+                                "results=${state.results.size} steps=${state.showSteps} stops=${state.editingStops}",
+                        )
+                        navSearchOpen = !navSearchOpen
+                        if (!navSearchOpen) focusManager.clearFocus()
+                    },
+                    modifier = Modifier.dpadHighlight(CircleShape),
+                ) { Icon(Sym.Search, contentDescription = stringResource(R.string.place_search_along_route)) }
+            }
+        }
+
+        // "Searching for GPS" chip — the banner distance/ETA freeze silently on signal loss
+        // (tunnel, garage, Location toggled off); a confident-looking frozen arrow with no hint
+        // it's stale was the audit's "GPS loss is completely invisible" finding. The dot/puck
+        // already grays via the same flag.
+        if (state.navigating && (state.myLocationStale || state.navStarved)) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                shadowElevation = 4.dp,
+                // Pinned ABOVE the arrow (user 2026-09-18). The dot is the thing that has gone
+                // gray, so the message belongs on it rather than in a band at the bottom of the
+                // screen, where the mute pop-out and the speed widget were already sitting. The
+                // road-name pill takes the space under the arrow, so this one goes over it.
+                // Bottom center stays the fallback for the frames before a puck position exists
+                // (a detached camera, the first fix of a drive).
+                modifier = if (puckScreen.have.value) Modifier
+                    .widthIn(max = 260.dp)
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints)
+                        layout(placeable.width, placeable.height) {
+                            val at = puckScreen.at.value ?: Offset(constraints.maxWidth / 2f, 0f)
+                            val margin = 8.dp.roundToPx()
+                            val maxX = (constraints.maxWidth - placeable.width - margin)
+                                .coerceAtLeast(margin)
+                            placeable.place(
+                                (at.x - placeable.width / 2f).roundToInt().coerceIn(margin, maxX),
+                                (at.y - PUCK_LABEL_GAP_PX - placeable.height).roundToInt()
+                                    .coerceAtLeast(margin),
+                            )
+                        }
+                    }
+                else Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = navBarClearance + 68.dp, start = 90.dp, end = 90.dp),
+            ) {
+                Text(
+                    stringResource(R.string.nav_gps_lost),
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                )
+            }
+        }
+
+        // Unified speed readout (Google-style), bottom-left while MOVING - during nav AND during a
+        // free-drive (browsing without a route, moving on the clean map). Always shows the current
+        // speed; the posted limit (on-device graph maxspeed, else the streamed "Speed B" overlay)
+        // tucks into the SAME box when known, and it still reads clean as just a speed when no limit
+        // is available. Over the limit -> amber. In free-drive the scale bar hides (below) so the box
+        // owns the corner, like Google's driving view.
+        val movingFree = !state.navigating && (state.mySpeed ?: 0f) > 3f &&
+            !searchOpen && state.selected == null && !state.directionsOpen && !state.showSteps && !resultsShown
+        val postedLimitKmh = state.speedLimitKmh ?: state.speedLimitOverlayKmh
+        // Away from the car during a drive (panned, pinched, previewing a step): Google's labeled
+        // Re-center pill takes the speed box's corner until the camera is back.
+        val navAway = state.navigating && !state.showSteps && !state.editingStops && state.results.isEmpty() &&
+            (state.navCameraDetached || state.previewStepIndex != null || navZoomOverride)
+        NavCorner(state, navAway, movingFree, postedLimitKmh, landscapeChrome, navBarClearance, chromeLift, onRecenter = { vm.recenterNav(); navRecenterTick++ })
+
+        if (!state.navigating && state.showSearchThisArea && state.selected == null && !searchOpen && !resultsShown) {
+            ElevatedButton(
+                onClick = vm::searchThisArea,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    // Landscape with the results panel on the left: centered in the map beside it
+                    // (the start padding shifts the center), low, since nothing is under it there.
+                    .padding(
+                        start = if (landscapeChrome && state.results.isNotEmpty()) sidePanelWidthDp else 0.dp,
+                        bottom = if (landscapeChrome && state.results.isNotEmpty()) 24.dp else 24.dp + chromeLift,
+                    ),
+            ) {
+                Icon(Sym.Refresh, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                Text(stringResource(R.string.mapscreen_search_this_area))
+            }
+        }
+
+        // Resume-navigation prompt — a drive was cut off by a process-kill (GrapheneOS reaping the
+        // backgrounded nav process); offer to pick it back up (re-routes from the current fix).
+        if (state.resumeNavLabel != null && !state.navigating && state.selected == null && !searchOpen) {
+            val dark = isAppInDarkTheme()
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = SheetPalette.bg(dark),
+                contentColor = SheetPalette.ink(dark),
+                shadowElevation = 6.dp,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(16.dp)
+                    .fillMaxWidth(),
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(
+                        stringResource(
+                            R.string.mapscreen_resume_nav,
+                            state.resumeNavLabel!!.ifBlank { stringResource(R.string.mapscreen_your_destination) },
+                        ),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Row(Modifier.align(Alignment.End).padding(top = 8.dp)) {
+                        TextButton(onClick = vm::dismissResume) { Text(stringResource(R.string.mapscreen_dismiss)) }
+                        Spacer(Modifier.width(8.dp))
+                        Button(onClick = vm::resumeNav) { Text(stringResource(R.string.mapscreen_resume)) }
+                    }
+                }
+            }
+        }
+
+        // --- bottom overlay: arrival summary / nav controls / place sheet ---
+        val bottomFrame = BottomOverlayFrame(state, BottomOverlay.of(state, searchOpen, pickingResults, app.vela.ui.RoutePicker.googleStyle.value))
+        app.vela.ui.SheetTransition(
+            targetState = bottomFrame,
+            contentKey = { it.overlay },
+            animateContent = { it.overlay.slide },
+            animateChange = { from, to -> BottomOverlay.animateChange(from.overlay, to.overlay) },
+            onBack = if (state.areaPicking || state.pickOnMap != null || state.transitNav != null ||
+                searchOpen || app.vela.ui.place.RoutePanelState.minimized.value || (altsOpen && state.directionsOpen && !state.showSteps && !state.editingStops) ||
+                (mapEngaged && bottomFrame.overlay == BottomOverlay.RESULTS && state.resultsCollapsed)) null else when (bottomFrame.overlay) {
+                BottomOverlay.PLACE -> if (state.navigating) null else vm::clearSelection
+                BottomOverlay.DIRECTIONS, BottomOverlay.CLASSIC_DIRECTIONS -> vm::clearRoute
+                // In a drive the list folds back into the bar by its own animation (StepsSheet's Back).
+                BottomOverlay.STEPS -> if (state.navigating) null else vm::closeSteps
+                BottomOverlay.TRIP_EDITOR, BottomOverlay.NAV_STOPS -> vm::closeStopsEditor
+                BottomOverlay.NAV_STOP_OFFER -> vm::dismissNavTapStop
+                BottomOverlay.RESULTS -> ({ resultsExpanded = false; vm.clearSearch() })
+                else -> null
+            },
+        ) { frame ->
+        val state = frame.state
+        when (frame.overlay) {
+            BottomOverlay.ARRIVAL -> ArrivalSummary(
+                destinationLabel = state.arrivedLabel,
+                destinationAddress = state.navDestAddress,
+                tripSeconds = state.arrivedSeconds,
+                tripDistanceMeters = state.arrivedDistanceMeters,
+                onDone = vm::finishNav,
+                onSaveDriven = if (state.drivenRouteOffer != null) vm::saveDrivenRoute else null,
+                drivenDefaultName = vm.defaultDrivenRouteName(),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(16.dp),
+            )
+
+            // Mid-drive stops editor (issue #402): the chooser's editor over the ETA bar's slot,
+            // origin = where you are, rows = the stops still ahead; Done replans once. Its Add stop
+            // applies the edits and opens the along-route search (issue #623): the search page is
+            // not drawn during a drive, so the planning pick left the editor hidden and stuck.
+            BottomOverlay.NAV_STOPS -> app.vela.ui.place.StopsEditorSheet(
+                originName = stringResource(R.string.mapscreen_your_location),
+                originIsMe = true,
+                destinationName = state.arrivedLabel.ifBlank { stringResource(R.string.mapscreen_destination) },
+                stops = vm.navStopsForEditor(),
+                onApply = vm::applyStops,
+                onAddStop = { vm.closeStopsEditor(); navSearchOpen = true },
+                onDismiss = vm::closeStopsEditor,
+                modifier = Modifier
+                    .align(if (landscapeChrome) Alignment.BottomStart else Alignment.BottomCenter)
+                    .landscapeColumn(landscapeChrome, sidePanelWidthDp),
+            )
+
+            BottomOverlay.STEPS -> StepsSheet(
+                enterFromPx = if (state.navigating) stepsEnterFromPx else 0f,
+                closeTick = stepsCloseTick,
+                maxListHeight = if (state.navigating) stepsListMax else null,
+                stopsRow = if (state.navigating) {
+                    val labels = vm.navRemainingStopLabels()
+                    ({ app.vela.ui.nav.NavStopsRow(labels, onEdit = vm::openStopsEditor, onRemoveNext = vm::removeNextStop) })
+                } else null,
+                // During nav the sheet wears the bar's own top, so bar -> sheet -> bar is one
+                // surface changing height; the chevron points down and closes.
+                header = if (state.navigating) { close ->
+                    app.vela.ui.nav.NavBarTop(
+                        remainingDistanceMeters = state.nav.remainingDistance,
+                        remainingSeconds = state.nav.remainingDuration,
+                        offRoute = state.nav.offRoute,
+                        paused = state.navPaused,
+                        onStop = requestEndNav,
+                        onSteps = close,
+                        trafficRatio = state.activeRoute?.trafficRatio,
+                        showListButton = false,
+                        handleUp = false,
+                        roadName = barRoadName(state),
+                        // The sheet wears the bar's own top, so the control has to stay in the
+                        // same place when the list is open.
+                        onPause = if (navPauseInBar) vm::toggleNavPause else null,
+                    )
+                } else null,
+                maneuvers = state.activeRoute?.maneuvers ?: emptyList(),
+                // Issue #519: the maneuver index where each leg after the first starts, named after
+                // its stop (remaining stops while driving, the planned list otherwise).
+                legStarts = remember(state.activeRoute, state.navigating, state.directionsWaypoints, state.nav.stepIndex) {
+                    val r = state.activeRoute
+                    val stops = if (state.navigating) vm.navRemainingStops().map { it.location to it.label } else state.directionsWaypoints.map { it.location to it.name }
+                    if (r == null || stops.isEmpty()) emptyList() else app.vela.core.nav.RouteStops.legStarts(r, stops)
+                },
+                etaSeconds = state.activeRoute?.let { it.durationInTrafficSeconds ?: it.durationSeconds } ?: 0.0,
+                distanceMeters = state.activeRoute?.distanceMeters ?: 0.0,
+                hasLiveTraffic = state.activeRoute?.hasLiveTraffic ?: false,
+                previewIndex = state.previewStepIndex,
+                currentStep = if (state.navigating) state.nav.stepIndex else null,
+                onStep = vm::previewStep,
+                onClose = vm::closeSteps,
+                roadLatin = state.roadNameLatin,
+                uiLang = app.vela.ui.AppLocale.effective().language,
+                // Arrive-row destination lines: the live nav state while navigating; pre-nav (the
+                // Steps preview from the directions panel) the selected place, unless the trip is
+                // reversed (the destination is you, so a place line would be wrong).
+                destName = when {
+                    state.navigating -> state.arrivedLabel
+                    !state.directionsReversed -> state.selected?.name
+                    else -> null
+                },
+                destAddress = when {
+                    state.navigating -> state.navDestAddress
+                    !state.directionsReversed -> state.selected?.address
+                    else -> null
+                },
+                // Background fills to the bottom; StepsSheet pads its own content. During nav it
+                // takes the bar's exact margins (floating pill, left column in landscape).
+                modifier = if (state.navigating) Modifier
+                    .align(if (landscapeChrome) Alignment.BottomStart else Alignment.BottomCenter)
+                    .landscapeColumn(landscapeChrome, sidePanelWidthDp)
+                    .navBarHost(landscapeChrome)
+                else Modifier.align(Alignment.BottomCenter),
+            )
+
+            // Tap-to-stop (Settings > Navigation): the tapped place is OFFERED here, above the
+            // nav bar, and only the button adds it. Nothing else about the drive changes until then.
+            BottomOverlay.NAV_STOP_OFFER -> {
+                val cand = state.navTapCandidate!!
+                val ahead = remember(cand, state.activeRoute, state.nav.traveledM) {
+                    val poly = state.activeRoute?.polyline.orEmpty()
+                    if (poly.size < 2) null else {
+                        val cum = app.vela.core.nav.RouteProjection.cumulative(poly)
+                        app.vela.core.nav.RouteProjection.alongMeters(poly, cum, cand.location, 2_000.0)
+                            ?.minus(state.nav.traveledM)?.takeIf { it > 0 }
+                    }
+                }
+                app.vela.ui.nav.NavStopOffer(
+                    name = cand.name,
+                    meta = listOfNotNull(
+                        cand.category,
+                        ahead?.let { stringResource(R.string.nav_stop_offer_ahead, formatDistance(it)) },
+                        // What the stop costs, once the check lands. Absent means the check is
+                        // still out, or the two figures were too close to claim a detour.
+                        state.navTapDetourMin?.let {
+                            stringResource(R.string.nav_stop_offer_detour, formatDuration(it * 60.0))
+                        },
+                    ).joinToString(" · "),
+                    onAdd = vm::confirmNavTapStop,
+                    onDismiss = vm::dismissNavTapStop,
+                    onRemove = if (vm.navTapCandidateIsStop()) vm::removeNavTapStop else null,
+                    // Reaching the button takes more presses on a key-driven phone than a thumb
+                    // needs, so the offer waits longer there.
+                    autoDismissMs = if (dpadMode) 25_000L else 10_000L,
+                    offerKey = state.navTapOfferTick,
+                    modifier = Modifier
+                        .align(if (landscapeChrome) Alignment.BottomStart else Alignment.BottomCenter)
+                        .landscapeColumn(landscapeChrome, sidePanelWidthDp)
+                        .navBarHost(landscapeChrome),
+                )
+            }
+
+            // While an in-nav search has results, the results branch below takes the bottom
+            // slot (Google's in-nav list does the same); clearing it brings the bar back.
+            // Landscape: the ETA/End bar joins the turn card in the LEFT column instead of
+            // spanning the width (issue #297), so the map keeps the whole right side.
+            BottomOverlay.NAV_CONTROLS -> Column(
+                Modifier
+                    .align(if (landscapeChrome) Alignment.BottomStart else Alignment.BottomCenter)
+                    .landscapeColumn(landscapeChrome, sidePanelWidthDp)
+                    .navBarHost(landscapeChrome),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                NavControls(
+                    remainingDistanceMeters = state.nav.remainingDistance,
+                    remainingSeconds = state.nav.remainingDuration,
+                    offRoute = state.nav.offRoute && !state.navPaused,
+                    paused = state.navPaused,
+                    onStop = requestEndNav,
+                    onSteps = {
+                        // From the button / chevron: the well opens from closed.
+                        stepsEnterFromPx = 0f
+                        stepsCloseTick = 0
+                        vm.openSteps()
+                    },
+                    onStepsFromDrag = { liftPx ->
+                        stepsEnterFromPx = liftPx
+                        stepsCloseTick = 0
+                        vm.openSteps()
+                    },
+                    maxLift = stepsListMax,
+                    roadName = barRoadName(state),
+                    // The rows that show under the figures while the bar is pulled up: the same
+                    // StepRow the sheet draws, at the same padding, so nothing moves at the swap.
+                    // It starts at the current step (the sheet opens scrolled there), dividers included.
+                    preview = {
+                        val lat = state.roadNameLatin
+                        val lang = app.vela.ui.AppLocale.effective().language
+                        val stopLabels = vm.navRemainingStopLabels()
+                        app.vela.ui.nav.NavStepsPreview(
+                            maneuvers = state.activeRoute?.maneuvers ?: emptyList(),
+                            currentStep = state.nav.stepIndex,
+                            romanize = { s -> if (s.isEmpty() || lat.isEmpty()) s else app.vela.core.voice.SpokenScript.forDisplay(s, lang, lat) },
+                            destName = state.arrivedLabel,
+                            destAddress = state.navDestAddress,
+                            legStarts = remember(state.activeRoute, state.nav.stepIndex) {
+                                val r = state.activeRoute
+                                val stops = vm.navRemainingStops().map { it.location to it.label }
+                                if (r == null || stops.isEmpty()) emptyList() else app.vela.core.nav.RouteStops.legStarts(r, stops)
+                            },
+                            stopsRow = { app.vela.ui.nav.NavStopsRow(stopLabels, onEdit = vm::openStopsEditor, onRemoveNext = vm::removeNextStop) },
+                        )
+                    },
+                    trafficRatio = state.activeRoute?.trafficRatio,
+                    showListButton = navListButton,
+                    onPause = if (navPauseInBar) vm::toggleNavPause else null,
+                    // Measured AFTER the padding → the bar surface itself; navBarClearance adds the
+                    // padding + gap back. Everything stacked above the bar keys off this.
+                    modifier = Modifier.onGloballyPositioned {
+                        // Everything above the bar assumes a card floating 16dp over the system bar.
+                        // Flush on the bottom edge (portrait) the bar holds that space itself, so
+                        // it is taken back out here and the gaps above stay what they were.
+                        val inside =
+                            (androidx.core.view.ViewCompat.getRootWindowInsets(rootView)
+                                ?.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())?.bottom ?: 0) +
+                                (16 * rootView.resources.displayMetrics.density).toInt()
+                        navBarHeightPx = (it.size.height - inside).coerceAtLeast(1)
+                        navBarTopPx = it.boundsInWindow().top
+                        navBarRightPx.intValue = it.boundsInWindow().right.roundToInt()
+                    },
+                )
+            }
+
+            // The dedicated stops editor covers the directions panel while open (drag to
+            // reorder, remove, add; one reroute on Done).
+            // The FULL-TRIP editor for everyone (issue #516): every row, start and destination
+            // included, can be dragged or dropped. It used to sit behind the chooser experiment
+            // while the plain editor pinned both ends, which is the complaint in that issue.
+            BottomOverlay.TRIP_EDITOR ->
+                app.vela.ui.place.TripEditorSheet(
+                points = remember(state.selected, state.directionsOrigin, state.directionsReversed, state.directionsWaypoints) { vm.tripPointsForEditor() },
+                meLabel = stringResource(R.string.mapscreen_your_location),
+                onApply = vm::applyTrip,
+                onAddStop = vm::beginPickStopFromEditor,
+                onDismiss = vm::closeStopsEditor,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+
+            // Tapping "Directions" opens a dedicated panel (popup) — mode tabs, the
+            // route option(s) with traffic-aware ETAs, selectable alternates, Start —
+            // instead of burying it at the bottom of the place sheet.
+            // Hidden while the search overlay is up (e.g. picking a custom origin) so
+            // the panel doesn't render over it.
+            BottomOverlay.DIRECTIONS -> {
+                val shareCtx = LocalContext.current
+                val destLabel = if (state.directionsReversed) (state.directionsOrigin?.name ?: stringResource(R.string.mapscreen_your_location))
+                else (state.selected?.name ?: stringResource(R.string.mapscreen_destination))
+                val shareText = state.activeRoute?.let { r ->
+                    stringResource(R.string.exp_chooser_share_text, destLabel,
+                        app.vela.ui.formatDuration(r.durationInTrafficSeconds ?: r.durationSeconds), app.vela.ui.formatDistance(r.distanceMeters))
+                }
+                app.vela.ui.place.GoogleStyleDirectionsPanel(
+                    onShowTraffic = if (app.vela.ui.RouteTrafficOnTap.on.value && !state.routeTrafficRequested && !app.vela.ui.GoogleFree.on.value && state.travelMode != app.vela.core.model.TravelMode.WALK) vm::requestRouteTraffic else null,
+                    currentMode = state.travelMode,
+                    routes = state.routes,
+                    activeRoute = state.activeRoute,
+                    flockOnRoute = state.flockOnRoute,
+                    modeEtas = state.modeEtas,
+                    onModeSelected = vm::setTravelMode,
+                    avoidTolls = state.avoidTolls,
+                    avoidHighways = state.avoidHighways,
+                    avoidFerries = state.avoidFerries,
+                    onAvoidTolls = vm::setAvoidTolls,
+                    onAvoidHighways = vm::setAvoidHighways,
+                    onAvoidFerries = vm::setAvoidFerries,
+                    onStartNav = onStartNav,
+                    onSearchAlongRoute = vm::searchAlongRoute,
+                    onTimeSelected = vm::setDirectionsTime,
+                    onEditStops = vm::openStopsEditor,
+                    altsOpen = altsOpen,
+                    onAltsOpenChange = { altsOpen = it },
+                    onSelectRoute = vm::selectRoute,
+                    onShare = {
+                        val dest = state.selected
+                        val body = listOfNotNull(
+                            shareText,
+                            dest?.let { "geo:${it.location.lat},${it.location.lng}?q=${it.location.lat},${it.location.lng}(${android.net.Uri.encode(it.name)})" },
+                        ).joinToString("\n")
+                        runCatching {
+                            shareCtx.startActivity(
+                                android.content.Intent.createChooser(
+                                    android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, body),
+                                    null,
+                                ),
+                            )
+                        }
+                    },
+                    onClose = vm::clearRoute,
+                    onStep = vm::previewStep,
+                    destName = destLabel,
+                    destAddress = state.selected?.address,
+                    legStarts = remember(state.activeRoute, state.directionsWaypoints) {
+                        val r = state.activeRoute
+                        if (r == null || state.directionsWaypoints.isEmpty()) emptyList()
+                        else app.vela.core.nav.RouteStops.legStarts(r, state.directionsWaypoints.map { it.location to it.name })
+                    },
+                    minimizeTick = dirPanTick,
+                    onCollapsedChange = { dirMinimized = it },
+                    // LANDSCAPE gets the cap too (user 2026-09-17: the panel grew over the
+                    // endpoints card). The column is short there, so the panel must stop under the
+                    // card rather than assume it can take 58% of the screen.
+                    bodyMaxDp = with(LocalDensity.current) {
+                        val strip = if (landscapeChrome) CHOOSER_MAP_STRIP_LAND_DP else CHOOSER_MAP_STRIP_DP
+                        (screenHeightPx.toDp().value - topCardBottomPx.toDp().value - strip - CHOOSER_HEADER_DP)
+                            .coerceAtLeast(if (landscapeChrome) CHOOSER_BODY_MIN_LAND_DP else CHOOSER_BODY_MIN_DP)
+                    },
+                    compact = landscapeChrome,
+                    modifier = Modifier
+                        .align(if (landscapeChrome) Alignment.BottomStart else Alignment.BottomCenter)
+                        .onGloballyPositioned { dirPanelTopRaw = it.boundsInWindow().top.roundToInt() }
+                        // The WHOLE card is capped in landscape, header and buttons included: the
+                        // body cap alone still let the fixed chrome grow over the endpoints card.
+                        .then(
+                            if (!landscapeChrome) Modifier else Modifier.heightIn(
+                                max = with(LocalDensity.current) {
+                                    (screenHeightPx - topCardBottomPx).toDp() - CHOOSER_MAP_STRIP_LAND_DP.dp
+                                }.coerceAtLeast(CHOOSER_CARD_MIN_LAND_DP),
+                            ),
+                        )
+                        .landscapeColumn(landscapeChrome, sidePanelWidthDp),
+                )
+            }
+
+            // The classic panel (and the transit tab under the Google-style picker) lives in its own
+            // composable: MapScreen is at ART's verifier limit, and this call was ~30 arguments.
+            BottomOverlay.CLASSIC_DIRECTIONS -> ClassicDirectionsHost(
+                state = state,
+                vm = vm,
+                onStartNav = onStartNav,
+                dirPanTick = dirPanTick,
+                onMinimized = { dirMinimized = it },
+                // Portrait: the body may open only as far as the endpoints card leaves over a
+                // minimum strip of map (issue #400, 240x320 phones); the chooser's own header
+                // (handle + mode chips) is allowed for above the body. Floored so the list is
+                // never a sliver; a normal phone never hits this cap.
+                bodyMaxDp = if (landscapeChrome) null else with(LocalDensity.current) {
+                    (screenHeightPx.toDp().value - topCardBottomPx.toDp().value - CHOOSER_MAP_STRIP_DP - CHOOSER_HEADER_DP)
+                        .coerceAtLeast(CHOOSER_BODY_MIN_DP)
+                },
+                landscapeChrome = landscapeChrome,
+                sidePanelWidthDp = sidePanelWidthDp,
+                onTopPx = { dirPanelTopRaw = it },
+            )
+
+            // The place sheet yields while Street View is up - the pano takes the top half and the
+            // bottom half must stay pure map (the pose cone), not a sheet.
+            BottomOverlay.PLACE -> PlaceSheet(
+                place = state.selected!!,
+                resolving = state.tapResolvingFor != null && state.tapResolvingFor == state.selected?.id,
+                unlinked = state.tapUnlinkedFor != null && state.tapUnlinkedFor == state.selected?.id,
+                sheetKey = state.selected!!.id.let { id -> state.sheetAlias?.takeIf { it.first == id }?.second ?: id },
+                // Row-level Menu button (results list): open the sheet on its Menu tab.
+                initialTab = sheetMenuAsk?.takeIf { it == state.selected?.id }?.let { "Menu" },
+                onExpandedChange = { placeSheetExpanded = it },
+                isSaved = state.saved.any { it.id == state.selected!!.id },
+                reviews = state.reviews,
+                reviewsLoading = state.reviewsLoading,
+                reviewsFound = state.reviewsFound,
+                reviewsLimited = state.reviewsLimited,
+                onMoreReviews = if (state.reviewsNextToken != null) vm::loadMoreReviews else null,
+                reviewsMoreLoading = state.reviewsMoreLoading,
+                photosLoading = state.photosLoading,
+                morePhotos = state.morePhotosFor != null && state.morePhotosFor == state.selected?.featureId,
+                onMorePhotos = vm::loadAllPhotos,
+                onShowPhotos = if (state.photosAwaitingTapFor != null && state.photosAwaitingTapFor == state.selected?.featureId) vm::loadPhotosNow else null,
+                onPhotoCategories = if (state.selected?.photoCategories?.any { it != null } == true || state.photoWalkedFor == state.selected?.featureId) null else vm::loadPhotoCategories,
+                detailsLoading = state.loadingDetails,
+                placesHere = state.placesHere,
+                // Ownership-gated: a board renders ONLY on the place it was fetched for. Writers
+                // are guarded, but selection paths that skip the clear (saved/recent opens) let a
+                // previous stop's departures land on an unrelated place otherwise.
+                stopDepartures = state.stopDepartures
+                    ?.takeIf { state.stopDeparturesFor != null && state.stopDeparturesFor == state.selected?.id },
+                stopDeparturesLoading = state.stopDeparturesLoading &&
+                    state.stopDeparturesFor != null && state.stopDeparturesFor == state.selected?.id,
+                stopDeparturesCachedAt = state.stopDeparturesCachedAt?.takeIf { state.stopDeparturesFor == state.selected?.id },
+                onTapRoute = vm::openRouteDetail,
+                onClose = { sheetMenuAsk = null; vm.clearSelection() },
+                onToggleSave = vm::toggleSave,
+                onDirections = vm::routeToSelected,
+                onStartNavigation = { vm.startNavToSelected() },
+                onStreetView = { vm.openStreetView(state.selected!!) },
+                onOpenPlace = vm::selectPlace,
+                onOpenSimilar = vm::openSimilar,
+                onSetShortcut = vm::setSelectedAsShortcut,
+                onRetryReviews = vm::retryReviews,
+                onNeedReviews = vm::ensureReviews,
+                onShowReviews = if (state.reviewsAwaitingTapFor != null && state.reviewsAwaitingTapFor == state.selected?.id) vm::loadReviewsNow else null,
+                onClearParking = {
+                    vm.clearParkingSpot()
+                    vm.clearSelection()
+                    Toast.makeText(context, context.getString(R.string.map_parking_cleared), Toast.LENGTH_SHORT).show()
+                },
+                lists = state.lists,
+                onAddToList = { listId -> vm.addPlaceToList(listId, state.selected!!) },
+                onRemoveFromList = { listId -> vm.removePlaceFromList(listId, state.selected!!) },
+                onCreateListWith = { name -> val id = vm.createList(name); vm.addPlaceToList(id, state.selected!!) },
+                onSetNote = { note -> vm.setPlaceNote(state.selected!!, note) },
+                onChooseIcon = { iconPickFor = state.selected },
+                minimizeTick = sheetPanTick,
+                // No navigationBarsPadding here: the sheet's background should reach
+                // the screen bottom (no map peeking through under the nav bar); the
+                // sheet pads its own content for the nav bar instead.
+                // Landscape: a LEFT side panel (width-capped) instead of a full-width sheet,
+                // so the map and its right-side buttons stay usable beside it (Google's
+                // landscape layout, user 2026-07-20).
+                modifier = Modifier
+                    .align(if (landscapeChrome) Alignment.BottomStart else Alignment.BottomCenter)
+                    .landscapeColumn(landscapeChrome, sidePanelWidthDp)
+                    // Live top edge for the layers button's overlap gate (see placeSheetTopPx).
+                    .then(sheetEdge.report),
+            )
+
+            // Search results as a BOTTOM sheet, Google-style — same detent family as the place
+            // sheet (minimized bar ↔ peek ↔ expanded). Reached only when nothing above matched,
+            // so a selected place / directions / nav always win the bottom slot. Street View
+            // gates it too: opening the viewer clears `selected`, which used to fall through to
+            // THIS branch and draw the results list over the bottom-half mini map (user
+            // 2026-07-18); the sheet returns when the viewer closes.
+            // A custom map of only lines and areas (issue #669): no result list, so its Save offer
+            // is this bar in the bottom slot.
+            // A shape being drawn takes the same slot (one call for both: MapScreen is at the
+            // method size limit).
+            BottomOverlay.SHAPES -> ShapeBottomBar(state, vm)
+            BottomOverlay.RESULTS -> Box(Modifier.fillMaxSize()) {
+              ResultsSheet(
+                state = state,
+                vm = vm,
+                focusManager = focusManager,
+                context = context,
+                resultsExpanded = resultsExpanded,
+                onExpandedChange = { resultsExpanded = it },
+                onShownChange = { filteredResultIds = it },
+                minimizeTick = resultsPanTick,
+                sheetMenuAsk = sheetMenuAsk,
+                onMenuAsk = { sheetMenuAsk = it },
+                // Landscape: left side panel like the place sheet (see its modifier note).
+                modifier = Modifier
+                    .align(if (landscapeChrome) Alignment.BottomStart else Alignment.BottomCenter)
+                    .landscapeColumn(landscapeChrome, sidePanelWidthDp),
+              )
+            // Imported Google list preview: offer to save (nothing persisted until tapped).
+            // A pill under the search bar, clear of the results sheet at the bottom.
+            // A pushed URGENT notice (calibration.json, level "urgent") is a modal, not a card —
+        // for announcements that must be seen (the "servers overloaded" class of message).
+        // Same signed channel + the same one-time dismissal persistence as the cards.
+        state.notices.firstOrNull { it.level == app.vela.core.config.Notice.LEVEL_URGENT }?.let { n ->
+            app.vela.ui.VelaDialog(
+                onDismissRequest = { vm.dismissNotice(n.id) },
+                title = n.title,
+                confirmText = stringResource(android.R.string.ok),
+                onConfirm = { vm.dismissNotice(n.id) },
+                dismissText = if (n.url != null) stringResource(R.string.mapscreen_learn_more) else stringResource(R.string.place_close),
+                onDismiss = {
+                    n.url?.let { u -> runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(u))) } }
+                    vm.dismissNotice(n.id)
+                },
+            ) {
+                Text(n.body)
+            }
+        }
+        // Not over the expanded list: the banner sat on its filter row.
+        state.pendingImport?.takeIf { !resultsExpanded }?.let { imp ->
+                val savedMsg = stringResource(R.string.map_list_saved, imp.title)
+                Surface(
+                    shape = RoundedCornerShape(28.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    shadowElevation = 6.dp,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(top = 76.dp)
+                        .dpadHighlight(RoundedCornerShape(20.dp))
+                        .clickable {
+                            vm.saveImportedList()
+                            Toast.makeText(context, savedMsg, Toast.LENGTH_SHORT).show()
+                        },
+                ) {
+                    Row(
+                        Modifier.padding(start = 16.dp, end = 20.dp, top = 10.dp, bottom = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Sym.BookmarkBorder, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            if (imp.shapes.isNotEmpty()) stringResource(R.string.map_save_mymap) else saveListLabel(imp.places.size),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                }
+            }
+            }
+            BottomOverlay.NONE -> Unit
+        }
+
+        }
+
+        // Transit step-by-step guidance (Moovit-style) — a BOTTOM PANE since 2026-08-08 (issue
+        // #232): the map above it shows the drawn itinerary with the camera framing the guided leg.
+        app.vela.ui.SheetTransition(
+            targetState = state.transitNav,
+            contentKey = { it != null },
+            animateContent = { it != null },
+            onBack = if (state.transitNav != null && !state.areaPicking) vm::endTransitNav else null,
+        ) { tn ->
+            if (tn != null) app.vela.ui.place.TransitNavSheet(
+                nav = tn,
+                onNext = vm::advanceTransitNav,
+                onBack = vm::backTransitNav,
+                onEnd = vm::endTransitNav,
+                onWalkDirections = vm::walkDirections,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
+
+        // Tap-through: the stop timeline for a route tapped on the departure board. Drawn over the
+        // place sheet; tapping a stop opens that stop's own board, so the user keeps drilling down
+        // the line the way Google's tap-through does. Also shown (with a spinner) while it loads.
+        app.vela.ui.SheetTransition(
+            targetState = state.takeIf { it.routeDetail != null || it.routeDetailLoading },
+            contentKey = { it != null },
+            animateContent = { it != null },
+            onBack = if (state.routeDetail != null || state.routeDetailLoading) vm::closeRouteDetail else null,
+        ) { snapshot ->
+            if (snapshot != null) app.vela.ui.place.RouteDetailSheet(
+                step = snapshot.routeDetail,
+                title = snapshot.routeDetailTitle,
+                loading = snapshot.routeDetailLoading,
+                onClose = vm::closeRouteDetail,
+                onStopTap = vm::openRouteStop,
+            )
+        }
+
+        // In-app Street View (keyless pano tiles on a GL sphere). HALF-SCREEN over the map by
+        // default (Google-style: the map underneath shows a rotating view cone at the pano and
+        // eases along as you walk), with a corner button to go full screen.
+        if (state.streetView != null || state.streetViewLoading) {
+            app.vela.ui.place.StreetViewScreen(
+                pano = state.streetView,
+                bitmap = state.streetViewBitmap,
+                loading = state.streetViewLoading,
+                shownYear = state.streetViewShownYear,
+                shownMonth = state.streetViewShownMonth,
+                historical = state.streetViewHistorical,
+                onClose = vm::closeStreetView,
+                onMove = vm::moveStreetView,
+                onTimeTravel = vm::timeTravelStreetView,
+                onPose = { la, ln, yaw -> svPose = doubleArrayOf(la, ln, yaw.toDouble()) },
+            )
+        }
+
+        // "Choose on map" crosshair — the map is visible; a fixed pin marks screen center. Move the
+        // map under it (or long-press) and Confirm to set the start/stop from that point (Google-style).
+        state.pickOnMap?.let { target ->
+            ChooseOnMapOverlay(
+                target = target,
+                onConfirm = vm::confirmMapPick,
+                onCancel = vm::cancelChooseOnMap,
+            )
+        }
+
+        // D-pad zoom buttons (docs/dpad.md): pinch has no key equivalent, so give zoom a
+        // first-class on-screen control while the UI is key-driven. Shown ONLY while
+        // browsing the map with no list/sheet/panel over it — the mid-right buttons sit in
+        // the vertical focus path of the results list / place sheet and would intercept
+        // DOWN traversal into their rows (measured: DOWN from the results header jumped to
+        // the zoom + button instead of the first result). During those, the map is behind
+        // a panel anyway; zoom the map via the engaged crosshair after closing the panel.
+        // Touch phones get the same pair behind Settings > Navigation > "Prefer buttons over
+        // swipes" (issue #393): one pill in the bottom-right stack, above the parking button,
+        // in the parking button's own dress so the corner reads as one set of controls.
+        val zoomButtonsVisible = (dpadMode || app.vela.ui.PreferButtons.on.value) && !searchOpen && !state.navigating && !app.vela.ui.DrivingMode.on.value &&
+            state.selected == null && state.drawing == null && !state.directionsOpen && !state.showSteps &&
+            state.activeRoute == null && state.routes.isEmpty() &&
+            (state.results.isEmpty() || state.resultsCollapsed)
+        if (zoomButtonsVisible) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                shadowElevation = 6.dp,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    .padding(end = 24.dp, bottom = chromeLift + 144.dp),
+            ) {
+                Column(Modifier.width(40.dp)) {
+                    Box(
+                        Modifier
+                            .size(40.dp)
+                            .dpadHighlight(RoundedCornerShape(12.dp))
+                            .clickable(onClick = { mapDpad.zoomBy(1.0) }),
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(Sym.Add, contentDescription = stringResource(R.string.mapscreen_zoom_in)) }
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f),
+                    )
+                    Box(
+                        Modifier
+                            .size(40.dp)
+                            .dpadHighlight(RoundedCornerShape(12.dp))
+                            .clickable(onClick = { mapDpad.zoomBy(-1.0) }),
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(Sym.Remove, contentDescription = stringResource(R.string.mapscreen_zoom_out)) }
+                }
+            }
+        }
+
+        // Replaying a recorded trip drives the dot + camera like a live drive; give the
+        // user an explicit way out (its tap stops the replay and resumes live GPS). A DEMO drive
+        // (Settings → Simulate driving) is meant to look like real nav — its own "End" button stops
+        // it (stopNav cancels the demo), so don't show the replay pill over the nav chrome.
+        MapFloaters(state, vm, sheetEdge)
+        // Search along the route: Google's page (the whole screen in portrait, the left column
+        // over a dimmed map in landscape). Drawn last, so it covers the banner, bar and buttons.
+        if (state.navigating && navSearchOpen && state.results.isEmpty()) {
+            app.vela.ui.nav.NavSearchChips(
+                query = navSearchQuery,
+                onQueryChange = { navSearchQuery = it },
+                onPick = { q ->
+                    navSearchOpen = false
+                    navSearchQuery = ""
+                    focusManager.clearFocus()
+                    android.util.Log.d("VelaNavSearch", "picked a search along the route")
+                    vm.searchAlongRoute(q)
+                },
+                onClose = { navSearchOpen = false; focusManager.clearFocus() },
+                recents = state.recents,
+            )
+        }
+
+        // The locate + parking buttons yield to the bottom surfaces that actually REACH them:
+        // the route chooser and step list always (full width), and in PORTRAIT the place/results
+        // sheets too. In LANDSCAPE those two render as the width-capped left panel, so the
+        // bottom-right corner is free and both buttons stay up beside an open list or place
+        // (user 2026-07-20: stop hiding buttons that nothing is covering). Street View keeps
+        // them hidden - its bottom half is the pose mini-map.
+        val fabChromeOk = gates.fabChromeOk
+        // True while the landscape left panel (place sheet or results, any detent) is on screen -
+        // bottom-LEFT chrome (scale bar) yields to it and the attribution centers in the strip.
+        val sidePanelUp = landscapeChrome &&
+            (placeSheetUp || (state.results.isNotEmpty() && state.selected == null && !searchOpen))
+        if (fabChromeOk && (landscapeChrome || (state.selected == null && !resultsShown))) {
+            // Stock M3 FAB, deliberately: a Google-style flat circle was tried (2026-07-08)
+            // and reverted — every surface tone melted into the dark tiles.
+            FloatingActionButton(
+                onClick = onRecenter,
+                shape = mapButtonShape,
+                containerColor = mapButtonColor(darkTheme), contentColor = mapButtonInk(darkTheme),
+                elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(defaultElevation = 10.dp),
+                modifier = Modifier
+                    .dpadHighlight(mapButtonShape)
+                    .align(Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    .padding(16.dp)
+                    .padding(bottom = chromeLift),
+            ) {
+                LocateGlyph(darkTheme) // draws the ring itself
+            }
+            // The parking button, its menu and its history sheet (ParkingControl, below).
+            ParkingControl(state, vm, darkTheme, chromeLift)
+            // (The live-traffic overlay toggle moved to Settings → Map — it's a
+            // niche browse-only layer, and nav now shows per-segment route traffic,
+            // so it no longer earns a spot on the map.)
+            // Scale bar (below, ScaleBarReader): bottom-left over the credit, raised over the
+            // free-drive speed box while that shows (speedBoxLift).
+            // Required Esri attribution while the imagery is on - bottom center, clear of the
+            // scale bar and FABs, the year centered on its own line under the credit.
+            if (app.vela.ui.SatelliteLayer.on.value) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        // Centered in the map STRIP while the landscape panel owns the left.
+                        .padding(start = if (sidePanelUp) sidePanelWidthDp else 0.dp)
+                        .padding(bottom = 16.dp + chromeLift),
+                ) {
+                    // Whose pixels are on screen. Past z19 where Esri has no native tiles the
+                    // deep layer is Google's imagery (satDeep == -1), cross-faded in over
+                    // z18.6..19.6 (ensureSatelliteDeep): credit Google there, both in the blend,
+                    // and drop Esri's capture year once Esri is no longer what you are looking at.
+                    val zoomNow = remember(metersPerPixelState.value, state.center) {
+                        val lat = state.center?.lat ?: 0.0
+                        val mpp = metersPerPixelState.value
+                        if (mpp <= 0.0) 0.0 else kotlin.math.ln(78271.517 * kotlin.math.cos(Math.toRadians(lat)) / mpp) / kotlin.math.ln(2.0)
+                    }
+                    val googleDeep = state.satDeep == -1 && zoomNow >= 18.6
+                    val googleOnly = state.satDeep == -1 && zoomNow >= 19.6
+                    Text(
+                        when {
+                            googleOnly -> stringResource(R.string.map_satellite_attribution_google)
+                            googleDeep -> stringResource(R.string.map_satellite_attribution) + " \u00b7 " + stringResource(R.string.map_satellite_attribution_google)
+                            else -> stringResource(R.string.map_satellite_attribution)
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (darkTheme) Color(0xFFB8C2CC) else Color(0xFF4A4A4A),
+                    )
+                    state.imageryYear?.takeIf { !googleOnly }?.let {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (darkTheme) Color(0xFFB8C2CC) else Color(0xFF4A4A4A),
+                        )
+                    }
+                }
+            }
+            // Also step aside while the free-drive speed box occupies the low corner (it moved
+            // down level with the locate FAB, user 2026-07-14) - the follow gate alone missed a
+            // moving-but-panned map, where both used to want the same spot.
+            // The landscape panel owns the bottom-left corner - the bar would draw on top of it.
+            // OpenStreetMap attribution (issue #302, [OsmCredit] has the rules): bottom-left under
+            // the scale bar, lifted over the nav bar and the minimized results bar, into the map
+            // strip in landscape. Satellite keeps its own centered credit.
+            run {
+                val navLift = if (state.navigating) with(LocalDensity.current) { navBarHeightPx.toDp() } + 6.dp else 0.dp
+                OsmCredit(
+                    darkTheme,
+                    start = if (sidePanelUp) sidePanelWidthDp + 8.dp else 8.dp,
+                    bottom = 2.dp + chromeLift + navLift,
+                    movingFree = movingFree,
+                )
+            }
+            // Never hidden for the speed box: it rides above it with the credit (issue #848).
+            if (!sidePanelUp) ScaleBarReader(metersPerPixelState, movingFree, chromeLift)
+        }
+            // Outside the FAB-chrome block on purpose: the Your-lists button in the search bar is
+            // reachable while the search overlay is open, and that block is not composed then,
+            // so the button set a flag nothing rendered (issue #343).
+            if (listsSheetOpen) {
+                ListsSheet(
+                    lists = state.lists,
+                    onOpenList = { listsSheetOpen = false; vm.openList(it) },
+                    onCreateList = { name -> vm.createList(name) },
+                    onUpdateList = vm::updateList,
+                    onDeleteList = vm::deleteList,
+                    onMoveList = vm::moveList,
+                    onDismiss = { listsSheetOpen = false },
+                    vm = vm,
+                )
+            }
+
+            // Portrait, place card at (or near) its minimized bar: the locate FAB rides ABOVE the
+            // card's measured top edge (user 2026-07-20: current location stays reachable with a
+            // card minimized). Offset from the sheet's live top so it tracks the card; the >55%
+            // floor keeps it to the minimized neighborhood - at peek/expanded the measured top
+            // sits above the floor so it stays hidden. MEASURED ONLY (2026-07-23): the logical
+            // expanded flag also gated this, and a pill swipe on a short-content card flips that
+            // flag while the card never grows, so the button vanished with the card unmoved
+            // (the same phantom-expanded class as the search-bar/layers hides).
+            // Landscape needs none of this: the side panel leaves the normal FABs standing.
+            if (fabChromeOk && !landscapeChrome && state.selected != null &&
+                state.pickOnMap == null && sheetEdge.below55.value
+            ) {
+                FloatingActionButton(
+                    onClick = onRecenter,
+                    shape = mapButtonShape,
+                    containerColor = mapButtonColor(darkTheme), contentColor = mapButtonInk(darkTheme),
+                elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(defaultElevation = 10.dp),
+                    modifier = Modifier
+                        .dpadHighlight(mapButtonShape)
+                        .align(Alignment.TopEnd)
+                        .offset {
+                            androidx.compose.ui.unit.IntOffset(
+                                -16.dp.roundToPx(),
+                                sheetEdge.top.value - 72.dp.roundToPx(),
+                            )
+                        },
+                ) {
+                    LocateGlyph(darkTheme)
+                }
+            }
+
+            // Layers/satellite toggle, top-right under the search bar + chips. Shown on the browse
+            // map AND while a place sheet is open, WHENEVER the button's corner actually clears the
+            // sheet (user 2026-07-20: never hide it just for orientation, only for overlap - the
+            // compass coexists the same way). The gate compares the sheet's MEASURED top edge
+            // against the button's bottom edge, so it's continuously right on any screen: phone
+            // portrait and tablets keep the button beside a minimized sheet, a phone-landscape PEEK
+            // (sheet reaches the corner) drops it, and the slim minimized bar brings it back.
+            // sheetTopPx == 0 = unmeasured (first frame) - treated as covered, no flash.
+            // Street View / pick-on-map keep a selected place with NO sheet composed, so the stale
+            // measurement must not show the button over the pano/picker - both are excluded.
+            val layersDensity = LocalDensity.current
+            val layersButtonBottomPx = WindowInsets.statusBars.getTop(layersDensity) +
+                with(layersDensity) { ((if (landscapeChrome) 74.dp else 128.dp) + 42.dp + 8.dp).toPx() }
+            // Landscape short-circuits the vertical test: the sheet is the width-capped LEFT
+            // panel there, which never reaches the top-right corner whatever its detent.
+            sheetEdge.layersBottom = layersButtonBottomPx
+            val clearOfPlaceSheet = state.selected == null ||
+                (
+                    state.streetView == null && !state.streetViewLoading && state.pickOnMap == null &&
+                        (landscapeChrome || sheetEdge.clearLayers.value)
+                    )
+            // The expanded/results hides are portrait-only too: the landscape panel caps below
+            // the search bar and never reaches this corner at ANY detent.
+            // Not over the route chooser either (issue #405): the endpoints card owns that corner
+            // and a map-style button beside a route list is noise.
+            // Not in driving mode either (issue #727): the mode's X is the way back to this button.
+            if (app.vela.ui.LayersButton.on.value && !searchOpen && !state.directionsOpen && !state.areaPicking &&
+                !state.navigating && !state.replaying && !app.vela.ui.DrivingMode.on.value &&
+                (!resultsShown || landscapeChrome) &&
+                clearOfPlaceSheet
+            ) {
+                // The button and its tile panel (LayersPanel.kt); the gate above is the one thing
+                // MapScreen keeps.
+                LayersCorner(vm, landscapeChrome, darkTheme)
+            }
+
+        // --- transient surfaces --------------------------------------------
+        if (state.showPsdsTip && state.selected == null && !searchOpen && !state.navigating &&
+            state.resumeNavLabel == null
+        ) {
+            LocationTip(state.tipNetworkLocation, vm)
+        }
+        // ONE notification area: the heads-up flash, downloads, the update card and pushed notices
+        // all STACK here (each with its own dismiss) instead of painting over each other — the old
+        // separate status card sat on the chips and could cover the update card. Position: just
+        // below the search bar + chips on the browse map; during nav just below the turn card,
+        // whose height VARIES (lanes, "then" row) — so it hangs off the banner's MEASURED bottom
+        // edge, the same navBannerBottomPx the compass uses, and slides with it.
+        val downloadingVoiceId = state.voiceDownloadingId
+        val downloadingRegion = state.routingDownloadingId != null || state.poiPackDownloadingId != null || state.regionFileStep != null
+        val bareMap = gates.bareMap
+        // Download progress shows over a place sheet or the route chooser too (2026-09-28: an area
+        // pick started from a dropped pin ran its whole pull with no card); only the search page
+        // keeps every card off. Notices and the update offer stay bare-map only.
+        val downloadsOk = !searchOpen
+        val fasterOffer = state.navigating && state.fasterRoute != null
+        if (state.status != null || fasterOffer ||
+            (bareMap && (state.notices.isNotEmpty() || state.updateInfo != null)) ||
+            (downloadsOk && (downloadingVoiceId != null || state.asrDownloadPct != null || downloadingRegion || state.areaDownloadPct != null))
+        ) {
+            val bannerBottom = with(LocalDensity.current) { navBannerBottomPx.toDp() }
+            Column(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .then(
+                        if (state.navigating && navBannerBottomPx > 0) {
+                            // positionInRoot already spans the status bar — no statusBarsPadding here.
+                            Modifier.padding(top = bannerBottom + 10.dp, start = 12.dp, end = 12.dp)
+                        } else if (state.directionsOpen && !searchOpen && topCardBottomPx > 0) {
+                            // Below the endpoints card, which is taller than the search bar the
+                            // 132dp constant was tuned for (cards printed over it otherwise).
+                            Modifier.padding(
+                                top = with(LocalDensity.current) { topCardBottomPx.toDp() } + 10.dp,
+                                start = 12.dp, end = 12.dp,
+                            )
+                        } else {
+                            Modifier.statusBarsPadding().padding(top = 132.dp, start = 12.dp, end = 12.dp)
+                        },
+                    ),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (fasterOffer) {
+                    FasterRouteCard(
+                        savingSeconds = state.fasterSavingSeconds,
+                        onSwitch = vm::acceptFasterRoute,
+                        onDismiss = vm::dismissFasterRoute,
+                        // The same ten seconds however you drive the UI: focus on the card stops
+                        // the clock, so a key-driven phone has all the time it needs.
+                        autoMs = 10_000L,
+                        autoAccept = app.vela.ui.FasterRouteAuto.accept.value,
+                        offerKey = state.fasterRoute ?: state.fasterSavingSeconds,
+                    )
+                }
+                state.status?.let { msg ->
+                    val voiceDl = state.statusVoiceDownloadId
+                    InfoCard(
+                        title = stringResource(R.string.mapscreen_heads_up),
+                        body = msg,
+                        actionLabel = stringResource(R.string.mapscreen_dismiss),
+                        onAction = vm::clearStatus,
+                        // A voice problem carries its fix. Normally a pill straight to Vela's voice
+                        // library; for a language with no Vela voice (Japanese) it opens the phone's
+                        // own voice settings instead, where the user can add a system voice.
+                        autoMs = state.statusAutoMs,
+                        pillLabel = when {
+                            state.statusOpensTtsSettings -> stringResource(R.string.mapscreen_system_voices)
+                            voiceDl != null -> app.vela.core.voice.PiperCatalog.byId(voiceDl)
+                                ?.let { v -> stringResource(R.string.mapscreen_download_voice, v.displayName, v.sizeMb) }
+                                ?: stringResource(R.string.mapscreen_get_voice)
+                            state.statusVoiceAction -> stringResource(R.string.mapscreen_get_voice)
+                            else -> null
+                        },
+                        onPill = when {
+                            voiceDl != null -> {
+                                { vm.clearStatus(); vm.downloadVoice(voiceDl) }
+                            }
+                            state.statusOpensTtsSettings -> {
+                                {
+                                    vm.clearStatus()
+                                    runCatching {
+                                        context.startActivity(
+                                            Intent("com.android.settings.TTS_SETTINGS")
+                                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                        )
+                                    }.onFailure {
+                                        runCatching {
+                                            context.startActivity(
+                                                Intent(android.provider.Settings.ACTION_SETTINGS)
+                                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            state.statusVoiceAction -> {
+                                { vm.clearStatus(); onOpenVoiceSettings() }
+                            }
+                            else -> null
+                        },
+                    )
+                }
+                if (downloadsOk) {
+                    if (downloadingVoiceId != null) {
+                        VoiceDownloadCard(installing = state.voiceInstalling, pct = state.voiceDownloadPct ?: 0f, onCancel = { vm.cancelVoiceDownload() })
+                    }
+                    // The speech model download (started from the mic offer or Settings) gets the
+                    // same card - it's also called Vela voice, so the one label fits both.
+                    if (state.asrDownloadPct != null) {
+                        VoiceDownloadCard(installing = state.asrInstalling, pct = state.asrDownloadPct ?: 0f, onCancel = { vm.cancelAsrDownload() })
+                    }
+                    // A region (state/country) download: the routing graph first, then its place
+                    // pack — same progress card treatment as the voice download, so a Settings-
+                    // started state download stays visible after backing out to the map.
+                    if (downloadingRegion) {
+                        RegionDownloadCard(
+                            name = state.regionDownloadName ?: "",
+                            places = state.poiPackDownloadingId != null,
+                            stage = state.updateStage,
+                            fileStep = state.regionFileStep,
+                            pct = when {
+                                state.poiPackDownloadingId != null -> state.poiPackDownloadPct
+                                state.regionFileStep != null -> state.regionFilePct
+                                else -> state.routingDownloadPct
+                            },
+                            onCancel = { vm.cancelRegionDownload() },
+                        )
+                    }
+                    // The "download this area" tile save: the ONE progress surface for it (its
+                    // per-tick status flashes are gone - they stacked a second banner, 2026-07-23).
+                    state.areaDownloadPct?.let { pct ->
+                        RegionDownloadCard(name = "", places = false, pct = pct, area = true, onCancel = { vm.cancelAreaDownload() })
+                    }
+                }
+                if (bareMap) {
+                    // A newer release on GitHub (self-updater; the check is a Settings toggle).
+                    state.updateInfo?.let { u ->
+                        UpdateCard(
+                            versionName = u.versionName,
+                            notes = u.notes,
+                            downloadPct = state.updateDownloadPct,
+                            onUpdate = { vm.downloadUpdate() },
+                            onDismiss = { vm.dismissUpdate() },
+                            onCancel = { vm.cancelUpdateDownload() },
+                        )
+                    }
+                    state.notices.filterNot { it.level == app.vela.core.config.Notice.LEVEL_URGENT }.forEach { n ->
+                        NoticeCard(n, onDismiss = { vm.dismissNotice(n.id) })
+                    }
+                }
+            }
+        }
+        }
+        if (state.areaPicking && !pipUi) {
+            AreaPickOverlay(state, vm, zoomButtons = dpadMode || app.vela.ui.PreferButtons.on.value) { mapDpad.zoomBy(it) }
+        }
+        PipNavOverlay(state, pipUi)
+    }
+}
+
+/** Route line color by congestion: blue when free-flowing, amber/red when the
+ *  live traffic-aware time runs meaningfully over the typical time. Walk/bike and
+ *  traffic-less routes stay the default blue. */
+/** The ahead line while the drive is paused: a muted lavender, distinct from the live blue, the
+ *  congestion amber and red and the driven gray, and visible on both themes (a slate gray was
+ *  tried first and vanished into the dark map's road fill). */
+private const val ROUTE_PAUSED_COLOR = "#9C8AD6"
+
+private fun routeTrafficColor(route: app.vela.core.model.Route?, dark: Boolean = false): String =
+    when (val ratio = route?.trafficRatio) {
+        null -> if (dark) "#3FE0D4" else "#1F6FEB"  // AutoMap: cyan route at night, deep blue by day
+        else -> when {
+            ratio > 1.4 -> "#D93838"  // heavy
+            ratio > 1.15 -> "#E8923D" // moderate
+            else -> if (dark) "#3FE0D4" else "#1F6FEB"  // light / free-flowing
+        }
+    }
+
+/** Per-segment live traffic as (startFraction, endFraction, level) along the route,
+ *  converting Google's meter offsets to fractions of the route length — drives the
+ *  route line's per-segment color (Google-style). Empty when there's no live data. */
+private fun routeTrafficSpans(route: app.vela.core.model.Route?): List<Triple<Float, Float, Int>> {
+    val dist = route?.distanceMeters ?: return emptyList()
+    if (dist <= 0.0) return emptyList()
+    return route.trafficSpans.map { sp ->
+        val s = (sp.startMeters / dist).toFloat().coerceIn(0f, 1f)
+        val e = ((sp.startMeters + sp.lengthMeters) / dist).toFloat().coerceIn(0f, 1f)
+        Triple(s, e, sp.level)
+    }
+}
+
+/** The places currently pinned on the map, in marker-index order (so a marker tap maps back to
+ *  the right [Place]). Search results win; else the opened place; else the ambient Google POIs
+ *  shown on the bare browse map. Dead POIs are dropped from the pins (Google-style). */
+private fun displayedPlaces(state: MapUiState): List<Place> = when {
+    state.results.isNotEmpty() -> state.results.filterNot { it.permanentlyClosed }
+    state.selected != null -> listOf(state.selected)
+    else -> emptyList() // ambient Google POIs render as category dots (their own layer), not pins
+}
+
+/** The ambient Google POIs actually shown: the bare browse map AND while a single place sheet
+ *  is open. Wiping them on select emptied the whole ambient source, so tapping a POI made every
+ *  icon around it vanish and closing the sheet re-placed the entire layer (the "POIs reload when
+ *  I tap one then exit", user 2026-07-15) - Google keeps the area's icons up around an opened
+ *  place. Only the opened place's own ambient copy is dropped, so its icon and label don't
+ *  double-draw under the red selection pin. Still hidden while results / a route preview / nav /
+ *  replay own the map. Used by BOTH the marker upload and the tap handler, so the
+ *  AMBIENT_INDEX_PROP a tap reports always indexes THIS list. */
+private fun ambientShownOf(state: MapUiState): List<Place> =
+    if (state.results.isEmpty() && !state.navigating && !state.replaying && state.activeRoute == null) {
+        val sel = state.selected ?: return state.ambientPois
+        state.ambientPois.filterNot {
+            it.name.equals(sel.name, ignoreCase = true) && it.location.distanceTo(sel.location) < 150.0
+        }
+    } else {
+        emptyList()
+    }
+
+// The layer's icon size and collision order read the prominence each place was PAINTED with, the
+// same value the view model ranked and capped on (AmbientStability), so a refined pool cannot
+// resize or reorder what is already on screen.
+private fun ambientMarkersOf(state: MapUiState): List<MapMarker> =
+    ambientShownOf(state).map { MapMarker(it.name, it.location, it.category, AmbientStability.prominenceOf(it), houseNumber = app.vela.core.util.PlaceNames.houseNumber(it.address)) }
+
+private fun markersOf(state: MapUiState, filteredIds: Set<String>?): List<MapMarker> =
+    displayedPlaces(state)
+        // The results sheet's filters (Open now / rating / price) report the surviving ids up;
+        // pins the LIST dropped must drop off the MAP too (user 2026-07-11). null = no filter on.
+        .let { list -> if (filteredIds == null) list else list.filter { it.id in filteredIds } }
+        // A custom map's markers draw as pins in their own icon and color (savedPinData); here they
+        // only frame the view and keep the tap index, except the one that is selected.
+        .map { MapMarker(it.name, it.location, it.category, rating = it.rating, fuelPrice = it.fuelPrice, drawn = !it.ownPin() || it.id == state.selected?.id, areaZoom = it.areaZoom()) }
+
+/** The nav bar and the step sheet it opens into: flush with the screen's bottom edge in portrait
+ *  (the card pads its own content off the system bar), a floating card in the landscape column. */
+private fun Modifier.navBarHost(landscape: Boolean): Modifier =
+    if (landscape) this.padding(start = NAV_LAND_EDGE_DP, end = 16.dp) else this
+
+/** Landscape nav cards sit this far from the safe left edge, as Google's do. */
+private val NAV_LAND_EDGE_DP = 8.dp
+/** Landscape nav: the current-road pill above the bar starts this far right of the left column,
+ *  past the speed box. */
+private val NAV_LAND_ROAD_START_DP = 190.dp
+
+/** The drive's lower-left corner: the speed box, or the Re-center pill while the camera is away
+ *  from the car. One call from MapScreen, which has no room for the two. */
+@Composable
+private fun BoxScope.NavCorner(
+    state: MapUiState,
+    navAway: Boolean,
+    movingFree: Boolean,
+    postedLimitKmh: Double?,
+    landscapeChrome: Boolean,
+    navBarClearance: androidx.compose.ui.unit.Dp,
+    chromeLift: androidx.compose.ui.unit.Dp,
+    onRecenter: () -> Unit,
+) {
+    // Driving mode's bar (issue #727) takes the drive bar's place: the box sits above it in
+    // portrait and beside it in landscape, and shows from the first fix, standing still too.
+    val drivingBar = SearchGates.drivingChromeLive.value
+    // Landscape drive: both sit in line with the bottom bar, just to its right.
+    val beside = (state.navigating || drivingBar) && landscapeChrome
+    val barRightPx = if (state.navigating) navBarRightPx.intValue else app.vela.ui.nav.DrivingBar.rightPx.intValue
+    val besideStart = with(LocalDensity.current) { barRightPx.toDp() } + 10.dp
+    val drivingClearance = with(LocalDensity.current) { app.vela.ui.nav.DrivingBar.heightPx.intValue.toDp() } + 16.dp
+    if (navAway) app.vela.ui.nav.NavRecenterPill(
+        onClick = onRecenter,
+        modifier = Modifier.align(Alignment.BottomStart).navigationBarsPadding()
+            .padding(start = if (landscapeChrome) besideStart else 16.dp, bottom = if (landscapeChrome) 16.dp else navBarClearance),
+    )
+    val drivingBox = drivingBar && state.myLocation != null
+    if (!navAway && app.vela.ui.SpeedDisplay.on.value && (((state.navigating && !state.showSteps && !state.editingStops) && state.mySpeed != null) || movingFree || drivingBox)) {
+        SpeedWidget(
+            speedMps = state.mySpeed,
+            limitKmh = postedLimitKmh,
+            imperial = Units.imperial.value,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .navigationBarsPadding()
+                // During nav the box clears the ETA bar; free-driving there is no bar, so it
+                // sits low in the corner, level with the locate FAB (user 2026-07-14). The
+                // scale bar yields the spot while the box is there.
+                .padding(
+                    start = if (beside) besideStart else 16.dp,
+                    bottom = if (beside) 16.dp else if (state.navigating) navBarClearance else if (drivingBar) drivingClearance else 16.dp + chromeLift,
+                )
+                .popIn(),
+        )
+    }
+}
+
+/** The buttons that float over the browse map (locate, parking, layers): one surface for all,
+ *  and the wallpaper's colors when that setting is on (Settings > Appearance), like the drive's. */
+@Composable
+internal fun mapButtonColor(dark: Boolean) =
+    if (app.vela.ui.theme.wallpaperColorsInUse()) MaterialTheme.colorScheme.primaryContainer
+    // True black: the near-black the search bar and chips sit on, with the ring doing the work
+    // of setting the button off (issue #769); the gray read as a different theme.
+    else if (dark && isAppInAmoled()) MaterialTheme.colorScheme.surfaceContainerHigh
+    else if (dark) Color(0xFF3C4043) else Color.White // a gray lighter than the dark map: the fill is what sets the button off
+
+/** The glyph on one of those buttons: white on the dark button (a dark gray on the white one in
+ *  light theme), the container's own ink with wallpaper colors. [accent] is for a button that
+ *  carries state, like a saved parking spot. */
+@Composable
+private fun mapButtonInk(dark: Boolean, accent: Color? = null) =
+    if (app.vela.ui.theme.wallpaperColorsInUse()) MaterialTheme.colorScheme.onPrimaryContainer
+    else accent ?: if (dark) Color.White else Color(0xFF3C4043)
+
+/** The locate button's shape (issue #797), read where `CircleShape` was: a getter for a getter, so
+ *  `MapScreen` grows no bytecode (see the size notes). */
+private val mapButtonShape: androidx.compose.ui.graphics.Shape get() = app.vela.ui.MapButtonShape.shape()
+
+/** The locate button's face: the glyph inside the ring (drawn here, since the button's own
+ *  modifier chain ends in its position). */
+@Composable
+private fun LocateGlyph(dark: Boolean) {
+    val ring = mapButtonRing(dark)
+    Box(
+        Modifier.size(56.dp).then(if (ring != null) Modifier.border(ring, mapButtonShape) else Modifier),
+        contentAlignment = Alignment.Center,
+    ) {
+        // Blue, as the dot it sends you back to is: the one place on these buttons blue means "you".
+        Icon(Sym.MyLocation, contentDescription = stringResource(R.string.mapscreen_center_on_my_location), tint = if (app.vela.ui.theme.wallpaperColorsInUse()) androidx.compose.material3.LocalContentColor.current else if (dark) Color(0xFF8AB4F8) else Color(0xFF1A73E8))
+    }
+}
+
+/** A faint edge on those buttons: the fill sets them off the map, this only keeps the circle
+ *  crisp over a pale road or a white label. None with wallpaper colors. */
+@Composable
+internal fun mapButtonRing(dark: Boolean): BorderStroke? =
+    if (app.vela.ui.theme.wallpaperColorsInUse()) null
+    else BorderStroke(1.dp, if (dark) Color.White.copy(alpha = if (isAppInAmoled()) 0.22f else 0.14f) else Color(0xFFDADCE0))
+
+/** How many leading search results the map frames (the list holds the rest). */
+private const val SEARCH_FIT_LEAD = 12
+
+private fun Place.ownPin() = pinColor != null || pinIconUrl != null || id.startsWith(MapViewModel.ROUTE_ROW_ID)
+
+@Composable
+private fun SearchResults(
+    results: List<Place>,
+    collapsed: Boolean,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onPick: (Place) -> Unit,
+    onMinimize: () -> Unit,
+    onExpand: () -> Unit,
+    onClose: () -> Unit,
+    listName: String? = null, // set when the results ARE an open list — shown as the sheet title
+    query: String = "", // the search text — leads the minimized bar so it says WHAT the results are
+    minimizeTick: Int = 0, // bumped when the user grabs the map — glide down, THEN flip collapsed
+    onShownChange: (Set<String>?) -> Unit = {}, // filtered-surviving ids (null = no filter active)
+    moreAvailable: Boolean = false, // a "More results" row at the end of the list (next pages of the same search)
+    loadingMore: Boolean = false,
+    moreBranches: Boolean = false, // the row reads "Show other locations" (a name search that landed on one place)
+    mapLayers: MapLayers? = null, // an open custom map's layers, to show and hide (issue #669)
+    bulk: ListBulk? = null, // an open list: its places can be selected, then removed or moved
+    onMore: () -> Unit = {},
+    onActionDirections: (Place) -> Unit = {},
+    onActionCall: (Place) -> Unit = {},
+    onActionShare: (Place) -> Unit = {},
+    onActionMenu: (Place) -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
+    // A BOTTOM sheet, Google-style, sharing the place sheet's detent grammar:
+    // MINIMIZED (a short "N results" bar, = the VM's resultsCollapsed so back agrees)
+    // ↔ PEEK (~0.42) ↔ EXPANDED (~0.82, hoisted to MapScreen so BACK steps it first).
+    // Drag the handle (or the list at its top) DOWN to shrink a detent, UP to grow
+    // one; tap the handle to step up. The X exits the search entirely (results + query),
+    // same as backing all the way out.
+    var openOnly by remember { mutableStateOf(false) }
+    // The places picked in an open list (long press a card, or the header's select button); null
+    // while not selecting. Forgotten when another list or a search takes the sheet.
+    var picked by remember(listName, bulk != null) { mutableStateOf<Set<String>?>(null) }
+    // 0 = off; else the max price level to show (1=$ … 4=$$$$). Tapping the chip cycles.
+    var priceMax by remember { mutableStateOf(0) }
+    val screenH = LocalConfiguration.current.screenHeightDp
+    // The list height is a hand-driven Animatable, the place sheet's physics: drags move it 1:1
+    // with the finger, releases ride the throw's own decay to the nearest size (0 = the minimized
+    // bar, peek, expanded), and the detent just stops the coast. Minimizing animates the list to
+    // ZERO first and only then flips the collapsed state, so the bar swap happens invisibly.
+    val peekL = screenH * 0.42f
+    // Landscape (side-panel layout): expanded caps below the search bar - the full-width bar
+    // deliberately stays in landscape, so the panel must stop under it, not slide beneath it.
+    val resultsLandscape = LocalConfiguration.current.screenWidthDp > screenH
+    val expL = if (resultsLandscape) minOf(screenH * 0.82f, maxOf(screenH - 104f, screenH * 0.55f)) else screenH * 0.82f
+    val listH = remember { Animatable(if (collapsed) 0f else if (expanded) expL else peekL) }
+    val resultsSettleSpec = remember { spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 350f) }
+    // Dropping to the bar GLIDES on a soft spring — at the settle stiffness the pan-triggered
+    // drop read as an abrupt blink (user 2026-07-10). Growing keeps the quicker settle so taps
+    // feel responsive.
+    val resultsGlideSpec = remember { spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 140f) }
+    val resultsDecay = remember { exponentialDecay<Float>(frictionMultiplier = 1.6f) }
+    // expL/peekL in the keys via screenH: rotation kept the other orientation's height (same
+    // stale-geometry trap the place sheet had - user 2026-07-23), so re-snap on a geometry change.
+    LaunchedEffect(collapsed, expanded, screenH) {
+        val target = if (collapsed) 0f else if (expanded) expL else peekL
+        if (listH.targetValue != target) listH.animateTo(target, if (target == 0f) resultsGlideSpec else resultsSettleSpec)
+    }
+    // Map grabbed: glide the OPEN list down to zero and only then flip collapsed — the same
+    // order the drag path uses. Flipping first unmounts the list mid-drop (the visible "pop").
+    // seenTick consumes the mount-time value so a REMOUNT (returning from a place sheet) can't
+    // replay a stale pan as a fresh minimize (same guard as the place sheet).
+    var seenTick by remember { mutableStateOf(minimizeTick) }
+    LaunchedEffect(minimizeTick) {
+        if (minimizeTick == seenTick || collapsed) return@LaunchedEffect
+        seenTick = minimizeTick
+        listH.animateTo(0f, resultsGlideSpec)
+        onMinimize()
+    }
+    val listState = rememberLazyListState()
+    val minimize = rememberUpdatedState(onMinimize)
+    val expand = rememberUpdatedState(onExpand)
+    val isCollapsed = rememberUpdatedState(collapsed)
+    val isExpanded = rememberUpdatedState(expanded)
+    val setExpanded = rememberUpdatedState(onExpandedChange)
+    val density = LocalDensity.current
+    val sheetScope = rememberCoroutineScope()
+    fun dragListBy(dyPx: Float) {
+        val dyDp = with(density) { dyPx.toDp().value }
+        sheetScope.launch { listH.snapTo((listH.value - dyDp).coerceIn(0f, expL)) }
+    }
+    fun settleList(velocityPxPerSec: Float) {
+        val vDp = with(density) { velocityPxPerSec.toDp().value }
+        val naturalEnd = resultsDecay.calculateTargetValue(listH.value, -vDp)
+        // Flick = commit at least one detent in the flick's direction (the place sheet's
+        // grammar; the pure projection made short flicks feel dead - user 2026-07-11).
+        val detents = listOf(0f, peekL, expL)
+        val target = when {
+            vDp < -app.vela.ui.place.FLING_COMMIT_DPS -> {
+                val up = detents.filter { it > listH.value + 1f }
+                maxOf(up.minOrNull() ?: expL, up.minByOrNull { kotlin.math.abs(it - naturalEnd) } ?: expL)
+            }
+            vDp > app.vela.ui.place.FLING_COMMIT_DPS -> {
+                val down = detents.filter { it < listH.value - 1f }
+                minOf(down.maxOrNull() ?: 0f, down.minByOrNull { kotlin.math.abs(it - naturalEnd) } ?: 0f)
+            }
+            else -> detents.minByOrNull { kotlin.math.abs(it - naturalEnd) } ?: peekL
+        }
+        sheetScope.launch {
+            // States first for peek/expanded so everything keyed on them stays honest; the
+            // MINIMIZED flip waits until the list has ridden down to zero (see above).
+            if (target != 0f) {
+                if (isCollapsed.value) expand.value()
+                setExpanded.value(target == expL)
+            }
+            val towardTarget = (naturalEnd - listH.value) * (target - listH.value) > 0f
+            if (towardTarget && kotlin.math.abs(naturalEnd - listH.value) >= kotlin.math.abs(target - listH.value)) {
+                try {
+                    listH.updateBounds(lowerBound = minOf(listH.value, target), upperBound = maxOf(listH.value, target))
+                    listH.animateDecay(-vDp, resultsDecay)
+                } finally {
+                    listH.updateBounds(lowerBound = null, upperBound = null)
+                }
+                if (kotlin.math.abs(listH.value - target) > 0.5f) listH.animateTo(target, resultsSettleSpec)
+            } else {
+                listH.animateTo(target, resultsSettleSpec, initialVelocity = -vDp)
+            }
+            if (target == 0f && !isCollapsed.value) minimize.value()
+        }
+    }
+    val dismissConn = remember {
+        object : NestedScrollConnection {
+            private var draggingSheet = false
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                val atTop = listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
+                if (available.y > 0f && atTop && listH.value > 0f) {
+                    draggingSheet = true
+                    dragListBy(available.y)
+                    return available
+                }
+                if (available.y < 0f && listH.value < expL) {
+                    draggingSheet = true
+                    dragListBy(available.y)
+                    return available
+                }
+                return Offset.Zero
+            }
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                if (draggingSheet) {
+                    draggingSheet = false
+                    settleList(available.y)
+                    return available
+                }
+                return Velocity.Zero
+            }
+        }
+    }
+    // Sort: 0 = relevance (Google's order), 1 = rating, 2 = distance. Picked from a menu — a
+    // cycling chip hid what the options even were (user 2026-07-10, same for price + rating).
+    var sortMode by remember { mutableStateOf(0) }
+    var sortMenu by remember { mutableStateOf(false) }
+    var priceMenu by remember { mutableStateOf(false) }
+    var ratingMenu by remember { mutableStateOf(false) }
+    // Rating floor: 0 = off, else 3.5 / 4.0 / 4.5 (Google's tiers).
+    var minRating by remember { mutableStateOf(0.0) }
+    // Wheelchair accessible only — the one attribute the keyless search response carries
+    // per result (see Place.wheelchairAccessible); the rest of Google's attribute filters
+    // would need a details fetch per place.
+    var accessibleOnly by remember { mutableStateOf(false) }
+    // Google-style filters: currently open, 4.0★+, and price (≤ the chosen level).
+    // "Open now" falls back to the WEEKLY HOURS when Google sent no live status (openNow == null) —
+    // the multi-result response often omits the status string, and dropping those places made the
+    // filter read as broken ("open places disappear"); the place sheet already computes the same
+    // fallback. A place with no status AND no parseable hours still drops (can't confirm open).
+    val nowForHours = remember(openOnly) { java.time.LocalDateTime.now() }
+    // Names that occur more than once (a chain's branches): those cards keep their address.
+    val repeatedNames = remember(results) { results.groupingBy { it.name.trim().lowercase() }.eachCount().filterValues { it > 1 }.keys }
+    val shown = results
+        .let { list ->
+            if (!openOnly) list else list.filter { p ->
+                p.openNow ?: (app.vela.core.util.OpeningHours.statusAt(p.hours, nowForHours)?.open == true)
+            }
+        }
+        .let { list -> if (minRating > 0.0) list.filter { (it.rating ?: 0.0) >= minRating } else list }
+        .let { list -> if (priceMax > 0) list.filter { (it.priceLevel ?: Int.MAX_VALUE) <= priceMax } else list }
+        .let { list -> if (accessibleOnly) list.filter { it.wheelchairAccessible } else list }
+        .let { list ->
+            when (sortMode) {
+                1 -> list.sortedByDescending { it.rating ?: -1.0 }
+                2 -> list.sortedBy { it.distanceMeters ?: Double.MAX_VALUE }
+                else -> list
+            }
+        }
+    // Tell the map which pins survived (sort doesn't change membership, so it isn't a key).
+    LaunchedEffect(openOnly, minRating, priceMax, accessibleOnly, results) {
+        onShownChange(
+            if (!openOnly && minRating == 0.0 && priceMax == 0 && !accessibleOnly) null
+            else shown.mapTo(HashSet()) { it.id },
+        )
+    }
+    // Same fixed sheet gray as the place sheet, not the wallpaper-tinted Material card.
+    val dark = isAppInDarkTheme()
+    Box(modifier) {
+    Card(
+        // statusBarsPadding caps the sheet's growth below the status bar, so the handle pill
+        // never slides under the clock / camera cutout when expanded (user 2026-07-09).
+        Modifier.statusBarsPadding().padding(top = 8.dp).fillMaxWidth(),
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        colors = CardDefaults.cardColors(containerColor = SheetPalette.bg(dark), contentColor = SheetPalette.ink(dark)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+    ) {
+        Column(Modifier.navigationBarsPadding()) {
+            // Handle, the place sheet's exact grammar for a bottom sheet: TAP steps one
+            // detent UP (minimized→peek, peek↔expanded). Drag UP grows a detent, drag
+            // DOWN shrinks one (expanded→peek→minimized). No hide button; the minimized
+            // bar IS the collapsed state.
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .pointerInput(collapsed, expanded) {
+                        detectTapGestures(onTap = {
+                            if (collapsed) onExpand() else onExpandedChange(!expanded)
+                        })
+                    }
+                    .pointerInput(Unit) {
+                        // Same physics as the place sheet (the shared sheetDragGestures grammar).
+                        sheetDragGestures(
+                            dragBy = { dy ->
+                                if (isCollapsed.value && dy < 0f) expand.value() // list mounts at 0 and grows with the finger
+                                dragListBy(dy)
+                            },
+                            settle = { settleList(it) },
+                        )
+                    },
+            ) {
+                // The handle pill is a real focus stop under D-pad: OK steps the sheet up a
+                // detent (the tap grammar), BACK steps it down as always - the tap/drag gestures
+                // on the Column above have no key path of their own (docs/dpad.md).
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp, bottom = 2.dp)
+                        .dpadHighlight(RoundedCornerShape(6.dp))
+                        .onKeyEvent { ev ->
+                            if ((ev.key == Key.DirectionCenter || ev.key == Key.Enter) && ev.type == KeyEventType.KeyUp) {
+                                if (collapsed) onExpand() else onExpandedChange(!expanded)
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                        .focusable(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        Modifier
+                            .size(width = 36.dp, height = 4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(SheetPalette.dim(dark).copy(alpha = 0.4f)),
+                    )
+                }
+                val pickedNow = picked
+                if (bulk != null && pickedNow != null) BulkBar(
+                    selection = pickedNow,
+                    all = shown.map { it.id }.toSet(),
+                    bulk = bulk,
+                    ink = SheetPalette.ink(dark),
+                    onChange = { picked = it },
+                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 2.dp, bottom = 8.dp),
+                ) else Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 4.dp, top = 2.dp, bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // The bar says WHAT you're looking at, not just how many: the list name or
+                    // the search text leads in full ink with the count on its own line UNDER it —
+                    // the inline "title · count" floated awkwardly against the right-side buttons
+                    // (user 2026-07-10); stacked left-aligned lines read like a proper header.
+                    val barTitle = listName ?: query.trim().ifBlank { null }
+                    Column(Modifier.weight(1f)) {
+                        if (barTitle != null) {
+                            Text(
+                                barTitle,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = SheetPalette.ink(dark),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        Text(
+                            androidx.compose.ui.res.pluralStringResource(R.plurals.mapscreen_results_count, shown.size, shown.size),
+                            style = if (barTitle != null) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
+                            color = SheetPalette.dim(dark),
+                            maxLines = 1,
+                        )
+                    }
+                    // Circled like the place-sheet header (one control language). The chevron
+                    // STAYS: it's the discoverable expand affordance AND the D-pad path (the
+                    // handle's tap detector isn't focusable) — removing it would orphan keypad
+                    // users (user 2026-07-11).
+                    if (bulk != null && shown.isNotEmpty()) {
+                        // The key path to selecting (a long press on a card is the touch one).
+                        app.vela.ui.place.HeaderCircleButton(
+                            SymOutlined.CheckCircle,
+                            stringResource(R.string.bulk_select),
+                            tint = SheetPalette.ink(dark),
+                            bg = SheetPalette.dim(dark),
+                        ) { picked = emptySet() }
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    app.vela.ui.place.HeaderCircleButton(
+                        if (!collapsed && expanded) Sym.KeyboardArrowDown else Sym.KeyboardArrowUp,
+                        if (!collapsed && expanded) stringResource(R.string.mapscreen_shrink_list) else stringResource(R.string.mapscreen_expand_list),
+                        tint = SheetPalette.ink(dark),
+                        bg = SheetPalette.dim(dark),
+                    ) { if (collapsed) onExpand() else onExpandedChange(!expanded) }
+                    Spacer(Modifier.width(8.dp))
+                    app.vela.ui.place.HeaderCircleButton(
+                        Sym.Close,
+                        stringResource(R.string.mapscreen_close_results),
+                        tint = SheetPalette.ink(dark),
+                        bg = SheetPalette.dim(dark),
+                    ) { onClose() }
+                    Spacer(Modifier.width(8.dp))
+                }
+                // The chips (and the divider under them) FOLD with the sheet height over
+                // its last 140dp of travel (SheetFold, the place sheet's minimize primitive):
+                // by the time only the bar remains they are zero-height, so the collapsed
+                // flip removes nothing visible - they used to pop out at the flip while the
+                // sheet itself had already stopped moving (user 2026-07-11).
+                val chipsFraction: () -> Float = { (listH.value / 140f).coerceIn(0f, 1f) }
+                app.vela.ui.SheetFold(composed = !collapsed, fraction = chipsFraction) {
+                // Filter chips on their own horizontally-scrollable row, so a third (or
+                // future) chip never crowds the header or clips on a narrow screen. Filled pills
+                // (a subtle tint when off, solid teal when on) so they read modern on the sheet —
+                // the default outlined M3 chip looked "old" against the filled category chips
+                // (user 2026-07-08). No border; a check icon marks an active toggle.
+                // OPAQUE container colors: these are ELEVATED chips, and a translucent container
+                // let the elevation SHADOW show through the pill — invisible on the dark sheet but
+                // a muddy near-black blob on the light one (user report 2026-07-08). The solids are
+                // the translucent values composited over each sheet color.
+                val chipColors = FilterChipDefaults.elevatedFilterChipColors(
+                    containerColor = if (dark) Color(0xFF333539) else Color(0xFFF1F3F4),
+                    labelColor = SheetPalette.ink(dark),
+                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                    selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary,
+                )
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(start = 16.dp, end = 8.dp, bottom = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (mapLayers != null) Box {
+                        var layerMenu by remember { mutableStateOf(false) }
+                        ElevatedFilterChip(
+                            selected = mapLayers.hidden.isNotEmpty(),
+                            onClick = { layerMenu = true },
+                            label = { Text(stringResource(R.string.mapscreen_layers_chip)) },
+                            shape = androidx.compose.foundation.shape.CircleShape,
+                            colors = chipColors,
+                            border = null,
+                            trailingIcon = { Icon(Sym.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        )
+                        VelaMenu(expanded = layerMenu, onDismissRequest = { layerMenu = false }) {
+                            mapLayers.names.forEach { name ->
+                                item((if (name in mapLayers.hidden) "\u2610  " else "\u2611  ") + name) { mapLayers.onToggle(name); layerMenu = false }
+                            }
+                        }
+                    }
+                    // A custom map's markers are not business listings: no hours, rating or price to filter by.
+                    if (!results.any { it.pinColor != null || it.pinIconUrl != null || it.mapLayer != null }) {
+                    ElevatedFilterChip(
+                        selected = openOnly,
+                        onClick = { openOnly = !openOnly; app.vela.ui.SearchActions.openNow?.invoke(openOnly) },
+                        label = { Text(stringResource(R.string.mapscreen_filter_open_now)) },
+                        shape = androidx.compose.foundation.shape.CircleShape,
+                        colors = chipColors,
+                        border = null,
+                        leadingIcon = if (openOnly) {
+                            { Icon(Sym.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        } else null,
+                    )
+                    // Sort: a menu (Relevance / Rating / Distance). LEFT of the filters like
+                    // Google's results header (user 2026-07-13).
+                    Box {
+                        ElevatedFilterChip(
+                            selected = sortMode > 0,
+                            onClick = { sortMenu = true },
+                            label = {
+                                Text(
+                                    when (sortMode) {
+                                        1 -> stringResource(R.string.mapscreen_sort_rating)
+                                        2 -> stringResource(R.string.mapscreen_sort_distance)
+                                        else -> stringResource(R.string.mapscreen_sort)
+                                    },
+                                )
+                            },
+                            shape = androidx.compose.foundation.shape.CircleShape,
+                            colors = chipColors,
+                            border = null,
+                            trailingIcon = { Icon(Sym.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        )
+                        VelaMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
+                            item(stringResource(R.string.mapscreen_sort_relevance)) { sortMode = 0; sortMenu = false }
+                            item(stringResource(R.string.mapscreen_sort_rating_item)) { sortMode = 1; sortMenu = false }
+                            item(stringResource(R.string.mapscreen_sort_distance_item)) { sortMode = 2; sortMenu = false }
+                        }
+                    }
+                    // Rating floor: a MENU of Google's tiers (3.5+/4.0+/4.5+) — the old fixed
+                    // 4.0★ toggle couldn't say what it did or offer another bar.
+                    Box {
+                        ElevatedFilterChip(
+                            selected = minRating > 0.0,
+                            onClick = { ratingMenu = true },
+                            label = { Text(if (minRating > 0.0) String.format(Locale.US, "%.1f+ ★", minRating) else stringResource(R.string.mapscreen_filter_rating)) },
+                            shape = androidx.compose.foundation.shape.CircleShape,
+                            colors = chipColors,
+                            border = null,
+                            trailingIcon = { Icon(Sym.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        )
+                        VelaMenu(expanded = ratingMenu, onDismissRequest = { ratingMenu = false }) {
+                            item(stringResource(R.string.mapscreen_filter_any_rating)) { minRating = 0.0; ratingMenu = false }
+                            item("3.5+ ★") { minRating = 3.5; ratingMenu = false }
+                            item("4.0+ ★") { minRating = 4.0; ratingMenu = false }
+                            item("4.5+ ★") { minRating = 4.5; ratingMenu = false }
+                        }
+                    }
+                    // Price ceiling: a menu of the four levels instead of blind cycling.
+                    Box {
+                        ElevatedFilterChip(
+                            selected = priceMax > 0,
+                            onClick = { priceMenu = true },
+                            label = { Text(if (priceMax == 0) stringResource(R.string.mapscreen_filter_price) else "≤ " + "$".repeat(priceMax)) },
+                            shape = androidx.compose.foundation.shape.CircleShape,
+                            colors = chipColors,
+                            border = null,
+                            trailingIcon = { Icon(Sym.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        )
+                        VelaMenu(expanded = priceMenu, onDismissRequest = { priceMenu = false }) {
+                            item(stringResource(R.string.mapscreen_filter_any_price)) { priceMax = 0; priceMenu = false }
+                            (1..4).forEach { lvl ->
+                                item("$".repeat(lvl)) { priceMax = lvl; priceMenu = false }
+                            }
+                        }
+                    }
+                    // Wheelchair accessible — the one attribute filter the keyless response supports.
+                    ElevatedFilterChip(
+                        selected = accessibleOnly,
+                        onClick = { accessibleOnly = !accessibleOnly },
+                        label = { Text(stringResource(R.string.mapscreen_filter_accessible)) },
+                        shape = androidx.compose.foundation.shape.CircleShape,
+                        colors = chipColors,
+                        border = null,
+                        leadingIcon = if (accessibleOnly) {
+                            { Icon(Sym.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        } else null,
+                    )
+                    } // not a custom map
+                }
+                Divider()
+                } // SheetFold - chips
+            }
+            if (!collapsed) {
+            LazyColumn(
+                Modifier
+                    .nestedScroll(dismissConn)
+                    .layout { measurable, constraints ->
+                        // Layout-phase read: animation frames re-layout the list, never recompose it.
+                        val maxHPx = listH.value.dp.roundToPx().coerceAtLeast(0)
+                        val pl = measurable.measure(constraints.copy(maxHeight = minOf(constraints.maxHeight, maxHPx)))
+                        layout(pl.width, pl.height) { pl.place(0, 0) }
+                    },
+                state = listState,
+            ) {
+                items(shown) { place ->
+                    if (place === shown.firstOrNull()) Spacer(Modifier.fillMaxWidth().height(8.dp).background(if (dark) Color.Black else Color(0xFFE8EAED)))
+                    ResultPlaceCard(
+                        place = place,
+                        dark = dark,
+                        showAddress = place.rating == null || place.name.trim().lowercase() in repeatedNames,
+                        selected = picked?.contains(place.id),
+                        onLongPress = if (bulk == null) null else { { picked = (picked ?: emptySet()) + place.id } },
+                        onPick = {
+                            val now = picked
+                            if (now == null) onPick(place) else picked = if (place.id in now) now - place.id else now + place.id
+                        },
+                        onActionDirections = { onActionDirections(place) },
+                        onActionCall = { onActionCall(place) },
+                        onActionShare = { onActionShare(place) },
+                        onActionMenu = { onActionMenu(place) },
+                    )
+                    // A band in the color behind the sheet between cards, as on Google's list.
+                    Spacer(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .background(if (dark) Color.Black else Color(0xFFE8EAED)),
+                    )
+                }
+                // Next pages of the same search, on demand (the first fetch is three pages).
+                if (moreAvailable) item {
+                    Box(Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+                        if (loadingMore) CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                        else TextButton(
+                            onClick = onMore,
+                            modifier = Modifier.dpadHighlight(CircleShape),
+                        ) { Text(stringResource(if (moreBranches) R.string.mapscreen_other_locations else R.string.mapscreen_more_results)) }
+                    }
+                }
+        }
+            } // if (!collapsed) — list
+        }
+    }
+    } // Box overlay for the list FAB
+} // SearchResults end
+
+/** One Google-style result card: photo strip, text block, action pills. Split out of
+ *  SearchResults: the list body overflowed the 64KB per-method bytecode limit. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun ResultPlaceCard(
+    place: Place,
+    dark: Boolean,
+    showAddress: Boolean,
+    selected: Boolean? = null, // null outside a selection; else whether this card is picked
+    onLongPress: (() -> Unit)? = null,
+    onPick: () -> Unit,
+    onActionDirections: () -> Unit,
+    onActionCall: () -> Unit,
+    onActionShare: () -> Unit,
+    onActionMenu: () -> Unit,
+) {
+    // Gallery is display-sized only: the w320-h220 search payloads decode at list
+    // size (400px wide cells) instead of full-res, which was the scroll jank.
+    // The strip loads from Google's image host, so it follows the photo settings like the sheet's
+    // gallery does: nothing with photos off, on-tap only, or Google off.
+    val photosOk = app.vela.ui.LoadPhotos.on.value && !app.vela.ui.PhotosOnTap.on.value && !app.vela.ui.GoogleFree.on.value
+    val gallery = remember(place.id, place.photoUrls, photosOk) { if (photosOk) place.photoUrls.take(3) else emptyList() }
+    // Google-style result card: photo strip FIRST (full-bleed), then the text
+    // block, then the action pills. Cards breathe with a plain gap, no bars.
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .then(if (selected == true) Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)) else Modifier)
+            .dpadHighlight(RoundedCornerShape(6.dp))
+            .combinedClickable(onClick = { onPick() }, onLongClick = onLongPress),
+    ) {
+        // Photo strip with GROUPED outer corners (16dp outside, square
+        // where images touch), full-bleed above the text, Google-style.
+        // Any photo at all shows: a single photo fills the strip.
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(top = 14.dp),
+        ) {
+        // Bigger, more legible rows (the address/category line read too
+        // small before): name at titleMedium, the secondary lines bumped
+        // from bodySmall→bodyMedium with a touch more breathing room.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (selected != null) Icon(
+                if (selected) Sym.CheckCircle else SymOutlined.RadioButtonUnchecked,
+                contentDescription = null,
+                tint = if (selected) MaterialTheme.colorScheme.primary else SheetPalette.dim(dark),
+                modifier = Modifier.padding(end = 10.dp).size(22.dp),
+            )
+            // A custom map's marker leads with its own icon, or a dot in its color.
+            if (place.pinIconUrl != null) {
+                coil.compose.AsyncImage(model = place.pinIconUrl, contentDescription = null, modifier = Modifier.padding(end = 10.dp).size(26.dp))
+            } else if (place.pinColor != null) {
+                Box(Modifier.padding(end = 10.dp).size(14.dp).background(Color(place.pinColor!!), androidx.compose.foundation.shape.CircleShape))
+            } else if (place.id.startsWith(MapViewModel.ROUTE_ROW_ID)) {
+                Icon(Sym.Directions, contentDescription = null, tint = SheetPalette.dim(dark), modifier = Modifier.padding(end = 10.dp).size(22.dp))
+            }
+            Text(place.name, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium, color = SheetPalette.ink(dark))
+        }
+        place.rating?.let { r ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 3.dp),
+            ) {
+                Text(
+                    String.format(Locale.US, "%.1f", r),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = SheetPalette.ink(dark),
+                )
+                // One line, as on Google's cards: the number, one star, the count, then distance,
+                // price and kind, cut with an ellipsis when the card is narrow.
+                Icon(Sym.Star, contentDescription = null, tint = app.vela.ui.StarGold, modifier = Modifier.padding(horizontal = 2.dp).size(15.dp))
+                val rest = listOfNotNull(
+                    place.reviewCount?.let { "($it)" },
+                    place.distanceMeters?.let { formatDistance(it) },
+                    place.priceText,
+                    place.category,
+                ).joinToString(" · ")
+                if (rest.isNotEmpty()) {
+                    Text(
+                        rest, style = MaterialTheme.typography.bodyMedium, color = SheetPalette.dim(dark),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+        // An unrated row (an address, a place from the downloaded data) keeps its own line.
+        val sub = if (place.rating != null) "" else listOfNotNull(
+            place.distanceMeters?.let { formatDistance(it) },
+            place.priceText,
+            place.category,
+        ).joinToString(" · ")
+        if (sub.isNotEmpty()) {
+            Text(
+                sub,
+                style = MaterialTheme.typography.bodyMedium,
+                color = SheetPalette.dim(dark),
+                modifier = Modifier.padding(top = 1.dp),
+            )
+        }
+        // Full address (city/state/zip) to disambiguate similar names
+        // and identical-looking residential addresses. A rated business whose name is the
+        // only one of its kind in the list goes without, as on Google's cards, but only when
+        // the card has its photos to tell it by (they can be turned off).
+        place.address?.takeIf { showAddress || gallery.isEmpty() }?.let { addr ->
+            Text(
+                addr,
+                style = MaterialTheme.typography.bodyMedium,
+                color = SheetPalette.dim(dark),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 1.dp),
+            )
+        }
+        // Gas stations: the live price on its own line under the address, bold with a
+        // pump glyph in the title ink so it pops out of the row (user 2026-07-10).
+        place.fuelPrice?.let { fp ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 2.dp),
+            ) {
+                Icon(
+                    Sym.LocalGasStation,
+                    contentDescription = null,
+                    tint = SheetPalette.ink(dark),
+                    modifier = Modifier.size(16.dp),
+                )
+                Text(
+                    fp,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = SheetPalette.ink(dark),
+                    modifier = Modifier.padding(start = 5.dp),
+                )
+            }
+        }
+        if (place.permanentlyClosed) {
+            Text(
+                stringResource(R.string.mapscreen_permanently_closed),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = SheetPalette.TrafficRed,
+                modifier = Modifier.padding(top = 3.dp),
+            )
+        } else (app.vela.ui.DemoClock.status(place)?.first ?: place.statusText)?.let { status ->
+            app.vela.ui.StatusText(
+                status,
+                openNow = app.vela.ui.DemoClock.status(place)?.second ?: place.openNow,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                dim = SheetPalette.dim(dark),
+                modifier = Modifier.padding(top = 3.dp),
+            )
+        }
+                    // The owner's note on a saved place - the whole point of putting it in a
+        // list ("this restaurant's fish is better than its chicken"), so the list
+        // view must show it, not just the place sheet.
+        place.savedNote?.let { note ->
+            Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.Top) {
+                Icon(
+                    Sym.FormatQuote,
+                    contentDescription = null,
+                    tint = SheetPalette.dim(dark),
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    note,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontStyle = FontStyle.Italic,
+                    color = SheetPalette.ink(dark),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+                    // Google-style service checks ("✓ Dine-in · ✓ Takeout · ✓ Delivery")
+                    // under the hours, from the About fetch.
+                    val checks = remember(place.id, place.about) { app.vela.ui.place.attributeHighlights(place.about).take(3) }
+                    if (checks.isNotEmpty()) {
+                        // One line, cut with an ellipsis: three long ones ran off the card.
+                        Text(
+                            checks.distinct().joinToString("  ·  ") { "\u2713 $it" },
+                            style = MaterialTheme.typography.bodyMedium, color = SheetPalette.dim(dark),
+                            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+        // The photos come after the facts, as on Google's cards: name, rating and hours lead.
+        if (gallery.isNotEmpty()) {
+            Row(
+                Modifier.fillMaxWidth().padding(top = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                gallery.forEachIndexed { i, url ->
+                    val corners = when {
+                        gallery.size == 1 -> RoundedCornerShape(16.dp)
+                        i == 0 -> RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
+                        i == gallery.lastIndex -> RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp)
+                        else -> RoundedCornerShape(0.dp)
+                    }
+                    coil.compose.AsyncImage(
+                        model = url.atWidth(400),
+                        contentDescription = null,
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(96.dp)
+                            .clip(corners)
+                            .background(SheetPalette.dim(dark).copy(alpha = 0.2f)),
+                    )
+                }
+            }
+        }
+        // Per-row action buttons, all filled: they act on the ROW's place directly, without opening it.
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 14.dp, bottom = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ResultActionButton(
+                icon = Sym.Directions,
+                label = stringResource(R.string.place_directions),
+                primary = true,
+                onClick = { onActionDirections() },
+            )
+            if (!place.phone.isNullOrBlank()) {
+                ResultActionButton(
+                    icon = Sym.Call,
+                    label = stringResource(R.string.place_call),
+                    primary = false,
+                    onClick = { onActionCall() },
+                )
+            }
+            place.website?.takeIf { !app.vela.ui.HideExternalLinks.on.value }?.let { site ->
+                val ctx = LocalContext.current
+                ResultActionButton(
+                    icon = Sym.Language,
+                    label = stringResource(R.string.place_website),
+                    primary = false,
+                    onClick = { runCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(site))) } },
+                )
+            }
+            ResultActionButton(
+                icon = Sym.Share,
+                label = stringResource(R.string.place_share),
+                primary = false,
+                iconOnly = true, // four labeled pills ran off the card
+                onClick = { onActionShare() },
+            )
+            // Menu opens the sheet straight onto its Menu tab (Google's
+            // row-level Menu button). Only when menu photos exist.
+            if (app.vela.ui.place.hasMenuPhotos(place)) {
+                ResultActionButton(
+                    icon = Sym.List,
+                    label = stringResource(R.string.place_tab_menu),
+                    primary = false,
+                    onClick = { onActionMenu() },
+                )
+            }
+        }
+        } // text column (16dp inset)
+        } // card column
+}
+
+/** Results bottom sheet call, split out of MapScreen: the call-site lambdas overflowed
+ *  the 64KB per-method bytecode limit on the giant MapScreen composable. */
+@Composable
+private fun ResultsSheet(
+    state: MapUiState,
+    vm: MapViewModel,
+    focusManager: androidx.compose.ui.focus.FocusManager,
+    context: android.content.Context,
+    resultsExpanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onShownChange: (Set<String>?) -> Unit,
+    minimizeTick: Int,
+    sheetMenuAsk: String?,
+    onMenuAsk: (String?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+              SearchResults(
+                results = state.results,
+                onShownChange = onShownChange,
+                collapsed = state.resultsCollapsed,
+                expanded = resultsExpanded,
+                onExpandedChange = onExpandedChange,
+                onPick = {
+                    focusManager.clearFocus()
+                    onMenuAsk(null)
+                    vm.selectPlace(it)
+                },
+                onMinimize = vm::collapseResults,
+                onExpand = vm::expandResults,
+                onClose = vm::clearSearch,
+                listName = state.openListId?.let { id -> state.lists.firstOrNull { it.id == id }?.name },
+                query = state.query,
+                minimizeTick = minimizeTick,
+                moreAvailable = state.resultsMoreQuery != null && state.resultsMoreQuery == state.query && state.openListId == null && state.pendingImport == null,
+                loadingMore = state.resultsLoadingMore,
+                moreBranches = state.resultsBranches,
+                mapLayers = mapLayersOf(state, vm),
+                bulk = listBulkOf(state, vm),
+                onMore = vm::loadMoreResults,
+                onActionDirections = { p ->
+                    focusManager.clearFocus()
+                    vm.directionsTo(p)
+                },
+                onActionCall = { p ->
+                    p.phone?.let { ph ->
+                        val dialable = "tel:" + ph.filter { it.isDigit() || it == '+' }
+                        runCatching { context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse(dialable))) }
+                    }
+                },
+                onActionShare = { p ->
+                    val url = app.vela.ui.place.sharePlaceUrl(p)
+                    runCatching {
+                        context.startActivity(
+                            Intent.createChooser(
+                                Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, url)
+                                },
+                                context.getString(R.string.place_share_place),
+                            ),
+                        )
+                    }
+                },
+                onActionMenu = { p ->
+                    focusManager.clearFocus()
+                    onMenuAsk(p.id)
+                    vm.selectPlace(p)
+                },
+                modifier = modifier,
+              )
+}
+
+/** Google result-card action: Directions is the filled primary pill (#A8C7FA bg,
+ *  #062E6F ink); Call/Share are transparent outlined pills (#5F6368 hairline, #A8C7FA ink). */
+@Composable
+private fun ResultActionButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    primary: Boolean,
+    iconOnly: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val pill = androidx.compose.foundation.shape.CircleShape
+    // Every button is filled, as on Google's cards: the first in the accent, the rest in its tint.
+    val scheme = MaterialTheme.colorScheme
+    val ink = if (primary) scheme.onPrimary else scheme.onSecondaryContainer
+    Row(
+        Modifier
+            .clip(pill)
+            .background(if (primary) scheme.primary else scheme.secondaryContainer)
+            .dpadHighlight(pill)
+            .clickable(onClick = onClick)
+            .padding(horizontal = if (iconOnly) 10.dp else 14.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = if (iconOnly) label else null, tint = ink, modifier = Modifier.size(18.dp))
+        if (!iconOnly) {
+            Spacer(Modifier.width(6.dp))
+            Text(label, style = MaterialTheme.typography.labelLarge, color = ink, maxLines = 1)
+        }
+    }
+}
+
+/** The map itself. Split out of MapScreen on 2026-09-18 for the same reason as the blocks
+ *  below it: the VelaMapView call ran ~220 lines of named arguments, several of them inline
+ *  `when` / `run` / `remember` expressions, and all of that bytecode counted toward MapScreen's
+ *  own method size (argument lists do; content lambdas do not). The four callbacks that write
+ *  MapScreen's local state are hoisted as parameters; everything the map alone reads is built
+ *  here. */
+@Composable
+private fun MapSurface(
+    state: MapUiState,
+    vm: MapViewModel,
+    hasMapTiler: Boolean,
+    darkTheme: Boolean,
+    amoled: Boolean,
+    hasLocation: () -> Boolean,
+    altsOpen: Boolean,
+    driveFollowing: Boolean,
+    speedOverlayArmed: Boolean,
+    filteredResultIds: Set<String>?,
+    cameraBottomInset: Int,
+    cameraLeftInset: Int,
+    topCardBottomPx: Int,
+    navBannerBottomPx: Int,
+    navBarTopPx: Float,
+    navOverviewTick: Int,
+    navRecenterTick: Int,
+    onNavRecenter: () -> Unit,
+    screenHeightPx: Float,
+    svPose: DoubleArray?,
+    metersPerPixelState: MutableState<Double>,
+    puckScreen: PuckScreen,
+    mapDpad: MapDpadController,
+    onMapTap: () -> Unit,
+    onUserPan: () -> Unit,
+    onOverlayState: (String) -> Unit,
+    onNavZoomOverride: (Boolean) -> Unit,
+) {
+    // The MAP can be lit apart from the chrome (Settings > Appearance > Map): the style, the route
+    // colors and the map's own overlays take these; sheets, cards and bars keep the app theme.
+    // Resolved HERE, not in MapScreen, whose method is at ART's verifier limit (PipNavOverlay).
+    val mapDark = app.vela.ui.theme.isMapDark()
+    val mapAmoled = app.vela.ui.theme.isMapAmoled()
+    val context = LocalContext.current
+    // MapTiler (when a key is built in) gives the Google-like look + its own
+    // light/dark styles; otherwise fall back to the keyless OpenFreeMap basemap
+    // with our own dark/light recolor.
+    val mapStyleUri = if (hasMapTiler) {
+        val variant = if (mapDark) "streets-v2-dark" else "streets-v2"
+        "https://api.maptiler.com/maps/$variant/style.json?key=${BuildConfig.MAPTILER_KEY}"
+    } else {
+        // The chosen look (Settings > Appearance > Map look), swapped for its cached
+        // Roboto-glyph patch when MapFonts has it ready (reactive - flips once the first
+        // refresh lands). Offline REGION DEFINITIONS deliberately keep the plain URL (see MapFonts).
+        MapFonts.effective(app.vela.ui.MapLook.style.value.uri)
+    }
+    // Roads already DRIVEN (entered by maneuvers up to the current step) + ref variants: the nav
+    // label bubbles must never call out the road being driven (Google labels only streets you
+    // cross), but the exclusion is per-step ON PURPOSE - the first cut excluded the WHOLE route,
+    // which hid exactly the label that matters most: the road you are about to turn onto ("the
+    // name of it needs to be right there", user 2026-07-16). Ref variants cover the basemap's
+    // bare-number `ref` prop ("5") and the OSRM spelling ("I 5").
+    // The turn you are about to make gets its own BLUE bubble at the corner (navTurnCallout), so
+    // its street is left out of the white ones here.
+    val turnCalloutRoad = remember(state.activeRoute, state.navigating, state.nav.stepIndex) {
+        if (!state.navigating) null else turnCalloutRoadOf(state.activeRoute?.maneuvers?.getOrNull(state.nav.stepIndex))
+    }
+    val navLabelExclude = remember(state.activeRoute, state.navigating, state.nav.stepIndex) {
+        if (!state.navigating) emptyList() else (state.activeRoute?.maneuvers
+            ?.take(state.nav.stepIndex.coerceAtLeast(0))
+            ?.flatMap { m ->
+                val refDigits = m.ref?.filter { it.isDigit() }
+                listOfNotNull(m.road, m.ref, refDigits)
+            }.orEmpty() + listOfNotNull(turnCalloutRoad))
+            .filter { it.isNotBlank() }.distinct()
+    }
+    // The next two maneuvers' target roads are force-INCLUDED in the label pass: a turn target
+    // often meets the route at a shared junction vertex, which a proper-crossing test can miss.
+    val navUpcomingRoads = remember(state.activeRoute, state.navigating, state.nav.stepIndex) {
+        if (!state.navigating) emptyList() else state.activeRoute?.maneuvers
+            ?.drop(state.nav.stepIndex)?.take(2)
+            ?.mapNotNull { m -> m.road?.takeIf { it.isNotBlank() && it != turnCalloutRoad } }.orEmpty()
+    }
+    // Saved-place pins for the browse map (issue #171): each list place carries its list's
+    // icon+color, quick-saves ride the default bookmark blue; deduped by place id (a place in
+    // several lists draws once, newest list wins). Empty while a result set / nav / replay /
+    // Street View owns the map.
+    // Also off while the route chooser is up: only the trip's own pins draw there (2026-09-30).
+    // Custom maps (issue #669): the previewed one and every saved list's shapes, less hidden layers.
+    val mapShapes = remember(state.pendingImport, state.pendingHiddenLayers, state.lists, state.drawing, state.navigating) {
+        // Not during a drive: the road and the route are what the map is for then.
+        if (state.navigating) emptyList() else
+        // A saved shape being changed is drawn once, as the drawing.
+        state.pendingImport?.shapes.orEmpty().filter { it.layer == null || it.layer !in state.pendingHiddenLayers } +
+            state.lists.flatMap { l -> l.shapes.filter { (it.layer == null || it.layer !in l.hiddenLayers) && it != state.drawing?.editOf } } +
+            // The shape being drawn, last, so no saved shape's index moves.
+            listOfNotNull(state.drawing?.takeIf { it.pts.size >= 4 }?.let { d ->
+                app.vela.core.model.MapShape(pts = d.pts, closed = d.closed && d.pts.size >= 6, color = d.color, width = 4f,
+                    fill = if (d.closed) (d.color and 0x00FFFFFFL) or 0x40000000L else null)
+            })
+    }
+    val savedPinData = remember(state.lists, state.saved, state.results, state.navigating, state.replaying, svPose, state.directionsOpen) {
+        if (state.navigating || state.replaying || svPose != null || state.directionsOpen) emptyList()
+        // A custom map on screen (opened from a link or from its saved list): its markers, as it drew them.
+        else if (state.results.isNotEmpty()) state.results.filter { it.pinColor != null || it.pinIconUrl != null }
+            .map { SavedPin(it.location.lat, it.location.lng, "place", it.pinColor ?: 0xFF1A73E8, it.pinIconUrl, name = it.name) to it }
+        else buildList {
+            val seen = HashSet<String>()
+            state.lists.forEach { l ->
+                l.places.forEach { lp ->
+                    if (lp.layer != null && lp.layer in l.hiddenLayers) return@forEach // a custom map's hidden layer (#669)
+                    if (seen.add(lp.id)) add(SavedPin(lp.lat, lp.lng, lp.icon ?: l.icon, lp.color ?: l.color, lp.iconUrl.takeIf { lp.icon == null }, name = lp.name) to lp.toPlace()) // its own icon first (#629), its own color (#669)
+                }
+            }
+            state.saved.forEach { sp ->
+                if (seen.add(sp.id)) {
+                    add(
+                        SavedPin(sp.lat, sp.lng, sp.icon ?: "bookmark", 0xFF1A73E8, name = sp.name) to
+                            app.vela.core.model.Place(id = sp.id, name = sp.name, location = sp.location, address = sp.address),
+                    )
+                }
+            }
+        }
+    }
+    val chooserUp = state.directionsOpen && !state.navigating
+    val chooserDest = if (state.directionsReversed) state.directionsOrigin else state.selected
+    // Transit lines (the plain highlight and the colored lines) are off while a non-transit route
+    // is on screen, chooser or drive: in a big city they buried the route, and the colored lines'
+    // orange and red read as traffic (user 2026-10-02).
+    val nonTransitRouteUp = (state.directionsOpen || state.navigating) &&
+        state.travelMode != app.vela.core.model.TravelMode.TRANSIT && state.activeRoute != null
+    VelaMapView(
+        styleUri = mapStyleUri,
+        myLocation = state.myLocation,
+        myBearing = state.myBearing,
+        // Coarse-only permission always means a vague position, even before a fresh fix
+        // reports its accuracy (Android hands coarse apps a fix only every few minutes): fall
+        // back to the ~2 km grid Android fuzzes coarse locations to, so the halo shows at once.
+        myAccuracyM = state.myAccuracyM ?: if (hasLocation() && androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.ACCESS_FINE_LOCATION,
+            ) != PackageManager.PERMISSION_GRANTED
+        ) 2000f else null,
+        mySpeed = state.mySpeed,
+        myFixRaw = state.myFixRaw,
+        mySpeedRaw = state.mySpeedRaw,
+        // A recorded-trip REPLAY emits its fixes at REPLAY_SPEEDUP x real time, so the map
+        // view scales the puck's clocks to match. A DEMO drive does NOT: startDemoDrive feeds
+        // `locationProvider.replay(fixes, speedup = 1f)` - real-time fixes - yet it also sets
+        // `replaying`, so it inherited the 3x clock scaling. The puck then dead-reckoned 3x too
+        // far between fixes, got stalled by the monotonic clamp until the next fix caught up,
+        // and its route bearing jumped with every surge - measured on-device as progress steps
+        // of 0 m (stalled) punctuated by 2.4 m lurches, chord-bearing wiggle 1.7 deg, and a
+        // camera yaw wiggle that the 55 deg tilt smears into the "record needle" swim across
+        // the top of the screen (issue #251, 2026-08-10). Demo drives run at 1x like real ones.
+        replaySpeedup = if (state.replaying && !state.demoDriving) (if (state.replayPaused) 0f else state.replaySpeed)
+            else if (state.demoDriving) (app.vela.ui.AppTune.local("demoSpeedup")?.toFloat()?.takeIf { it > 1f } ?: 1f) else 1f,
+        replaying = state.replaying,
+        compassHeading = state.compassHeading,
+        locationStale = state.myLocationStale,
+        cameraTarget = state.center,
+        cameraTargetZoom = state.centerZoom,
+        openZoom = state.startZoom,
+        recenterTick = state.recenterTick,
+        cameraBottomInsetPx = cameraBottomInset,
+        cameraLeftInsetPx = cameraLeftInset,
+        // The DRAWN line has its short median jogs straightened (RouteSmoothing, user 2026-10-03);
+        // the arrow rides the same line, guidance keeps the router's.
+        routePolyline = state.activeRoute?.let { it.drawPolyline ?: it.polyline }.let { p -> remember(p) { if (p == null) emptyList() else app.vela.core.nav.RouteSmoothing.roundBends(app.vela.core.nav.RouteSmoothing.removeZigzags(app.vela.core.nav.RouteSmoothing.straightenCircles(p))) } },
+        // A PAUSED drive draws its line in slate (user 2026-09-21): the map should say the
+        // guidance is on hold without reading the bar. Traffic spans keep their colors.
+        routeColor = if (state.navPaused) ROUTE_PAUSED_COLOR else routeTrafficColor(state.activeRoute, mapDark),
+        routeDashed = state.travelMode == app.vela.core.model.TravelMode.WALK ||
+            state.travelMode == app.vela.core.model.TravelMode.BICYCLE,
+        // Paused: one color end to end, no traffic colors over the lavender.
+        routeTrafficSpans = if (state.navPaused) emptyList() else routeTrafficSpans(state.activeRoute),
+        // The expanded transit row's legs (issue #233) while the chooser owns the map, and the
+        // WHOLE guided itinerary during step-by-step transit nav (issue #232) — there the camera
+        // frames the CURRENT leg and re-frames as Next/auto-advance moves through the trip.
+        transitPreview = when {
+            state.transitNav != null -> state.transitNav!!.itinerary
+            state.directionsOpen && !state.navigating && !state.replaying &&
+                state.travelMode == app.vela.core.model.TravelMode.TRANSIT -> state.transitPreview
+            else -> null
+        },
+        transitNavLeg = state.transitNav?.stepIndex,
+        tripEndpoints = if (state.transitNav == null && state.directionsOpen && !state.navigating && !state.replaying &&
+            state.travelMode == app.vela.core.model.TravelMode.TRANSIT && state.transitPreview == null) {
+            listOfNotNull(state.directionsOrigin?.location ?: state.myLocation) +
+                state.directionsWaypoints.map { it.location } + listOfNotNull(state.selected?.location)
+        } else emptyList(),
+        // Grayed, tappable alternates (Google-style) — only off-nav, with a chooser up.
+        alternates = if (state.navigating) emptyList() else run {
+            val activeIdx = state.routes.indexOf(state.activeRoute)
+            state.routes.mapIndexedNotNull { i, r ->
+                if (i != activeIdx && r.polyline.size >= 2) i to r.polyline else null
+            }
+        },
+        // Alternates are a faded version of the route blue with a darker outline (discussion
+        // #639): the old gray read as one more road on a dense grid. "fill|edge".
+        // Second pass the same day: the first fill (#A9C6F8) still read as near white on the
+        // light map, so both are a clearer blue.
+        // Third pass: on the DARK map (not AMOLED) a mid blue is the roads' own family and
+        // still sank in (same reporter, who drives in dark). There the alternate is a pale fill
+        // inside a route-blue outline, lighter than any road and edged in the one color nothing
+        // else on the map uses. AMOLED and light keep the blue fill.
+        altColor = when {
+            mapDark && !mapAmoled -> "#DCE7FF|#2F7BF0"
+            mapDark -> "#7C9FE0|#0E2247"
+            else -> "#7FA9F0|#3566C4"
+        },
+        onSelectAlternate = vm::selectRoute,
+        // Every route wears its time on the map, placed where it runs apart from the others;
+        // tapping a bubble picks that route. Both choosers (the classic one since 2026-09-17).
+        routeBubbles = if (state.directionsOpen && !state.navigating && state.routes.size > 1 &&
+            state.travelMode != app.vela.core.model.TravelMode.TRANSIT
+        ) {
+            remember(state.routes, state.activeRoute, altsOpen) {
+                routeBubblesFor(state.routes, state.routes.indexOf(state.activeRoute).coerceAtLeast(0), detailed = altsOpen)
+            }
+        } else emptyList(),
+        // ROUTE CHOOSER: only the trip's own points draw. The rest of the search results are
+        // noise once you are choosing a route, and they crowd the very pins that matter
+        // (user 2026-09-17). The destination keeps its own place pin (2026-09-30: a flag over
+        // it read as a second thing); no rating bubble, the pin says what it is.
+        markers = if (chooserUp) listOfNotNull(chooserDest?.let { MapMarker(it.name, it.location, it.category) }) else markersOf(state, filteredResultIds),
+        holdViewMinHits = if (state.resultsBranchesLoaded) Int.MAX_VALUE else if (app.vela.core.search.SearchKind.isName(state.query, state.results.map { it.name })) HOLD_VIEW_HITS_NAME else HOLD_VIEW_HITS_KIND,
+        frameMarkers = state.results.isNotEmpty() && state.selected == null && !state.resultsCollapsed,
+        holdMarkerFit = state.selected != null || state.streetView != null || state.streetViewLoading,
+        // The endpoints card's measured bottom edge: the route fit frames start/end in the
+        // strip between the card and the chooser instead of hiding either behind chrome.
+        cameraTopInsetPx = if (state.directionsOpen && !state.navigating) topCardBottomPx else 0,
+        // Numbered stop pins while the trip UI is active (chooser, editor or the drive itself).
+        stopPins = if (state.directionsOpen || state.navigating) state.directionsWaypoints.map { it.location } else emptyList(),
+        candidatePin = state.navTapCandidate?.location?.takeIf { state.navigating },
+        // The flag is left for a trip that ends at "your location", which has no place to draw.
+        destinationPin = if (chooserUp && chooserDest == null) state.myLocation else null,
+        navMode = state.navigating,
+        navDriveMode = state.travelMode == app.vela.core.model.TravelMode.DRIVE,
+        navLabelExclude = navLabelExclude,
+        navUpcomingRoads = navUpcomingRoads,
+        onNavRoadLatin = { vm.onNavRoadLatin(it) },
+        // Follow yields to a manual pan AND to step preview: the per-frame follow ticker used
+        // to keep re-pointing the camera at the puck while a banner swipe was trying to fly to
+        // the previewed turn - the two fought at 60 fps (user 2026-07-14). The puck itself
+        // keeps updating either way; only the camera steps aside.
+        navFollowing = !state.navCameraDetached && state.previewStepIndex == null,
+        navNorthUp = state.navNorthUp,
+        // The compass below the nav card is the heading-up/north-up toggle during a drive
+        // (a reorient-to-north tap would be overridden by the follow a frame later anyway).
+        // Detached (a pan, overview or step preview), the follow camera is not drawing, so a bare
+        // toggle showed nothing: switch the mode and re-center so the change is visible.
+        onCompassTap = {
+            if (!state.navigating) false
+            else {
+                vm.toggleNavNorthUp()
+                if (state.navCameraDetached || state.previewStepIndex != null) onNavRecenter()
+                true
+            }
+        },
+        poisEnabled = app.vela.ui.MapPoiPrefs.showPois.value,
+        // The POI bitmaps are fixed pixels, so below hdpi they render physically huge (a 240x320
+        // phone at 120 dpi, issue #400, showed pins a fifth of the screen wide). Below 1.75x the
+        // default shrinks with the density; the Settings multiplier still applies on top.
+        poiIconScale = app.vela.ui.MapPoiPrefs.iconScale.floatValue * lowDensityIconScale(LocalDensity.current.density),
+        // No density correction on labels: see the parameter's note in VelaMapView.
+        poiLabelScale = app.vela.ui.MapPoiPrefs.iconScale.floatValue,
+        onNavPanned = vm::onNavPanned,
+        ambientCoversView = state.ambientCoversView,
+        // Grabbing the map with a sheet up drops it down out of the way so the map is yours
+        // to look at (Google does the same): the results sheet to its bar, the place sheet to
+        // its minimized card. The bar / a drag brings them back.
+        // A start view that is not the phone's position holds the map until the locate button.
+        driveFollowing = driveFollowing && !state.startHold,
+        onMapTap = onMapTap,
+        onUserPan = onUserPan,
+        onScaleChanged = { metersPerPixelState.value = it },
+        onOverlayState = onOverlayState,
+        darkTheme = mapDark,
+        amoled = mapAmoled,
+        applyKeylessTheme = !hasMapTiler,
+        // Off-nav: the whole-map raster when the user toggles it on. During nav we
+        // DON'T wash the whole map — the user asked for traffic on "just the road
+        // we're on, not all of it", so the route line itself is colored per-segment
+        // from the directions traffic spans (VelaMapView.routeGradientStops /
+        // DirectionsParser.parseTrafficSpans); the whole-map overlay stays off unless
+        // the user explicitly enables it in Settings → Map.
+        trafficOn = Traffic.on.value,
+        transitOn = app.vela.ui.TransitLayer.on.value && !nonTransitRouteUp,
+        transitMetro = app.vela.ui.TransitLayer.metro.value,
+        transitTrains = app.vela.ui.TransitLayer.trains.value,
+        // Off while a non-transit route is on screen (chooser or drive): in a big city the colored
+        // rail lines buried the route, and their orange and red read as traffic (user 2026-10-02).
+        transitLines = if (nonTransitRouteUp) emptyList() else state.transitLines,
+        satelliteOn = app.vela.ui.SatelliteLayer.on.value,
+        satDeep = state.satDeep,
+        topographyOn = app.vela.ui.Topography.on.value,
+        previewTarget = state.previewStepIndex?.let { state.activeRoute?.maneuvers?.getOrNull(it)?.location },
+        navOverviewTick = navOverviewTick,
+        navRecenterTick = navRecenterTick,
+        onNavZoomOverride = onNavZoomOverride,
+        onPuckScreen = { x, y -> puckScreen.set(Offset(x, y)) },
+        onPoiTap = vm::onPoiTap,
+        onMarkerTap = { i -> if (!chooserUp) displayedPlaces(state).getOrNull(i)?.let(vm::selectPlace) },
+        parkingSpot = state.parkingSpot,
+        onParkingTap = { vm.showParkedCar(context.getString(R.string.map_parked_car)) },
+        // Saved places stick out while browsing (issue #171): every list place + quick-save
+        // draws its list's icon/emoji in the list's color. Hidden while a result set owns the
+        // map (a list's own results would double-draw) and during nav/replay (declutter).
+        savedPins = savedPinData.map { it.first },
+        // Custom maps (issue #669): the previewed one and every saved list that carries shapes.
+        shapes = mapShapes,
+        onShapeTap = { i, at -> mapShapes.getOrNull(i)?.let { vm.openShape(it, at) } },
+        fitLeadCount = if (state.openListId == null && state.pendingImport == null) SEARCH_FIT_LEAD else Int.MAX_VALUE,
+        drawDots = state.drawing?.let { d -> d.pts.chunked(2).map { LatLng(it[0], it[1]) } },
+        onDrawTap = vm::drawAddPoint,
+        onDrawMove = vm::drawMovePoint,
+        onDrawRemove = vm::drawRemovePoint,
+        onSavedPinTap = { i -> savedPinData.getOrNull(i)?.second?.let(vm::selectPlace) },
+        svPose = svPose,
+        svTopInsetPx = (screenHeightPx * 0.55f).toInt(),
+        onSvMapTap = vm::moveStreetViewTo,
+        // No stale ambient dots mid-drive: the fetch pauses during nav, and the basemap POIs
+        // (kept visible in nav now) cover the gas-station-on-the-way case without duplicates.
+        ambientPois = if (state.navigating) emptyList() else ambientMarkersOf(state),
+        buildingOverlays = state.buildingOverlays,
+        addressOverlays = state.addressOverlays,
+        maxspeedOverlays = state.maxspeedOverlays,
+        placesOverlays = state.placesOverlays,
+        hiddenOpenPlaceIds = state.hiddenOpenPlaceIds,
+        ambientClosed = if (state.navigating) emptyList() else state.ambientClosed.map { MapMarker(it.name, it.location, it.category) },
+        onOpenPlaceClosed = vm::onOpenPlaceClosed,
+        placesPending = state.placesPending,
+        placesOneSet = state.placesOneSet,
+        osmBusinesses = app.vela.ui.MapPoiPrefs.osmBusinesses.value,
+        hideCivic = !app.vela.ui.MapPoiPrefs.showCivic.value,
+        // The exit you are taking, for the green callout on the map: only a numbered exit off
+        // a ramp or a fork, and only while its own step is the one being guided.
+        navTapPlaces = app.vela.ui.MapPoiPrefs.navTapPlaces.value,
+        navExitCallout = if (!state.navigating) null else remember(state.activeRoute, state.nav.stepIndex) {
+            val m = state.activeRoute?.maneuvers?.getOrNull(state.nav.stepIndex)
+            val ramp = m?.type in setOf(
+                app.vela.core.model.ManeuverType.RAMP_LEFT, app.vela.core.model.ManeuverType.RAMP_RIGHT,
+                app.vela.core.model.ManeuverType.FORK_LEFT, app.vela.core.model.ManeuverType.FORK_RIGHT,
+                app.vela.core.model.ManeuverType.KEEP_LEFT, app.vela.core.model.ManeuverType.KEEP_RIGHT,
+            )
+            val label = if (m != null && ramp) app.vela.core.nav.ExitLabel.of(m.instruction) else null
+            val poly = state.activeRoute?.polyline.orEmpty()
+            when {
+                m == null || label == null -> null
+                poly.size < 2 -> m.location to label
+                else -> {
+                    // ON THE RAMP, not on the freeway beside it (user 2026-09-17): the maneuver
+                    // point is where the ramp leaves, so walk a little way down the route past it.
+                    val cum = app.vela.core.nav.RouteProjection.cumulative(poly)
+                    val at = app.vela.core.nav.RouteProjection.alongMeters(poly, cum, m.location, 120.0)
+                    val p = if (at == null) m.location else app.vela.core.nav.RouteProjection.pointAt(poly, cum, at + EXIT_CALLOUT_AHEAD_M)
+                    p to label
+                }
+            }
+        },
+        // The street the next TURN enters, in a blue bubble with its tail on the corner: the name
+        // right where you turn, the way Google labels it.
+        navTurnCallout = if (turnCalloutRoad == null) null else remember(state.activeRoute, state.nav.stepIndex, state.roadNameLatin, state.trafficControls, state.flockCameras) {
+            val m = state.activeRoute?.maneuvers?.getOrNull(state.nav.stepIndex)
+            val poly = state.activeRoute?.polyline.orEmpty()
+            val label = turnCalloutRoad.let { r ->
+                if (state.roadNameLatin.isEmpty()) r
+                else app.vela.core.voice.SpokenScript.forDisplay(r, app.vela.ui.AppLocale.effective().language, state.roadNameLatin)
+            }
+            when {
+                m == null -> null
+                poly.size < 2 -> m.location to label
+                else -> {
+                    val cum = app.vela.core.nav.RouteProjection.cumulative(poly)
+                    val at = app.vela.core.nav.RouteProjection.alongMeters(poly, cum, m.location, 120.0)
+                    // Farther along the new street while a drawn light, stop sign or camera is under
+                    // the spot (2026-10-03): lights stand on the corner, and the callout never yields.
+                    val furniture = state.trafficControls.map { it.loc } + state.flockCameras.map { it.loc }
+                    val p = if (at == null) m.location else TURN_CALLOUT_STEPS_M.asSequence()
+                        .map { app.vela.core.nav.RouteProjection.pointAt(poly, cum, at + TURN_CALLOUT_AHEAD_M + it) }
+                        .firstOrNull { q -> furniture.none { it.distanceTo(q) < TURN_CALLOUT_CLEAR_M } }
+                        ?: app.vela.core.nav.RouteProjection.pointAt(poly, cum, at + TURN_CALLOUT_AHEAD_M)
+                    p to label
+                }
+            }
+        },
+        inNavOverview = state.inNavOverview,
+        navShields = remember(state.activeRoute, state.navigating, state.travelMode) {
+            val r = state.activeRoute
+            if (!state.navigating || r == null || state.travelMode != app.vela.core.model.TravelMode.DRIVE) emptyList()
+            else app.vela.core.nav.RouteShields.points(r)
+        },
+        basemapArchive = state.basemapArchive,
+        onOpenPlaceTap = vm::onOpenPlaceTap,
+        onRoadLimitKmh = vm::onOverlayRoadLimit,
+        speedOverlayOn = speedOverlayArmed, // motion-armed with hysteresis - NEVER on the parked browse map
+
+        trafficControls = state.trafficControls,
+        flockCameras = state.flockCameras,
+        speedCameras = state.speedCameras,
+        // Hide the tapped stop's own badge while it is selected - the red selected-place pin
+        // drops at the same coordinate and the two bus glyphs stacked read as a glitch
+        // (user 2026-07-13). Structural list equality keeps the identity gate quiet.
+        transitStops = state.transitStops.filter { st -> state.selected?.id != "gtfs:${st.stopId}" && app.vela.ui.TransitLayer.showsStop(st.modes) },
+        onTransitStopTap = vm::onTransitStopTap,
+        navBannerBottomPx = if (state.navigating) navBannerBottomPx else 0,
+        navBarTopPx = navBarTopPx,
+        // Index into the SHOWN list (the same one ambientMarkersOf uploads), not the raw
+        // pool - while a place is open the shown list drops the selected place's copy, so
+        // raw-pool indices would be off by one past it.
+        onAmbientTap = { i -> ambientShownOf(state).getOrNull(i)?.let(vm::selectPlace) },
+        onCameraIdle = vm::onCameraIdle,
+        onMapLongPress = vm::onMapLongPress,
+        onAddressLabelTap = vm::onAddressLabelTap,
+        onViewport = vm::onViewport,
+        dpadController = mapDpad,
+        modifier = Modifier.fillMaxSize(),
+    )
+}
+
+/** Building-overlay debug badge + UI-thread FPS readout (Settings -> Developer). Split out of
+ *  MapScreen on 2026-09-13: the MapScreen composable had grown past the JVM 64 KB method limit
+ *  in the debug variant (Compose source info counts), and this block was the cleanest cut. */
+/** The classic route chooser, split out of MapScreen (verifier limit, see PipNavOverlay). With the
+ *  Google-style picker on, the TRANSIT tab still uses this body (the laid-out time and vehicle
+ *  chips suit transit) under the picker's own header, so switching modes reads as one sheet. */
+@Composable
+private fun BoxScope.ClassicDirectionsHost(
+    state: MapUiState,
+    vm: MapViewModel,
+    onStartNav: () -> Unit,
+    dirPanTick: Int,
+    onMinimized: (Boolean) -> Unit,
+    bodyMaxDp: Float?,
+    landscapeChrome: Boolean,
+    sidePanelWidthDp: androidx.compose.ui.unit.Dp,
+    onTopPx: (Int) -> Unit,
+) {
+    val ctx = LocalContext.current
+    val destLabel = if (state.directionsReversed) (state.directionsOrigin?.name ?: stringResource(R.string.mapscreen_your_location))
+    else (state.selected?.name ?: stringResource(R.string.mapscreen_destination))
+    DirectionsPanel(
+        onShowTraffic = if (app.vela.ui.RouteTrafficOnTap.on.value && !state.routeTrafficRequested && !app.vela.ui.GoogleFree.on.value && state.travelMode != app.vela.core.model.TravelMode.WALK) vm::requestRouteTraffic else null,
+        destinationName = destLabel,
+        currentMode = state.travelMode,
+        routes = state.routes,
+        activeRoute = state.activeRoute,
+        flockOnRoute = state.flockOnRoute,
+        transit = state.transit,
+        transitLoading = state.transitLoading,
+        modeEtas = state.modeEtas,
+        onModeSelected = vm::setTravelMode,
+        avoidTolls = state.avoidTolls,
+        avoidHighways = state.avoidHighways,
+        avoidFerries = state.avoidFerries,
+        onAvoidTolls = vm::setAvoidTolls,
+        onAvoidHighways = vm::setAvoidHighways,
+        onAvoidFerries = vm::setAvoidFerries,
+        onSelectRoute = vm::selectRoute,
+        onStartNav = onStartNav,
+        minimizeTick = dirPanTick,
+        onSteps = if (state.activeRoute != null) vm::openSteps else null,
+        onSearchAlongRoute = vm::searchAlongRoute,
+        onWalkDirections = vm::walkDirections,
+        onStartTransit = vm::startTransitNav,
+        onTransitPreview = vm::onTransitRowExpanded,
+        onTimeSelected = vm::setDirectionsTime,
+        transitPrefer = state.transitPrefer,
+        onTransitPrefer = vm::setTransitPrefer,
+        transitRoutePref = state.transitRoutePref,
+        onTransitRoutePref = vm::setTransitRoutePref,
+        onCollapsedChange = onMinimized,
+        bodyMaxDp = bodyMaxDp,
+        googleHeader = app.vela.ui.RoutePicker.googleStyle.value,
+        onShare = {
+            val dest = state.selected
+            val body = listOfNotNull(
+                destLabel,
+                dest?.let { "geo:${it.location.lat},${it.location.lng}?q=${it.location.lat},${it.location.lng}(${android.net.Uri.encode(it.name)})" },
+            ).joinToString("\n")
+            runCatching {
+                ctx.startActivity(
+                    android.content.Intent.createChooser(
+                        android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, body),
+                        null,
+                    ),
+                )
+            }
+        },
+        onClose = vm::clearRoute,
+        // Landscape: a LEFT side panel, width-capped, exactly like the place and results
+        // sheets beside it (issue #297). As a full-width bottom sheet its open height ate
+        // a landscape screen whole - the map was not merely obscured, it was completely
+        // gone, which is a poor way to ask someone to choose between routes drawn on it.
+        modifier = Modifier
+            .align(if (landscapeChrome) Alignment.BottomStart else Alignment.BottomCenter)
+            .onGloballyPositioned { onTopPx(it.boundsInWindow().top.roundToInt()) }
+            .landscapeColumn(landscapeChrome, sidePanelWidthDp),
+    )
+}
+
+/** The picture-in-picture overlay: the turn card across the top and the trip's figures along the
+ *  bottom. Split out of MapScreen (2026-09-28): the MapScreen method sits at ART's verifier limit
+ *  and two more direct calls in it made the release build fail verification (a VerifyError at
+ *  launch on Android 14, a silently dead screen on 16). */
+@Composable
+private fun BoxScope.PipNavOverlay(state: MapUiState, pipUi: Boolean) {
+    if (pipUi && state.navigating && state.maneuverText.isNotEmpty() && app.vela.ui.PipTurnCard.on.value) {
+        PipTurnCardOverlay(state)
+    } else if (pipUi && state.navigating && state.maneuverText.isNotEmpty()) {
+        // ONE bar along the bottom, Google's mini map (checked on the 4a 2026-10-02): the turn
+        // glyph in a darker column at the left, the road the turn enters as the headline, and
+        // under it the distance to the turn and the arrival clock. Flush with the window's
+        // edges; the window clips the corners. The arrival clock is formatArrivalClock, which
+        // follows the phone's 12/24-hour setting (Clock24).
+        val next = state.activeRoute?.maneuvers?.getOrNull(state.nav.stepIndex)
+        val roadOnly = next?.let { m -> m.ref?.takeIf { it.isNotBlank() } ?: m.road?.takeIf { it.isNotBlank() } }
+        val secs = state.nav.remainingDuration
+        androidx.compose.material3.Surface(
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+            color = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        ) {
+            Row(Modifier.height(androidx.compose.foundation.layout.IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
+                if (next != null) {
+                    Box(
+                        Modifier.fillMaxHeight()
+                            .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.10f))
+                            .padding(horizontal = 6.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(app.vela.ui.nav.maneuverIconFor(next), contentDescription = null, modifier = Modifier.size(26.dp))
+                    }
+                }
+                Column(Modifier.padding(horizontal = 8.dp, vertical = 5.dp)) {
+                    Text(
+                        roadOnly ?: state.maneuverText,
+                        style = if (roadOnly != null) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (roadOnly != null) FontWeight.SemiBold else null,
+                        maxLines = if (roadOnly != null) 1 else 2,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        formatDistance(state.nav.distanceToNextManeuver) + " · " + app.vela.ui.formatArrivalClock(secs),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = LocalContentColor.current.copy(alpha = 0.72f),
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** The older picture-in-picture layout, kept as a setting (`PipTurnCard`): a turn card across the
+ *  top, the trip's time left and arrival along the bottom. */
+@Composable
+private fun BoxScope.PipTurnCardOverlay(state: MapUiState) {
+        // Google's earlier shape: the turn card's own green with the glyph, the
+        // distance as the headline and the turn text under it, across the top of the window.
+        // The old dark strip put everything on one small line and read as a caption
+        // (user 2026-09-13: hard to parse next to Google's).
+        val next = state.activeRoute?.maneuvers?.getOrNull(state.nav.stepIndex)
+        androidx.compose.material3.Surface(
+            // Flush with the window's edges, no margin or rounding (user 2026-10-03): a rounded card
+            // inset 4 dp wasted the mini window's width; the window clips its own corners.
+            modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth(),
+            color = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        ) {
+            Row(
+                Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (next != null) {
+                    Icon(
+                        app.vela.ui.nav.maneuverIconFor(next),
+                        contentDescription = null,
+                        modifier = Modifier.size(30.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                }
+                Column {
+                    Text(
+                        formatDistance(state.nav.distanceToNextManeuver),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                    )
+                    // The road the turn enters, not the whole sentence: "Turn left o..." said
+                    // nothing at the mini map's width; "County Rte E8" does.
+                    val roadOnly = next?.let { m -> m.ref?.takeIf { it.isNotBlank() } ?: m.road?.takeIf { it.isNotBlank() } }
+                    Text(
+                        roadOnly ?: state.maneuverText,
+                        style = if (roadOnly != null) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
+                        maxLines = if (roadOnly != null) 1 else 2,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+        // The trip's own figures along the bottom, as Google's mini map shows them (user
+        // 2026-09-25): time left and arrival, the same numbers the nav bar shows. Distance is
+        // left out: at the mini window's width it only ever showed as a trailing "...".
+        // Same container as the turn card above it, and centered (user 2026-09-28: the gray
+        // strip read as a different kind of thing under the green card). The arrival clock is
+        // formatArrivalClock, which follows the phone's 12/24-hour setting (Clock24).
+        androidx.compose.material3.Surface(
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+            color = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        ) {
+            val secs = state.nav.remainingDuration
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    formatDuration(secs),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                )
+                Text(
+                    " · " + app.vela.ui.formatArrivalClock(secs),
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                )
+            }
+        }
+}
+
+@Composable
+private fun BoxScope.BuildingDebugBadge(overlayDebugState: String) {
+    val label = when {
+        !app.vela.ui.BuildingOverlay.on.value -> "MS bldg: OFF"
+        overlayDebugState == "drawing" -> "MS bldg: DRAWING"
+        overlayDebugState == "hidden" -> "MS bldg: hidden (OSM dense)"
+        else -> "MS bldg: none here"
+    }
+    var fps by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) {
+        var frames = 0
+        var acc = 0L
+        var last = 0L
+        while (true) {
+            withFrameNanos { now ->
+                if (last != 0L) {
+                    acc += now - last
+                    frames++
+                    if (acc >= 500_000_000L) { // recompute twice a second
+                        fps = (frames * 1_000_000_000.0 / acc).toInt()
+                        frames = 0; acc = 0L
+                    }
+                }
+                last = now
+            }
+        }
+    }
+    Column(
+        Modifier
+            .align(Alignment.BottomStart)
+            .padding(start = 8.dp, bottom = 92.dp)
+            .background(androidx.compose.ui.graphics.Color(0xCC000000), RoundedCornerShape(4.dp))
+            .padding(horizontal = 6.dp, vertical = 3.dp),
+    ) {
+        Text("$fps fps", color = androidx.compose.ui.graphics.Color.White, fontSize = 11.sp)
+        Text(label, color = androidx.compose.ui.graphics.Color.White, fontSize = 11.sp)
+    }
+}
+
+/** The turn card at the top of the nav screen (live maneuver, or the previewed step while
+ *  swiping ahead). Split out of MapScreen on 2026-09-13 - see [BuildingDebugBadge]. */
+@Composable
+private fun BoxScope.NavTurnBanner(
+    state: MapUiState,
+    vm: MapViewModel,
+    landscapeChrome: Boolean,
+    sidePanelWidthDp: androidx.compose.ui.unit.Dp,
+    onBottomPx: (Int) -> Unit,
+) {
+    val mans = state.activeRoute?.maneuvers
+    val liveStep = state.nav.stepIndex
+    val previewing = state.previewStepIndex != null
+    // Show the previewed step when swiping ahead, else the live maneuver.
+    val shownIdx = (state.previewStepIndex ?: liveStep).coerceIn(0, mans?.lastIndex ?: 0)
+    val shown = mans?.getOrNull(shownIdx)
+    // A roundabout's own EXIT step is not a "then": it repeats the same roundabout ("At the
+    // roundabout, take the 2nd exit" twice read as two roundabouts, real drive 2026-10-03). The
+    // "then" is the maneuver after it, at the combined distance.
+    val skipRbExit = shown?.type == app.vela.core.model.ManeuverType.ROUNDABOUT &&
+        mans?.getOrNull(shownIdx + 1)?.type == app.vela.core.model.ManeuverType.EXIT_ROUNDABOUT
+    val next = mans?.getOrNull(shownIdx + if (skipRbExit) 2 else 1)
+    // Show the real romanized road name where the basemap gave us one (issue #184): swap the
+    // local-script name in the instruction for its Latin form. No ICU fallback here - a name we
+    // have no real romanization for keeps its local script (a skeleton on a sign reads broken).
+    val navUiLang = app.vela.ui.AppLocale.effective().language
+    fun navRomanize(s: String): String =
+        if (s.isEmpty() || state.roadNameLatin.isEmpty()) s
+        else app.vela.core.voice.SpokenScript.forDisplay(s, navUiLang, state.roadNameLatin)
+    ManeuverBanner(
+        offRoute = state.nav.offRoute,
+        // The road inside the text is abbreviated the way the pill does it (issue #837); the
+        // voice keeps the full words from `maneuverText`.
+        text = navRomanize(app.vela.core.util.RoadNameShort.inText(if (previewing) (shown?.instruction.orEmpty()) else state.maneuverText, shown?.road)),
+        // The headline distance is the APPROACH to the shown maneuver. A maneuver's own
+        // distanceMeters is the travel AFTER it (Route.kt convention) — showing it here
+        // put the leg-after on the previewed step's headline ("3.1 mi — Turn right onto
+        // Elm St" for a turn 500 ft after the previous one). The approach leg is the
+        // PREVIOUS maneuver's after-distance.
+        distanceMeters = if (previewing) {
+            mans?.getOrNull(shownIdx - 1)?.distanceMeters ?: state.nav.distanceToNextManeuver
+        } else {
+            state.nav.distanceToNextManeuver
+        },
+        type = shown?.type ?: ManeuverType.STRAIGHT,
+        roundabout = shown?.roundabout,
+        ref = shown?.ref,
+        laneHint = shown?.laneHint,
+        lanes = shown?.lanes.orEmpty(),
+        nextText = next?.instruction?.let { navRomanize(app.vela.core.util.RoadNameShort.inText(it, next.road)) },
+        nextType = next?.type,
+        nextRoundabout = next?.roundabout,
+        nextRef = next?.ref,
+        // The road being driven = the one entered by the LIVE maneuver last passed
+        // (never the previewed one - previewing shouldn't change where you "are").
+        currentRef = mans?.getOrNull(liveStep - 1)?.let { m -> m.roadAt(m.distanceMeters - state.nav.distanceToNextManeuver).second },
+        // The shown→next gap is the SHOWN maneuver's step length (a maneuver's distanceMeters is
+        // the travel AFTER it, to the next maneuver — both OSRM and the Google parser use that
+        // convention). Passing next.distanceMeters was the next→next-next gap: it made "then
+        // Arrive" (ARRIVE has 0 after it) show permanently while approaching the final turn, and
+        // suppressed true exit-then-merge compounds whose merge had a long following leg.
+        nextDistanceMeters = shown?.distanceMeters?.let { d -> if (skipRbExit) d + (mans?.getOrNull(shownIdx + 1)?.distanceMeters ?: 0.0) else d },
+        destName = state.arrivedLabel,
+        destAddress = state.navDestAddress,
+        // Speed-scaled approach gate for lanes + the "then" row: identity at city speeds
+        // (≤ ~60 mph), ~1 km ≈ 30 s at highway speed — Google's cadence.
+        laneShowM = maxOf(800.0, (state.mySpeed ?: 0f).toDouble() * 30.0),
+        previewing = previewing,
+        onPreviewNext = { vm.previewStep((shownIdx + 1).coerceAtMost(mans?.lastIndex ?: liveStep)) },
+        onPreviewPrev = { if (shownIdx - 1 <= liveStep) vm.clearPreview() else vm.previewStep(shownIdx - 1) },
+        onExitPreview = vm::clearPreview,
+        // Landscape: the turn card becomes a LEFT column rather than a full-width banner
+        // (issue #297). Spanning the width, it and the ETA bar left a thin horizontal
+        // sliver of map between them with the puck half under the bar - the road ahead is
+        // exactly what you need to see while driving.
+        modifier = Modifier
+            .align(if (landscapeChrome) Alignment.TopStart else Alignment.TopCenter)
+            .landscapeColumn(landscapeChrome, sidePanelWidthDp)
+            .statusBarsPadding()
+            .padding(start = if (landscapeChrome) NAV_LAND_EDGE_DP else 12.dp, top = 12.dp, end = 12.dp, bottom = 12.dp)
+            // Report the banner's bottom edge so the compass can drop just below it (any height),
+            // and to the drive camera, which keeps the road ahead out from under it.
+            .onGloballyPositioned {
+                onBottomPx((it.positionInRoot().y + it.size.height).roundToInt())
+                NavChromeEdges.bannerBottomPx = (it.positionInWindow().y + it.size.height).roundToInt()
+            },
+    )
+}
+
+/** The search entry page (recents, saved, Home/Work, suggestions, pickers). Split out of
+ *  MapScreen on 2026-09-13 - see [BuildingDebugBadge]. */
+@Composable
+private fun SearchEntryHost(state: MapUiState, vm: MapViewModel, focusManager: androidx.compose.ui.focus.FocusManager) {
+    SearchEntryContent(
+        savedRoutes = state.savedRoutes.filter { it.pinned },
+        onPickSavedRoute = { focusManager.clearFocus(); vm.openSavedRoute(it) },
+        suggestions = state.suggestions,
+        localSuggestions = state.localSuggestions,
+        onPickLocal = {
+            focusManager.clearFocus()
+            vm.pickLocalSuggestion(it)
+        },
+        querySuggestions = state.querySuggestions,
+        onPickQuery = {
+            focusManager.clearFocus()
+            vm.searchRecent(it)
+        },
+        onFillQuery = vm::fillQuery,
+        onRemoveLocal = vm::removeLocalSuggestion,
+        lists = state.lists,
+        onAddToList = { place, listId -> vm.addPlaceToList(listId, place) },
+        onRemoveFromList = { place, listId -> vm.removePlaceFromList(listId, place) },
+        onCreateListWith = { place, name -> vm.addPlaceToList(vm.createList(name), place) },
+        saved = state.saved.filter { it.pinned },
+        savedTip = !vm.savedPinTipDone.value && state.saved.isNotEmpty() && state.saved.none { it.pinned },
+        onDismissSavedTip = vm::dismissSavedPinTip,
+        recents = state.recents,
+        recentPlaces = state.recentPlaces,
+        home = state.home,
+        work = state.work,
+        assigning = state.assigningShortcut,
+        pickingOrigin = state.pickingOrigin,
+        pickingDest = state.pickingDest,
+        pickingStop = state.pickingStop,
+        onCancelPickStop = vm::cancelPickStop,
+        onUseMyLocation = vm::useMyLocationAsOrigin,
+        onChooseOnMap = {
+            focusManager.clearFocus()
+            if (state.pickingOrigin) vm.chooseOriginOnMap()
+            else if (state.pickingDest) vm.chooseDestOnMap()
+            else vm.chooseStopOnMap()
+        },
+        onPickSuggestion = {
+            focusManager.clearFocus()
+            vm.selectPlace(it)
+        },
+        onPickSaved = {
+            focusManager.clearFocus()
+            vm.selectSaved(it)
+        },
+        onPickRecent = {
+            focusManager.clearFocus()
+            vm.searchRecent(it)
+        },
+        onPickRecentPlace = {
+            focusManager.clearFocus()
+            vm.selectSaved(it)
+        },
+        onRemoveRecent = vm::removeRecentQuery,
+        onRemoveRecentPlace = vm::removeRecentPlace,
+        onClearRecents = vm::clearRecents,
+        onPickShortcut = {
+            focusManager.clearFocus()
+            vm.openShortcut(it)
+        },
+        onAssignShortcut = vm::beginAssignShortcut,
+        onClearShortcut = vm::clearShortcut,
+        onCancelAssign = vm::cancelAssign,
+        onPinSavedAs = vm::pinSavedAs,
+        onUnpinSaved = { vm.setSavedPlacePinned(it.id, false) },
+        onUnpinSavedRoute = { vm.setSavedRoutePinned(it.id, false) },
+        onRemoveSaved = vm::removeSaved,
+        onRenameSaved = vm::renameSaved,
+    )
+}
+
+@Composable
+private fun CategoryChips(onPick: (String) -> Unit, modifier: Modifier = Modifier) {
+    // Driving mode keeps the search bar alone at the top (issue #727). The row's place stays
+    // taken, so the landscape bar keeps its half width and the compass its corner.
+    if (app.vela.ui.DrivingMode.on.value) { Spacer(modifier); return }
+    // (localized label, STABLE English search query, icon) — the query is the logic key sent to Google
+    // search (works in any locale), the label is what the user sees, so the chips localize without
+    // changing what's searched. The list is in the user's order, less the chips switched off
+    // (Settings > Search > Quick search buttons, issue #779).
+    val categories = app.vela.ui.QuickCategories.all().map { Triple(it.label, it.query, it.icon) }
+    // Settings > Map "Category shortcuts" (issue #654): the row, one chip with a menu, or nothing.
+    when (app.vela.ui.CategoryChipsPref.mode.value) {
+        app.vela.ui.CategoryChipsPref.Mode.HIDDEN -> return
+        app.vela.ui.CategoryChipsPref.Mode.BUTTON -> {
+            var open by remember { mutableStateOf(false) }
+            Box(modifier) {
+                ElevatedAssistChip(
+                    onClick = { open = true },
+                    modifier = Modifier.dpadHighlight(RoundedCornerShape(8.dp)),
+                    label = { Text(stringResource(R.string.cat_menu)) },
+                    leadingIcon = { Icon(Sym.Category, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    shape = CircleShape,
+                )
+                app.vela.ui.VelaMenu(expanded = open, onDismissRequest = { open = false }) {
+                    categories.forEach { (labelRes, query, icon) ->
+                        item(stringResource(labelRes), icon) { open = false; onPick(query) }
+                    }
+                }
+            }
+            return
+        }
+        app.vela.ui.CategoryChipsPref.Mode.ROW -> Unit
+    }
+    Row(
+        modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Your lists used to lead this row as a round button. It moved into the search bar beside
+        // the settings gear (issue #290): on the far left it competed with the quick-category
+        // chips, which are a different kind of control, and the reach was awkward.
+        categories.forEach { (labelRes, query, icon) ->
+            ElevatedAssistChip(
+                onClick = { onPick(query) },
+                modifier = Modifier.dpadHighlight(RoundedCornerShape(8.dp)),
+                label = { Text(stringResource(labelRes)) },
+                leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                // Full pill, Google-style — the M3 default 8dp corners read dated on a map chip row.
+                shape = androidx.compose.foundation.shape.CircleShape,
+                // MONOCHROME glyphs (user 2026-07-06), SOFT ink (user 2026-07-11): the M3
+                // default tints the icon primary teal; full onSurface made the solid glyph
+                // read DARKER than the label. onSurfaceVariant matches the glyph weight to
+                // the text, like Google's rows.
+                colors = androidx.compose.material3.AssistChipDefaults.elevatedAssistChipColors(
+                    leadingIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+            )
+        }
+        // Every chip, hidden ones included, behind one More (issue #779).
+        MoreCategoriesChip(onPick)
+    }
+}
+
+/** "Choose on map" mode: a full-screen overlay over the live map with a center crosshair, a hint
+ *  banner and a Confirm button. Empty areas carry no gesture modifiers, so map pan/zoom pass straight
+ *  through to the MapLibre view below; only the banner and button consume touches. */
+@Composable
+private fun ChooseOnMapOverlay(
+    target: MapPick,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Box(Modifier.fillMaxSize()) {
+        Surface(
+            // Theme-following surface: the old inverseSurface is INVERTED by definition, which
+            // put a light banner on the dark app (user 2026-07-14).
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            shape = RoundedCornerShape(12.dp),
+            tonalElevation = 3.dp,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(12.dp)
+                .fillMaxWidth(),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(start = 16.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+            ) {
+                Text(
+                    stringResource(
+                        when (target) {
+                            MapPick.ORIGIN -> R.string.mapscreen_choose_origin_hint
+                            MapPick.DEST -> R.string.mapscreen_choose_dest_hint
+                            else -> R.string.mapscreen_choose_stop_hint
+                        },
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = onCancel) {
+                    Icon(Sym.Close, contentDescription = stringResource(R.string.mapscreen_cancel))
+                }
+            }
+        }
+        // Pin whose tip points at the exact map center (offset up by ~half its height).
+        Icon(
+            Sym.Place,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .align(Alignment.Center)
+                .size(44.dp)
+                .offset(y = (-22).dp),
+        )
+        Button(
+            onClick = onConfirm,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = 24.dp),
+        ) {
+            Icon(Sym.Check, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+            Text(
+                stringResource(
+                    when (target) {
+                        MapPick.ORIGIN -> R.string.mapscreen_choose_set_start
+                        MapPick.DEST -> R.string.mapscreen_choose_set_dest
+                        else -> R.string.mapscreen_choose_set_stop
+                    },
+                ),
+            )
+        }
+    }
+}
+
+/** Full-screen search page body: saved places + recent searches, shown over an
+ *  opaque background while the search box is focused (Google-style). */
+@Composable
+private fun SearchEntryContent(
+    suggestions: List<Place>,
+    localSuggestions: List<app.vela.ui.map.LocalSuggestion>,
+    onPickLocal: (app.vela.ui.map.LocalSuggestion) -> Unit,
+    querySuggestions: List<String> = emptyList(),
+    onPickQuery: (String) -> Unit = {},
+    onFillQuery: (String) -> Unit = {},
+    onRemoveLocal: (app.vela.ui.map.LocalSuggestion) -> Unit,
+    lists: List<app.vela.core.model.PlaceList> = emptyList(),
+    onAddToList: (Place, String) -> Unit = { _, _ -> },
+    onRemoveFromList: (Place, String) -> Unit = { _, _ -> },
+    onCreateListWith: (Place, String) -> Unit = { _, _ -> },
+    saved: List<SavedPlace>,
+    /** Saved places exist and none is pinned here: say where they are, once ([SavedPinTip]). */
+    savedTip: Boolean = false,
+    onDismissSavedTip: () -> Unit = {},
+    recents: List<RecentQuery>,
+    recentPlaces: List<RecentPlace>,
+    home: SavedPlace?,
+    work: SavedPlace?,
+    savedRoutes: List<app.vela.core.model.SavedRoute> = emptyList(),
+    onPickSavedRoute: (app.vela.core.model.SavedRoute) -> Unit = {},
+    onUnpinSavedRoute: (app.vela.core.model.SavedRoute) -> Unit = {},
+    onUnpinSaved: (SavedPlace) -> Unit = {},
+    assigning: ShortcutKind?,
+    pickingOrigin: Boolean = false,
+    pickingDest: Boolean = false,
+    pickingStop: Boolean = false,
+    onCancelPickStop: () -> Unit = {},
+    onUseMyLocation: () -> Unit = {},
+    onChooseOnMap: () -> Unit = {},
+    onPickSuggestion: (Place) -> Unit,
+    onPickSaved: (SavedPlace) -> Unit,
+    onPickRecent: (String) -> Unit,
+    onPickRecentPlace: (SavedPlace) -> Unit,
+    onRemoveRecent: (String) -> Unit,
+    onRemoveRecentPlace: (String) -> Unit,
+    onClearRecents: () -> Unit,
+    onPickShortcut: (ShortcutKind) -> Unit,
+    onAssignShortcut: (ShortcutKind) -> Unit,
+    onClearShortcut: (ShortcutKind) -> Unit,
+    onCancelAssign: () -> Unit,
+    onPinSavedAs: (SavedPlace, ShortcutKind) -> Unit,
+    onRemoveSaved: (SavedPlace) -> Unit,
+    onRenameSaved: (SavedPlace, String) -> Unit = { _, _ -> },
+) {
+    // While typing, live place suggestions take over the page (Google-style). The user's OWN
+    // history + list matches (issue #180) lead, instant and offline, then the network results.
+    if (localSuggestions.isNotEmpty() || suggestions.isNotEmpty() || querySuggestions.isNotEmpty()) {
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = 8.dp),
+        ) {
+            if (assigning != null) AssignBanner(assigning, onCancelAssign)
+            if (pickingStop) PickStopBanner(onCancelPickStop)
+            localSuggestions.forEach { s ->
+                // Menu state is keyed on the suggestion so a keystroke that rebuilds the list
+                // closes any open menu instead of leaving it stranded on a different row.
+                var menuOpen by remember(s) { mutableStateOf(false) }
+                val place = s.place
+                val isContact = s.kind == app.vela.ui.map.LocalSuggestion.Kind.CONTACT
+                SuggestionRow(
+                    icon = when (s.kind) {
+                        app.vela.ui.map.LocalSuggestion.Kind.RECENT_QUERY -> Sym.History
+                        app.vela.ui.map.LocalSuggestion.Kind.RECENT_PLACE -> Sym.Place
+                        app.vela.ui.map.LocalSuggestion.Kind.SAVED_PLACE -> Sym.Bookmark
+                        app.vela.ui.map.LocalSuggestion.Kind.CONTACT -> Sym.Person
+                    },
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    label = s.label,
+                    sublabel = s.sublabel,
+                    // A contact reads as a person, not a search: their photo (or a person on the
+                    // same tinted disc Home and Work use) and a "Contact · Home" chip, so the row
+                    // can never be mistaken for a place the geocoder found (user 2026-09-06).
+                    leading = if (isContact) ({ ContactAvatar(s.photoUri) }) else null,
+                    badge = if (isContact) listOfNotNull(stringResource(R.string.suggestion_contact_badge), s.badge).joinToString(" · ") else null,
+                    onClick = { onPickLocal(s) },
+                    onFill = if (isContact) null else ({ onFillQuery(s.label) }),
+                    onLongClick = { menuOpen = true },
+                    trailing = {
+                        SuggestionOverflow(
+                            open = menuOpen,
+                            onOpenChange = { menuOpen = it },
+                            place = place,
+                            removable = s.removable,
+                            lists = lists,
+                            onRemove = { onRemoveLocal(s) },
+                            onAddToList = { id -> place?.let { onAddToList(it, id) } },
+                            onRemoveFromList = { id -> place?.let { onRemoveFromList(it, id) } },
+                            onCreateWith = { name -> place?.let { onCreateListWith(it, name) } },
+                        )
+                    },
+                )
+                Divider()
+            }
+            suggestions.forEach { p ->
+                var menuOpen by remember(p.id) { mutableStateOf(false) }
+                SuggestionRow(
+                    icon = Sym.Search,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    label = p.name,
+                    sublabel = p.address ?: p.category,
+                    onClick = { onPickSuggestion(p) },
+                    // The primary line only (the name, or the street line of an address): the
+                    // arrow is for refining, and a whole "name, city, state" left nothing to
+                    // refine (user 2026-09-22). Google fills the full line; we do not.
+                    onFill = { onFillQuery(p.name) },
+                    onLongClick = { menuOpen = true },
+                    trailing = {
+                        SuggestionOverflow(
+                            open = menuOpen,
+                            onOpenChange = { menuOpen = it },
+                            place = p,
+                            removable = false,
+                            lists = lists,
+                            onRemove = {},
+                            onAddToList = { id -> onAddToList(p, id) },
+                            onRemoveFromList = { id -> onRemoveFromList(p, id) },
+                            onCreateWith = { name -> onCreateListWith(p, name) },
+                        )
+                    },
+                )
+                Divider()
+            }
+            // Bare query rows from the autocomplete ("Starbucks", "cvs pharmacy hours"): a
+            // search, not a place, so a plain search icon and no overflow menu.
+            querySuggestions.forEach { q ->
+                SuggestionRow(
+                    icon = Sym.Search,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    label = q,
+                    onClick = { onPickQuery(q) },
+                    onFill = { onFillQuery(q) },
+                )
+                Divider()
+            }
+        }
+        return
+    }
+    Column(
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(top = 8.dp),
+    ) {
+        if (assigning != null) AssignBanner(assigning, onCancelAssign)
+        if (pickingStop) PickStopBanner(onCancelPickStop)
+        // When picking a directions origin, offer "Your location" at the very top to
+        // reset back to live GPS (Google-style From picker).
+        if (pickingOrigin) {
+            SuggestionRow(
+                icon = Sym.MyLocation,
+                tint = MaterialTheme.colorScheme.primary,
+                label = stringResource(R.string.mapscreen_your_location),
+                onClick = onUseMyLocation,
+            )
+            Divider()
+        }
+        // "Choose on map" — leave the search overlay and set this endpoint by moving a crosshair
+        // over the live map (or long-pressing), Google-style. Offered for both origin and stop.
+        if (pickingOrigin || pickingDest || pickingStop) {
+            SuggestionRow(
+                icon = Sym.Place,
+                tint = MaterialTheme.colorScheme.primary,
+                label = stringResource(R.string.mapscreen_choose_on_map),
+                onClick = onChooseOnMap,
+            )
+            Divider()
+        }
+        // Pinned Home / Work shortcuts (Google-style), above Saved. SIDE BY SIDE since issue #255:
+        // two full-width rows for two words spent a third of the first screen on them, and Google
+        // pairs them for the same reason.
+        ShortcutPair(home, work, onPickShortcut, onAssignShortcut, onClearShortcut)
+        Divider()
+        // Saved routes and runs (issue #622): one tap opens the route chooser on it.
+        if (savedRoutes.isNotEmpty() && !pickingOrigin && !pickingDest && !pickingStop) {
+            SectionLabel(stringResource(R.string.mapscreen_section_routes))
+            savedRoutes.forEach { r ->
+                SuggestionRow(
+                    icon = Sym.Directions,
+                    tint = MaterialTheme.colorScheme.primary,
+                    label = r.name,
+                    onClick = { onPickSavedRoute(r) },
+                    trailing = {
+                        IconButton(onClick = { onUnpinSavedRoute(r) }, modifier = Modifier.dpadHighlight(CircleShape)) {
+                            Icon(Sym.PushPin, contentDescription = stringResource(R.string.saved_unpin), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    },
+                    sublabel = listOfNotNull(
+                        if (r.isRun) androidx.compose.ui.res.pluralStringResource(R.plurals.saved_route_stops, r.stops.size, r.stops.size) else null,
+                        r.destLabel.takeIf { it.isNotBlank() },
+                    ).joinToString(" · ").ifBlank { null },
+                )
+                Divider()
+            }
+        }
+        if (saved.isNotEmpty()) {
+            SectionLabel(stringResource(R.string.mapscreen_section_saved))
+            saved.forEach { sp ->
+                SavedRow(sp, onPickSaved, onPinSavedAs, onRemoveSaved, onRenameSaved, onUnpinSaved)
+                Divider()
+            }
+        } else if (savedTip) {
+            SectionLabel(stringResource(R.string.mapscreen_section_saved))
+            SavedPinTip(onDismissSavedTip)
+            Divider()
+        }
+        // ONE chronological "Recent" list — Google mixes recently-viewed places and recent
+        // searches by time rather than bucketing them; the icon tells them apart (pin for a
+        // place you opened, clock for a query you typed).
+        if (recentPlaces.isNotEmpty() || recents.isNotEmpty()) {
+            // Clear recents sits beside the heading as a filled pill, where it reads as a
+            // button (issue #748); it used to trail the list as plain text.
+            Row(Modifier.fillMaxWidth().padding(end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) { SectionLabel(stringResource(R.string.mapscreen_section_recent)) }
+                androidx.compose.material3.FilledTonalButton(onClick = onClearRecents, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 4.dp), modifier = Modifier.dpadHighlight(CircleShape)) {
+                    Text(stringResource(R.string.mapscreen_clear_recents), style = MaterialTheme.typography.labelLarge)
+                }
+            }
+            val merged: List<Any> = (recentPlaces + recents).sortedByDescending { entry ->
+                when (entry) {
+                    is RecentPlace -> entry.at
+                    is RecentQuery -> entry.at
+                    else -> 0L
+                }
+            }
+            merged.forEach { entry ->
+              // Keyed, or a row removed by its swipe hands its slid-out state to the next one.
+              androidx.compose.runtime.key(entry) {
+                when (entry) {
+                    is RecentPlace -> {
+                        // Long-press OR the ⋮ opens the same manage menu as the typing view (issue
+                        // #180): save this recent place to a list, or drop it from history. (The
+                        // press-hold was previously only on the typed-suggestion rows, so the entry
+                        // page (where history actually lives) had no long-press. The ⋮ opens the
+                        // menu on a plain tap too, so removal works even where long-press doesn't.)
+                        var menuOpen by remember(entry.place.id) { mutableStateOf(false) }
+                        val p = entry.place.toPlace()
+                        // A swipe toward the start drops it from history (issue #748); the ⋮ stays
+                        // as the key path.
+                        // Toward the end opens the row's menu, where Add to list is (issue #772).
+                        // Painted in the page's own color: the theme's surface is gray on the
+                        // AMOLED theme and white on the light one, and the rows read as cards.
+                        SwipeActionRow(
+                            onDelete = { onRemoveRecentPlace(entry.place.id) }, deleteLabel = stringResource(R.string.recent_remove),
+                            onEdit = { menuOpen = true }, editLabel = stringResource(R.string.place_save_to_list), editIcon = SymOutlined.BookmarkBorder,
+                            background = MaterialTheme.colorScheme.background,
+                        ) {
+                            SuggestionRow(
+                                icon = Sym.Place,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                label = entry.place.name,
+                                sublabel = entry.place.address,
+                                onClick = { onPickRecentPlace(entry.place) },
+                                onFill = { onFillQuery(entry.place.name) },
+                                onLongClick = { menuOpen = true },
+                                trailing = {
+                                    SuggestionOverflow(
+                                        open = menuOpen,
+                                        onOpenChange = { menuOpen = it },
+                                        place = p,
+                                        removable = true,
+                                        lists = lists,
+                                        onRemove = { onRemoveRecentPlace(entry.place.id) },
+                                        onAddToList = { id -> onAddToList(p, id) },
+                                        onRemoveFromList = { id -> onRemoveFromList(p, id) },
+                                        onCreateWith = { name -> onCreateListWith(p, name) },
+                                    )
+                                },
+                            )
+                        }
+                    }
+                    is RecentQuery -> {
+                        var menuOpen by remember(entry.query) { mutableStateOf(false) }
+                        SwipeActionRow(onDelete = { onRemoveRecent(entry.query) }, deleteLabel = stringResource(R.string.recent_remove), background = MaterialTheme.colorScheme.background) {
+                            SuggestionRow(
+                                icon = Sym.History,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                label = entry.query,
+                                onClick = { onPickRecent(entry.query) },
+                                onFill = { onFillQuery(entry.query) },
+                                onLongClick = { menuOpen = true },
+                                trailing = {
+                                    SuggestionOverflow(
+                                        open = menuOpen,
+                                        onOpenChange = { menuOpen = it },
+                                        place = null, // a typed query, not a place: only "remove from history"
+                                        removable = true,
+                                        lists = lists,
+                                        onRemove = { onRemoveRecent(entry.query) },
+                                        onAddToList = {},
+                                        onRemoveFromList = {},
+                                        onCreateWith = {},
+                                    )
+                                },
+                            )
+                        }
+                    }
+                }
+                Divider()
+              }
+            }
+        }
+        if (saved.isEmpty() && recents.isEmpty() && recentPlaces.isEmpty()) {
+            Text(
+                stringResource(R.string.mapscreen_search_empty_hint),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(16.dp),
+            )
+        }
+    }
+}
+
+/**
+ * Home and Work side by side (issue #255).
+ *
+ * Each half opens its place, or arms assign when unset, with the same ⋮ menu (Change / Remove) the
+ * stacked rows had - halving the height must not cost an action. An unset half reads just "Add"
+ * under the label rather than a whole sentence: the label directly above it already said which one
+ * it is, and the long form was the widest text on the row for no added meaning.
+ */
+@Composable
+private fun ShortcutPair(
+    home: SavedPlace?,
+    work: SavedPlace?,
+    onPick: (ShortcutKind) -> Unit,
+    onAssign: (ShortcutKind) -> Unit,
+    onClear: (ShortcutKind) -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ShortcutCell(ShortcutKind.HOME, home, onPick, onAssign, onClear, Modifier.weight(1f))
+        // A hairline between the two, so the pair reads as two targets and not one wide row.
+        Box(
+            Modifier
+                .height(28.dp)
+                .width(1.dp)
+                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)),
+        )
+        ShortcutCell(ShortcutKind.WORK, work, onPick, onAssign, onClear, Modifier.weight(1f))
+    }
+}
+
+/** One half of [ShortcutPair]. */
+@Composable
+private fun ShortcutCell(
+    kind: ShortcutKind,
+    place: SavedPlace?,
+    onPick: (ShortcutKind) -> Unit,
+    onAssign: (ShortcutKind) -> Unit,
+    onClear: (ShortcutKind) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val icon = if (kind == ShortcutKind.HOME) Sym.Home else Sym.Work
+    val label = stringResource(if (kind == ShortcutKind.HOME) R.string.shortcut_home else R.string.shortcut_work)
+    val dark = isAppInDarkTheme()
+    var menu by remember { mutableStateOf(false) }
+    Row(
+        modifier
+            .dpadHighlight(RoundedCornerShape(8.dp))
+            .clickable { if (place != null) onPick(kind) else onAssign(kind) }
+            .padding(horizontal = 8.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Google's tinted disc behind the glyph - at this size a bare icon beside two lines of
+        // text reads as decoration rather than as the thing you press.
+        Box(
+            Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = if (place != null) 0.16f else 0.10f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = if (place != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyLarge,
+                color = SheetPalette.ink(dark),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                place?.let { it.address ?: it.name } ?: stringResource(R.string.mapscreen_shortcut_add),
+                style = MaterialTheme.typography.bodySmall,
+                color = SheetPalette.dim(dark),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (place != null) {
+            Box {
+                IconButton(onClick = { menu = true }, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        Sym.MoreVert,
+                        contentDescription = stringResource(R.string.mapscreen_edit_shortcut, label),
+                        tint = SheetPalette.ink(dark),
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+                VelaMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    item(stringResource(R.string.mapscreen_menu_change)) { menu = false; onAssign(kind) }
+                    item(stringResource(R.string.mapscreen_menu_remove)) { menu = false; onClear(kind) }
+                }
+            }
+        }
+    }
+}
+
+/** A pinned Home/Work shortcut row: opens the place, or arms assign when unset;
+ *  a ⋮ menu (Change / Remove) when set. */
+@Suppress("unused") // kept for the landscape/wide layouts that still stack; see ShortcutPair
+@Composable
+private fun ShortcutRow(
+    kind: ShortcutKind,
+    place: SavedPlace?,
+    onPick: (ShortcutKind) -> Unit,
+    onAssign: (ShortcutKind) -> Unit,
+    onClear: (ShortcutKind) -> Unit,
+) {
+    val icon = if (kind == ShortcutKind.HOME) Sym.Home else Sym.Work
+    // Localized display label (the ShortcutKind.label enum value stays the stable "Home"/"Work" key).
+    val label = stringResource(if (kind == ShortcutKind.HOME) R.string.shortcut_home else R.string.shortcut_work)
+    // Fixed sheet palette (not the theme's on-surface, which renders dark/black on our
+    // fixed gray under some Material-You themes / light mode).
+    val dark = isAppInDarkTheme()
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .dpadHighlight(RoundedCornerShape(6.dp))
+            .clickable { if (place != null) onPick(kind) else onAssign(kind) }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            // Unset rows share the page's glyph ink (onSurfaceVariant) - the old SheetPalette
+            // dim was LIGHTER than the recents pin beside it and the pair read mismatched
+            // (user 2026-07-11). Set rows keep the primary tint (they carry state).
+            tint = if (place != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge, color = SheetPalette.ink(dark))
+            Text(
+                place?.let { it.address ?: it.name }
+                    ?: stringResource(R.string.mapscreen_set_shortcut_address, label.lowercase()),
+                style = MaterialTheme.typography.bodySmall,
+                color = SheetPalette.dim(dark),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (place != null) {
+            var menu by remember { mutableStateOf(false) }
+            Box {
+                IconButton(onClick = { menu = true }) {
+                    // Same ink as the row's text - the default LocalContentColor went near-black
+                    // on the fixed sheet gray under some themes (user report).
+                    Icon(
+                        Sym.MoreVert,
+                        contentDescription = stringResource(R.string.mapscreen_edit_shortcut, label),
+                        tint = SheetPalette.ink(dark),
+                    )
+                }
+                VelaMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    item(stringResource(R.string.mapscreen_menu_change)) { menu = false; onAssign(kind) }
+                    item(stringResource(R.string.mapscreen_menu_remove)) { menu = false; onClear(kind) }
+                }
+            }
+        }
+    }
+}
+
+/** A saved-place row: tap to open, ⋮ menu to pin it as Home/Work or remove it. */
+@Composable
+private fun SavedRow(
+    place: SavedPlace,
+    onPick: (SavedPlace) -> Unit,
+    onPinAs: (SavedPlace, ShortcutKind) -> Unit,
+    onRemove: (SavedPlace) -> Unit,
+    onRename: (SavedPlace, String) -> Unit = { _, _ -> },
+    onUnpin: (SavedPlace) -> Unit = {},
+) {
+    // Rename (issue #434): a saved lot named by its coordinates or road gets a name of yours.
+    var renaming by remember { mutableStateOf(false) }
+    var draft by remember { mutableStateOf(place.name) }
+    if (renaming) {
+        app.vela.ui.VelaDialog(
+            onDismissRequest = { renaming = false },
+            title = stringResource(R.string.saved_rename_title),
+            confirmText = stringResource(R.string.saved_rename_action),
+            onConfirm = { if (draft.isNotBlank()) onRename(place, draft); renaming = false },
+            dismissText = stringResource(android.R.string.cancel),
+            onDismiss = { renaming = false },
+        ) {
+            androidx.compose.material3.OutlinedTextField(
+                value = draft,
+                onValueChange = { draft = it },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().dpadFieldEscape(),
+            )
+        }
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .dpadHighlight(RoundedCornerShape(6.dp))
+            .clickable { onPick(place) }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Sym.Star, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(16.dp))
+        // Explicit colors: the search page is a background()-Box, not a Surface, so
+        // LocalContentColor is unset and a colorless Text/Icon renders BLACK in dark
+        // mode (same trap ShortcutRow documents). Match the SuggestionRow siblings.
+        Text(
+            place.name,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        var menu by remember { mutableStateOf(false) }
+        Box {
+            IconButton(onClick = { menu = true }) {
+                Icon(
+                    Sym.MoreVert,
+                    contentDescription = stringResource(R.string.mapscreen_saved_place_options),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            VelaMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                item(stringResource(R.string.mapscreen_set_as_home)) { menu = false; onPinAs(place, ShortcutKind.HOME) }
+                item(stringResource(R.string.mapscreen_set_as_work)) { menu = false; onPinAs(place, ShortcutKind.WORK) }
+                item(stringResource(R.string.mapscreen_menu_rename)) { menu = false; renaming = true }
+                item(stringResource(R.string.saved_unpin)) { menu = false; onUnpin(place) }
+                item(stringResource(R.string.mapscreen_menu_remove)) { menu = false; onRemove(place) }
+            }
+        }
+    }
+}
+
+/** A slim banner while picking a place to pin as Home/Work. */
+@Composable
+private fun AssignBanner(kind: ShortcutKind, onCancel: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            if (kind == ShortcutKind.HOME) Sym.Home else Sym.Work,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(
+            stringResource(R.string.mapscreen_assign_shortcut_hint, kind.label.lowercase()),
+            style = MaterialTheme.typography.bodyMedium,
+            // Explicit color: the search page is a plain background()-Box, not a Surface, so
+            // LocalContentColor is NOT set for it — a colorless Text falls back to BLACK and
+            // vanishes on the dark sheet. Same convention as SuggestionRow.
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = onCancel) { Text(stringResource(R.string.mapscreen_cancel)) }
+    }
+}
+
+/** A quiet mode label while picking a place to add as a directions stop — without it the
+ *  Add-stop picker is visually identical to plain search. The old full banner with its own
+ *  Cancel button read as clutter sitting right above the Choose-on-map row (user 2026-07-14);
+ *  the search bar's back arrow and hardware BACK are the way out, like every other search mode. */
+@Composable
+private fun PickStopBanner(@Suppress("UNUSED_PARAMETER") onCancel: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Sym.AddLocationAlt,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            stringResource(R.string.mapscreen_pick_stop_hint),
+            style = MaterialTheme.typography.labelLarge,
+            // Explicit color: no Surface on the search page means no LocalContentColor.
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/**
+ * In the Saved section's place for someone with saved places and none pinned, until dismissed.
+ * This page listed every saved place before pins; after an update that brought them, the
+ * section was empty and the places looked gone.
+ */
+@Composable
+private fun SavedPinTip(onDismiss: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(SymOutlined.Bookmarks, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(14.dp))
+        Text(
+            stringResource(R.string.search_saved_tip),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f).padding(vertical = 8.dp),
+        )
+        TextButton(onClick = onDismiss, modifier = Modifier.dpadHighlight(androidx.compose.material3.ButtonDefaults.textShape)) {
+            Text(stringResource(R.string.mapscreen_got_it))
+        }
+    }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        fontWeight = FontWeight.Medium,
+        modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp),
+    )
+}
+
+// combinedClickable powers the press-hold on suggestion rows (issue #180). The row still
+// clicks on tap / D-pad center; long-press (touch) opens the same menu the trailing ⋮ opens,
+// so D-pad keeps a key path via the button.
+
+/** A contact's thumbnail on the tinted disc the Home/Work rows use; the person glyph shows
+ *  through when there is no photo (or it fails to load, the image simply never paints). */
+@Composable
+private fun ContactAvatar(photoUri: String?) {
+    Box(
+        Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Sym.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        if (photoUri != null) {
+            coil.compose.AsyncImage(
+                model = photoUri,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+/** The small chip after a suggestion's label, in the accent tint so it reads as a category, not text. */
+@Composable
+private fun SuggestionBadge(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.primary,
+        maxLines = 1,
+        modifier = Modifier
+            .background(
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                RoundedCornerShape(6.dp),
+            )
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    )
+}
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun SuggestionRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tint: androidx.compose.ui.graphics.Color,
+    label: String,
+    onClick: () -> Unit,
+    sublabel: String? = null,
+    onRemove: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null,
+    /** Replaces [icon] when set (a contact's photo disc). */
+    leading: (@Composable () -> Unit)? = null,
+    /** A small chip after the label ("Contact · Home"). */
+    badge: String? = null,
+    /** Google's "put it in the box" arrow: the row's text goes into the search field without
+     *  searching, so a long address or a name can be finished by hand (user 2026-09-22). */
+    onFill: (() -> Unit)? = null,
+) {
+    val hasTrailing = onRemove != null || trailing != null || onFill != null
+    Row(
+        Modifier.fillMaxWidth().dpadHighlight(RoundedCornerShape(6.dp))
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(start = 16.dp, end = if (hasTrailing) 4.dp else 16.dp, top = 12.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (leading != null) {
+            Box(Modifier.padding(end = 12.dp)) { leading() }
+        } else {
+            Icon(icon, contentDescription = null, modifier = Modifier.padding(end = 12.dp), tint = tint)
+        }
+        if (sublabel == null) {
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = if (hasTrailing) Modifier.weight(1f) else Modifier,
+            )
+        } else {
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (badge != null) {
+                        Spacer(Modifier.width(8.dp))
+                        SuggestionBadge(badge)
+                    }
+                }
+                Text(
+                    sublabel,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        if (onFill != null) {
+            app.vela.ui.place.HeaderCircleButton(
+                Sym.NorthWest,
+                stringResource(R.string.search_fill_cd),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                bg = MaterialTheme.colorScheme.onSurfaceVariant,
+                size = 32.dp,
+            ) { onFill() }
+        }
+        // A trailing slot (the ⋮ overflow + its menu) wins over the bare X when provided; both
+        // are their own D-pad focus stops with a ring, reached after the row itself.
+        if (trailing != null) {
+            trailing()
+        } else if (onRemove != null) {
+            // Same circle language as the sheet headers, sized down for a list row.
+            app.vela.ui.place.HeaderCircleButton(
+                Sym.Close,
+                stringResource(R.string.mapscreen_menu_remove),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                bg = MaterialTheme.colorScheme.onSurfaceVariant,
+                size = 32.dp,
+            ) { onRemove() }
+        }
+    }
+}
+
+/** The ⋮ overflow + its context menu for a search-suggestion row (issue #180): save a place
+ *  to a list, or drop a history row. Opened by the ⋮ button (D-pad + touch) or a row long-press.
+ *  [place] null = a bare query row (save-to-list hidden); [removable] false = not from history
+ *  (remove hidden). Reuses the place sheet's list picker so the checkmark/create flow matches. */
+@Composable
+private fun SuggestionOverflow(
+    open: Boolean,
+    onOpenChange: (Boolean) -> Unit,
+    place: Place?,
+    removable: Boolean,
+    lists: List<app.vela.core.model.PlaceList>,
+    onRemove: () -> Unit,
+    onAddToList: (String) -> Unit,
+    onRemoveFromList: (String) -> Unit,
+    onCreateWith: (String) -> Unit,
+) {
+    var showSave by remember { mutableStateOf(false) }
+    // Rename, for a row that is in a list (issue #736): the place sheet's menu has it too, but
+    // the list's own rows are where people look for it. Same store call as the sheet's.
+    val inList = place != null && lists.any { l -> l.places.any { it.matches(place.id, place.featureId) } }
+    var showRename by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { onOpenChange(true) }) {
+            Icon(
+                Sym.MoreVert,
+                contentDescription = stringResource(R.string.mapscreen_suggestion_options),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        VelaMenu(expanded = open, onDismissRequest = { onOpenChange(false) }) {
+            if (place != null) item(stringResource(R.string.place_save_to_list)) { onOpenChange(false); showSave = true }
+            if (inList) item(stringResource(R.string.mapscreen_menu_rename)) { onOpenChange(false); showRename = true }
+            if (removable) item(stringResource(R.string.mapscreen_remove_from_history)) { onOpenChange(false); onRemove() }
+        }
+    }
+    if (showRename && place != null) {
+        var draft by remember(place.id) { mutableStateOf(place.name) }
+        app.vela.ui.VelaDialog(
+            onDismissRequest = { showRename = false },
+            title = stringResource(R.string.saved_rename_title),
+            confirmText = stringResource(R.string.saved_rename_action),
+            onConfirm = { if (draft.isNotBlank()) app.vela.ui.SavedActions.rename?.invoke(place, draft); showRename = false },
+            dismissText = stringResource(android.R.string.cancel),
+            onDismiss = { showRename = false },
+        ) {
+            androidx.compose.material3.OutlinedTextField(
+                value = draft,
+                onValueChange = { draft = it },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().dpadFieldEscape(),
+            )
+        }
+    }
+    if (showSave && place != null) {
+        val containing = lists.filter { l -> l.places.any { it.matches(place.id, place.featureId) } }
+            .mapTo(HashSet()) { it.id }
+        app.vela.ui.place.SaveToListSheet(
+            lists = lists,
+            containingIds = containing,
+            onToggle = { id, add -> if (add) onAddToList(id) else onRemoveFromList(id) },
+            onCreateWith = { name -> onCreateWith(name) },
+            onDismiss = { showSave = false },
+        )
+    }
+}
+
+@Composable
+private fun InfoCard(
+    title: String,
+    body: String,
+    actionLabel: String,
+    onAction: () -> Unit,
+    modifier: Modifier = Modifier,
+    pillLabel: String? = null,
+    onPill: (() -> Unit)? = null,
+    // Self-dismissing after this long, with the faster-route card's draining bar as the clock;
+    // focus anywhere on the card (reaching for it with keys) freezes it. Null = stays put.
+    autoMs: Long? = null,
+) {
+    // Fixed sheet palette so this banner reads as the same gray as the place sheet
+    // and results list, not a wallpaper-tinted Material card.
+    val dark = isAppInDarkTheme()
+    val left = remember(body, autoMs) { androidx.compose.animation.core.Animatable(1f) }
+    val dismiss = rememberUpdatedState(onAction)
+    var held by remember(body) { mutableStateOf(false) }
+    if (autoMs != null) {
+        LaunchedEffect(body, autoMs, held) {
+            if (held) return@LaunchedEffect
+            val remaining = (autoMs * left.value).toInt()
+            left.animateTo(0f, androidx.compose.animation.core.tween(remaining.coerceAtLeast(1), easing = androidx.compose.animation.core.LinearEasing))
+            dismiss.value()
+        }
+    }
+    Card(
+        modifier.fillMaxWidth().onFocusChanged { held = it.hasFocus },
+        colors = CardDefaults.cardColors(containerColor = SheetPalette.bg(dark)),
+    ) {
+        if (pillLabel != null && onPill != null) {
+            // With a primary action the card takes the UpdateCard layout: text block, then a
+            // trailing row of quiet-dismiss + filled pill (reads by shape/fill, color-blind safe).
+            Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 10.dp)) {
+                Text(title, fontWeight = FontWeight.SemiBold, color = SheetPalette.ink(dark))
+                Text(body, style = MaterialTheme.typography.bodySmall, color = SheetPalette.dim(dark))
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 6.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = onAction) { Text(actionLabel) }
+                    Spacer(Modifier.width(4.dp))
+                    Button(
+                        onClick = onPill,
+                        shape = CircleShape,
+                        modifier = Modifier.dpadHighlight(CircleShape),
+                    ) { Text(pillLabel) }
+                }
+            }
+        } else {
+            Row(
+                Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(title, fontWeight = FontWeight.SemiBold, color = SheetPalette.ink(dark))
+                    Text(body, style = MaterialTheme.typography.bodySmall, color = SheetPalette.dim(dark))
+                }
+                TextButton(onClick = onAction) { Text(actionLabel) }
+            }
+        }
+        if (autoMs != null) {
+            app.vela.ui.VelaProgressBarOf({ left.value }, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp))
+        }
+    }
+}
+
+/** Voice-download progress over the map — makes the onboarding one-tap install visible (it used to
+ *  run with no surface outside Settings). Reads the SAME state the Settings row does, so it also
+ *  shows when a Settings-started download is still running after backing out to the map. The bar
+ *  includes the extract phase (KokoroInstaller maps untar into the tail), so it no longer parks at
+ *  ~98% while the archive unpacks. */
+@Composable
+private fun VoiceDownloadCard(installing: Boolean, pct: Float, onCancel: (() -> Unit)? = null, modifier: Modifier = Modifier) {
+    Card(
+        modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (installing) stringResource(R.string.map_voice_installing)
+                    else stringResource(R.string.map_voice_downloading, (pct * 100).toInt()),
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
+                // No cancel during the unpack: the bytes are already down, aborting there only wastes them.
+                if (!installing && onCancel != null) {
+                    IconButton(onClick = onCancel, modifier = Modifier.size(28.dp).dpadHighlight(androidx.compose.foundation.shape.CircleShape)) {
+                        Icon(Sym.Close, contentDescription = stringResource(R.string.mapscreen_cancel), modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            // Determinate while downloading; the unpack step can't report a meaningful %, so it goes
+            // indeterminate under the "Installing…" label rather than crawling a frozen-looking bar.
+            app.vela.ui.VelaProgressBar(if (installing) null else pct)
+        }
+    }
+}
+
+/** Progress card for a region (state/country) offline download — the routing graph, then the
+ *  region's place pack. Mirrors [VoiceDownloadCard] so a Settings-started download stays visible
+ *  on the map. */
+@Composable
+private fun RegionDownloadCard(name: String, places: Boolean, pct: Int, area: Boolean = false, stage: Int = 0, fileStep: Int? = null, onCancel: (() -> Unit)? = null, modifier: Modifier = Modifier) {
+    Card(
+        modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    when {
+                        area -> stringResource(R.string.map_area_downloading, pct)
+                        // An update's two quiet moments, named: the file being checked and
+                        // written (the bar sat at 100 with nothing said), and the whole file again
+                        // when the small update did not fit (the count restarting from 0).
+                        !area && stage == 1 -> stringResource(if (fileStep == 2) R.string.map_region_update_applying_map else R.string.map_region_update_applying, name)
+                        !area && stage == 2 -> stringResource(if (fileStep == 2) R.string.map_region_update_full_map else R.string.map_region_update_full, name, pct)
+                        places -> stringResource(R.string.map_region_places_downloading, name, pct)
+                        fileStep == 1 -> stringResource(R.string.map_region_placesfile_downloading, name, pct)
+                        fileStep == 2 -> stringResource(R.string.map_region_map_downloading, name, pct)
+                        else -> stringResource(R.string.map_region_downloading, name, pct)
+                    },
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
+                if (onCancel != null) {
+                    IconButton(onClick = onCancel, modifier = Modifier.size(28.dp).dpadHighlight(androidx.compose.foundation.shape.CircleShape)) {
+                        Icon(Sym.Close, contentDescription = stringResource(R.string.mapscreen_cancel), modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            app.vela.ui.VelaProgressBar(if (!area && stage == 1) null else pct / 100f)
+        }
+    }
+}
+
+/** "A newer Vela is out" card (self-updater): download with progress, then the system
+ *  installer takes over. "Not now" silences this version until a newer one appears. */
+@Composable
+private fun UpdateCard(
+    versionName: String,
+    notes: String = "",
+    downloadPct: Int?,
+    onUpdate: () -> Unit,
+    onDismiss: () -> Unit,
+    onCancel: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 4.dp)) {
+            Text(stringResource(R.string.update_available_title, versionName), fontWeight = FontWeight.SemiBold)
+            // What changed, from the release's own notes, folded by default (issue #330): the
+            // nightly notes are the commit list since the last release, which is exactly the
+            // "what am I installing" answer, minus markdown glyphs.
+            val plainNotes = remember(notes) { plainReleaseNotes(notes) }
+            if (plainNotes.isNotEmpty() && downloadPct == null) {
+                var showNotes by remember { mutableStateOf(false) }
+                TextButton(onClick = { showNotes = !showNotes }, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
+                    Text(stringResource(if (showNotes) R.string.update_notes_hide else R.string.update_notes_show), style = MaterialTheme.typography.labelLarge)
+                }
+                if (showNotes) {
+                    Text(
+                        plainNotes,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 24,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(end = 8.dp, bottom = 4.dp),
+                    )
+                }
+            }
+            if (downloadPct != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.update_downloading, downloadPct), style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                    onCancel?.let {
+                        IconButton(onClick = it, modifier = Modifier.size(28.dp).dpadHighlight(CircleShape)) {
+                            Icon(Sym.Close, contentDescription = stringResource(R.string.mapscreen_cancel), modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+                app.vela.ui.VelaProgressBar(downloadPct / 100f, Modifier.padding(top = 6.dp, bottom = 8.dp))
+            } else {
+                Row(
+                    Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.update_later)) }
+                    Spacer(Modifier.width(4.dp))
+                    // A filled primary pill, same treatment as the dialogs' confirm button: the
+                    // action reads by SHAPE and fill, not by text color alone (color-blind safe).
+                    Button(
+                        onClick = onUpdate,
+                        shape = CircleShape,
+                        modifier = Modifier.dpadHighlight(CircleShape),
+                    ) { Text(stringResource(R.string.update_install)) }
+                }
+            }
+        }
+    }
+}
+
+/** Release notes as plain lines: headings, bullets and links stripped, the CI's own
+ *  versionName/versionCode bookkeeping lines dropped. Keeps the first 24 lines. The notes' own
+ *  first heading ("What's new in 0.5.2426") is dropped, since whatever shows them titles them
+ *  the same way, and a stable's hand-written list ends where the generated one begins
+ *  ("Everything since ..."): the commits after it are what "Full notes" is for. */
+internal fun plainReleaseNotes(notes: String): String =
+    notes.lines()
+        .let { l -> val i = l.indexOfFirst { NOTES_HEADING.containsMatchIn(it) }; if (i in 0..3) l.filterIndexed { k, _ -> k != i } else l }
+        .takeWhile { !it.trim().startsWith("Everything since ") && !it.trim().startsWith("Everything in this release") }
+        .map { it.trim().trimStart('#').trim() }
+        .map { it.replace(Regex("""^[-*]\s+"""), "\u2022 ") }
+        .map { it.replace(Regex("""\[([^\]]+)\]\([^)]*\)"""), "$1").replace(Regex("""\*\*|__|`"""), "") }
+        .filter { it.isNotBlank() && !it.startsWith("versionName", ignoreCase = true) && !it.startsWith("versionCode", ignoreCase = true) && !it.startsWith("<") }
+        .take(24)
+        .joinToString("\n")
+
+private val NOTES_HEADING = Regex("""^#*\s*What's (new|changed) in \d""")
+
+/** A notice pushed through the signed calibration channel - level-tinted, with an
+ *  optional "Learn more" link and a per-id Dismiss. */
+@Composable
+private fun NoticeCard(notice: Notice, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val container = when (notice.level) {
+        Notice.LEVEL_ERROR -> MaterialTheme.colorScheme.errorContainer
+        Notice.LEVEL_WARN -> MaterialTheme.colorScheme.tertiaryContainer
+        else -> MaterialTheme.colorScheme.secondaryContainer
+    }
+    val content = when (notice.level) {
+        Notice.LEVEL_ERROR -> MaterialTheme.colorScheme.onErrorContainer
+        Notice.LEVEL_WARN -> MaterialTheme.colorScheme.onTertiaryContainer
+        else -> MaterialTheme.colorScheme.onSecondaryContainer
+    }
+    Card(
+        modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = container, contentColor = content),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 4.dp)) {
+            Text(notice.title, fontWeight = FontWeight.SemiBold)
+            if (notice.body.isNotBlank()) {
+                // Cap a pushed notice's body so a long one can't grow the card past a small screen and
+                // shove the Dismiss/Learn-more buttons off the bottom (the notice overlay doesn't scroll).
+                Text(notice.body, style = MaterialTheme.typography.bodySmall, maxLines = 6, overflow = TextOverflow.Ellipsis)
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                notice.url?.let { url ->
+                    TextButton(onClick = {
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                    }) { Text(stringResource(R.string.mapscreen_learn_more)) }
+                }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.mapscreen_dismiss)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FasterRouteCard(
+    savingSeconds: Double,
+    onSwitch: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    // Issue #594: the offer used to wait forever, so a driver had to answer a prompt covering the
+    // map with their hands on the wheel. It resolves itself now, and the bar across the bottom of
+    // the card is the clock: no number to read at speed, and it drains toward whichever button is
+    // about to be pressed for you.
+    autoMs: Long = 10_000L,
+    autoAccept: Boolean = true,
+    // Identity of THIS offer, so a recomposition (the speedo ticking, the ETA moving) cannot give
+    // the driver their ten seconds back, and a second offer restarts the clock.
+    offerKey: Any = savingSeconds,
+) {
+    val left = remember(offerKey, autoMs, autoAccept) { androidx.compose.animation.core.Animatable(1f) }
+    val act = rememberUpdatedState(if (autoAccept) onSwitch else onDismiss)
+    // REACHING FOR IT STOPS THE CLOCK (benwiley4000 on #594). The first cut gave key-driven phones
+    // a longer window because reaching a button takes more presses, and he pointed out that this
+    // is backwards: a longer window mostly means the interruption sits on the screen longer, since
+    // someone driving with keys is LESS likely to answer at all. So everybody gets the same ten
+    // seconds, and focus landing anywhere on the card, which is what reaching for it looks like on
+    // a key-driven phone, freezes the countdown until it leaves again.
+    var held by remember(offerKey) { mutableStateOf(false) }
+    LaunchedEffect(offerKey, autoMs, autoAccept, held) {
+        if (held) return@LaunchedEffect
+        val remaining = (autoMs * left.value).toInt()
+        left.animateTo(
+            0f,
+            androidx.compose.animation.core.tween(remaining.coerceAtLeast(1), easing = androidx.compose.animation.core.LinearEasing),
+        )
+        act.value()
+    }
+    Card(
+        modifier
+            .fillMaxWidth()
+            .onFocusChanged { held = it.hasFocus },
+        // The same dress as every other card in the stack (update, downloads, notices) and the
+        // same pair as its own countdown bar (primary on secondaryContainer): it used to be the one
+        // tertiary card with a primary bar inside, which read as a different kind of thing
+        // (user 2026-09-23).
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.mapscreen_faster_route_title), fontWeight = FontWeight.SemiBold)
+                Text(
+                    stringResource(R.string.mapscreen_faster_route_saves, formatDuration(savingSeconds)),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            // The dismiss keeps an explicit contrast pair: under Material You a default primary
+            // TextButton can land on the same pastel as the card (the "No" all but vanished,
+            // user 2026-07-14); onSecondaryContainer is guaranteed against secondaryContainer. The
+            // confirm is the app's filled primary pill, like the update card's, in the same color
+            // as the countdown bar under it.
+            TextButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSecondaryContainer),
+            ) { Text(stringResource(R.string.mapscreen_no)) }
+            Button(
+                onClick = onSwitch,
+                shape = CircleShape,
+                modifier = Modifier.dpadHighlight(CircleShape),
+            ) { Text(stringResource(R.string.mapscreen_switch)) }
+        }
+        // INSIDE the card, where every other progress bar in the app sits (user 2026-09-18: the
+        // update card draws its bar inside the box and this one drew a hairline along the very
+        // bottom edge, so the two read as different kinds of thing). The value is read in the draw
+        // phase, so the countdown still never recomposes the card.
+        app.vela.ui.VelaProgressBarOf(
+            { left.value },
+            Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+        )
+    }
+}
+
+/** Manage-lists dialog (Your lists): create, rename, restyle or delete a list;
+ *  tapping one opens its places. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class, androidx.compose.ui.ExperimentalComposeUiApi::class)
+@Composable
+private fun ListsSheet(
+    lists: List<app.vela.core.model.PlaceList>,
+    onOpenList: (String) -> Unit,
+    onCreateList: (String) -> String,
+    onUpdateList: (app.vela.core.model.PlaceList) -> Unit,
+    onDeleteList: (String) -> Unit,
+    onMoveList: (String, Int) -> Unit = { _, _ -> },
+    onDismiss: () -> Unit,
+    vm: MapViewModel? = null,
+) {
+    val savedState = vm?.state?.collectAsState()
+    val exportContext = androidx.compose.ui.platform.LocalContext.current // starts the one-list export's share sheet
+    var editing by remember { mutableStateOf<app.vela.core.model.PlaceList?>(null) }
+    var creating by remember { mutableStateOf(false) }
+    // The Saved places picked for removing or moving to a list; null while not selecting.
+    var pickedSaved by remember { mutableStateOf<Set<String>?>(null) }
+    // D-pad-first initial focus (hard rule, docs/dpad.md): a raw Dialog must place focus
+    // itself - land it on the New-list button so the menu opens usable with no wasted press.
+    val listsAutoFocus = app.vela.ui.rememberDpadAutoFocus()
+    // Opened from the search page, the search field keeps its focus behind this dialog, and a
+    // focused field keeps the search page up over whatever is opened next. Every way out to the
+    // map drops that focus first, as a pick on the search page does. Read here, outside the
+    // dialog, this is the screen's focus manager rather than the dialog's.
+    val screenFocus = androidx.compose.ui.platform.LocalFocusManager.current
+    // Lists picked by a long press, for deleting several at once (issue #748); null while not
+    // selecting. A list about to be deleted on its own waits in deletingList for the question.
+    var pickedLists by remember { mutableStateOf<Set<String>?>(null) }
+    var deletingList by remember { mutableStateOf<app.vela.core.model.PlaceList?>(null) }
+    var deletingPicked by remember { mutableStateOf(false) }
+    var rowHeightPx by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        // The dialog's own tone, a step above the background, so the sheet reads as a sheet in
+        // the dark theme (issue #748) the way VelaDialog does.
+        Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+            Column(Modifier.padding(vertical = 16.dp).widthIn(max = 420.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val pickedNowLists = pickedLists
+                    if (pickedNowLists != null) {
+                        Text(
+                            androidx.compose.ui.res.pluralStringResource(R.plurals.bulk_selected, pickedNowLists.size, pickedNowLists.size),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(onClick = { deletingPicked = true }, enabled = pickedNowLists.isNotEmpty(), modifier = Modifier.size(40.dp).dpadHighlight(CircleShape)) {
+                            Icon(SymOutlined.Delete, contentDescription = stringResource(R.string.list_delete), tint = if (pickedNowLists.isNotEmpty()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        IconButton(onClick = { pickedLists = null }, modifier = Modifier.size(40.dp).dpadHighlight(CircleShape)) {
+                            Icon(Sym.Close, contentDescription = stringResource(R.string.bulk_done), tint = MaterialTheme.colorScheme.onSurface)
+                        }
+                    } else {
+                        Text(
+                            stringResource(R.string.mapscreen_section_lists),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f),
+                        )
+                        // Icons alone: the words crowded the title (issue #748).
+                        if (vm != null) IconButton(onClick = { screenFocus.clearFocus(); vm.startDrawing(); onDismiss() }, modifier = Modifier.size(40.dp).dpadHighlight(CircleShape)) {
+                            Icon(SymOutlined.Draw, contentDescription = stringResource(R.string.draw_action), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
+                        }
+                        IconButton(onClick = { creating = true }, modifier = Modifier.focusRequester(listsAutoFocus).size(40.dp).dpadHighlight(CircleShape)) {
+                            Icon(Sym.Add, contentDescription = stringResource(R.string.mapscreen_new_list), tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(22.dp))
+                        }
+                    }
+                }
+                if (lists.isEmpty()) {
+                    Text(
+                        stringResource(R.string.lists_empty_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                    )
+                }
+                LazyColumn(Modifier.heightIn(max = 420.dp)) {
+                    itemsIndexed(lists, key = { _, l -> l.id }) { index, list ->
+                        val pickedNowLists = pickedLists
+                        val pickedList = pickedNowLists?.contains(list.id)
+                        // Swipe toward the start to delete, toward the end to edit (issue #748); a
+                        // long press or a held OK starts selecting. The handle at the end reorders
+                        // by drag, and on a keypad Up and Down on it move the list and OK opens the
+                        // editor.
+                        val openRow = {
+                            if (pickedNowLists == null) { screenFocus.clearFocus(); onOpenList(list.id) }
+                            else pickedLists = if (list.id in pickedNowLists) pickedNowLists - list.id else pickedNowLists + list.id
+                        }
+                        val selectRow = { pickedLists = (pickedNowLists ?: emptySet()) + list.id }
+                        val rowFocus = remember { FocusRequester() }
+                        SwipeActionRow(
+                            onDelete = { if (list.places.isEmpty()) onDeleteList(list.id) else deletingList = list },
+                            deleteLabel = stringResource(R.string.list_delete),
+                            onEdit = { editing = list },
+                            editLabel = stringResource(R.string.list_edit),
+                            background = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        ) {
+                            // The handle is the row's focus sibling, not its child: focus search
+                            // never enters a focused node's own children. Focus arriving from
+                            // outside the row lands on the row, never the handle, where Down would
+                            // move the list instead of walking the rows.
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                                    .onSizeChanged { rowHeightPx = it.height.toFloat() }
+                                    .focusProperties { enter = { rowFocus } }
+                                    .focusGroup()
+                                    .padding(end = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Row(
+                                    Modifier
+                                        .weight(1f)
+                                        .focusRequester(rowFocus)
+                                        .dpadHighlight(RoundedCornerShape(8.dp))
+                                        .dpadLongClick(onClick = openRow, onLongClick = selectRow)
+                                        .combinedClickable(onClick = openRow, onLongClick = selectRow)
+                                        .padding(start = 20.dp, top = 12.dp, bottom = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    when (pickedList) {
+                                        null -> ListIconBadge(list.icon, Color(list.color), 22.dp)
+                                        true -> Icon(Sym.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                                        false -> Icon(SymOutlined.RadioButtonUnchecked, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
+                                    }
+                                    Spacer(Modifier.width(16.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(list.name, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                                        Text(
+                                            androidx.compose.ui.res.pluralStringResource(R.plurals.lists_place_count, list.places.size, list.places.size),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                                // Custom order (issue #343): the store's array order is the display
+                                // order everywhere. The handle moves one row per row height dragged.
+                                if (lists.size > 1 && pickedNowLists == null) ReorderHandle(
+                                    onMove = { d -> if ((d < 0 && index > 0) || (d > 0 && index < lists.size - 1)) onMoveList(list.id, d) },
+                                    onActivate = { editing = list },
+                                    rowHeightPx = rowHeightPx,
+                                    contentDescription = stringResource(R.string.list_reorder),
+                                ) else if (pickedNowLists == null) IconButton(onClick = { editing = list }, modifier = Modifier.size(40.dp).dpadHighlight(CircleShape)) {
+                                    Icon(SymOutlined.Edit, contentDescription = stringResource(R.string.list_edit), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                                }
+                            }
+                        }
+                        Divider()
+                    }
+                    // The rest of what you saved (issue #622 follow-up): every starred place and
+                    // every saved route, with a pin for the ones the search page should show.
+                    val st = savedState?.value
+                    if (st != null && st.saved.isNotEmpty()) {
+                        val pickedNow = pickedSaved
+                        item {
+                            if (pickedNow != null) BulkBar(
+                                selection = pickedNow,
+                                all = st.saved.map { it.id }.toSet(),
+                                bulk = remember(lists) {
+                                    ListBulk(
+                                        targets = lists.map { it.id to it.name },
+                                        onRemove = { ids -> vm.removeSavedPlaces(ids) },
+                                        onMove = { ids, to -> vm.moveSavedPlacesToList(ids, to) },
+                                        onCreateList = { name -> onCreateList(name) },
+                                    )
+                                },
+                                ink = MaterialTheme.colorScheme.onSurface,
+                                onChange = { pickedSaved = it },
+                                modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 4.dp, top = 6.dp),
+                            ) else Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.weight(1f)) { SheetSectionLabel(stringResource(R.string.saved_sheet_places)) }
+                                // The key path to selecting (a long press on a row is the touch one).
+                                IconButton(onClick = { pickedSaved = emptySet() }, modifier = Modifier.padding(end = 8.dp).size(40.dp).dpadHighlight(CircleShape)) {
+                                    Icon(SymOutlined.CheckCircle, contentDescription = stringResource(R.string.bulk_select), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                                }
+                            }
+                        }
+                        items(st.saved, key = { "sp:" + it.id }) { sp ->
+                            val isPicked = pickedNow?.contains(sp.id)
+                            SavedSheetRow(
+                                icon = when (isPicked) { null -> Sym.Star; true -> Sym.CheckCircle; false -> SymOutlined.RadioButtonUnchecked },
+                                title = sp.name, sub = sp.address, pinned = sp.pinned,
+                                onOpen = {
+                                    if (pickedNow == null) { screenFocus.clearFocus(); onDismiss(); vm.selectSaved(sp) }
+                                    else pickedSaved = if (sp.id in pickedNow) pickedNow - sp.id else pickedNow + sp.id
+                                },
+                                onPin = { vm.setSavedPlacePinned(sp.id, !sp.pinned) },
+                                onLongPress = { pickedSaved = (pickedNow ?: emptySet()) + sp.id },
+                            )
+                        }
+                    }
+                    if (st != null && st.savedRoutes.isNotEmpty()) {
+                        item { SheetSectionLabel(stringResource(R.string.saved_sheet_routes)) }
+                        items(st.savedRoutes, key = { "sr:" + it.id }) { r ->
+                            SavedSheetRow(
+                                icon = Sym.Directions, title = r.name,
+                                sub = listOfNotNull(
+                                    if (r.isRun) androidx.compose.ui.res.pluralStringResource(R.plurals.saved_route_stops, r.stops.size, r.stops.size) else null,
+                                    r.destLabel.takeIf { it.isNotBlank() },
+                                ).joinToString(" · ").ifBlank { null },
+                                pinned = r.pinned,
+                                onOpen = { screenFocus.clearFocus(); onDismiss(); vm.openSavedRoute(r) },
+                                onPin = { vm.setSavedRoutePinned(r.id, !r.pinned) },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if (creating) {
+        ListEditorDialog(
+            initial = null,
+            // The new list takes the icon, the color and the sound picked here: it used to be made
+            // with the defaults whatever was chosen.
+            onSave = { name, icon, color, alert ->
+                val id = onCreateList(name)
+                onUpdateList(app.vela.core.model.PlaceList(id, name.trim(), icon, color, alert = alert))
+                creating = false
+            },
+            onDelete = null,
+            onDismiss = { creating = false },
+            onPreviewSound = { sound, n -> vm?.playListSound(sound, n) },
+        )
+    }
+    editing?.let { list ->
+        ListEditorDialog(
+            initial = list,
+            onSave = { name, icon, color, alert -> onUpdateList(list.copy(name = name, icon = icon, color = color, alert = alert)); editing = null },
+            onDelete = { onDeleteList(list.id); editing = null },
+            onDismiss = { editing = null },
+            onPreviewSound = { sound, n -> vm?.playListSound(sound, n) },
+            // This one list as a file of its own (#822): the same shape as the export of all lists.
+            onExport = { vm?.exportListIntent(list.id)?.let { i -> runCatching { exportContext.startActivity(i) } }; editing = null },
+        )
+    }
+    // A swiped list with places in it asks first; an empty one goes at once.
+    deletingList?.let { list ->
+        app.vela.ui.VelaDialog(
+            onDismissRequest = { deletingList = null },
+            title = stringResource(R.string.list_delete_title, list.name),
+            confirmText = stringResource(R.string.list_delete),
+            onConfirm = { onDeleteList(list.id); deletingList = null },
+            dismissText = stringResource(R.string.list_cancel),
+            onDismiss = { deletingList = null },
+        ) {
+            Text(androidx.compose.ui.res.pluralStringResource(R.plurals.lists_place_count, list.places.size, list.places.size), style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+    if (deletingPicked) {
+        val ids = pickedLists.orEmpty()
+        app.vela.ui.VelaDialog(
+            onDismissRequest = { deletingPicked = false },
+            title = androidx.compose.ui.res.pluralStringResource(R.plurals.lists_delete_count, ids.size, ids.size),
+            confirmText = stringResource(R.string.list_delete),
+            onConfirm = { ids.forEach(onDeleteList); pickedLists = null; deletingPicked = false },
+            dismissText = stringResource(R.string.list_cancel),
+            onDismiss = { deletingPicked = false },
+        ) {}
+    }
+}
+
+/** Parking history menu (long-press the P button). Restore an older spot after an accidental
+ *  overwrite; delete stale entries. Newest first; the one matching the current spot is tagged. */
+@Composable
+private fun ParkingHistorySheet(
+    history: List<app.vela.core.model.ParkedSpot>,
+    currentAtMillis: Long,
+    onRestore: (app.vela.core.model.ParkedSpot) -> Unit,
+    onDelete: (app.vela.core.model.ParkedSpot) -> Unit,
+    onClearAll: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val dark = isAppInDarkTheme()
+    // D-pad: the sheet opens on the newest spot, never on Clear all.
+    val firstSpot = app.vela.ui.rememberDpadAutoFocus()
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
+            Column(Modifier.padding(vertical = 16.dp).widthIn(max = 420.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        stringResource(R.string.parking_history_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = onClearAll, modifier = Modifier.dpadHighlight(RoundedCornerShape(20.dp))) { Text(stringResource(R.string.parking_history_clear_all)) }
+                }
+                LazyColumn(Modifier.heightIn(max = 360.dp)) {
+                    items(history, key = { it.savedAtMillis }) { entry ->
+                        val isCurrent = entry.savedAtMillis == currentAtMillis
+                        Row(
+                            (if (entry === history.firstOrNull()) Modifier.focusRequester(firstSpot) else Modifier)
+                                .fillMaxWidth()
+                                .dpadHighlight(RoundedCornerShape(8.dp))
+                                .clickable { onRestore(entry) }
+                                .padding(horizontal = 20.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                Sym.LocalParking,
+                                contentDescription = null,
+                                tint = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp),
+                            )
+                            Spacer(Modifier.width(14.dp))
+                            Column(Modifier.weight(1f)) {
+                                // DateUtils = localized relative age ("5 min ago" / "2 hours ago"),
+                                // no hand-rolled English.
+                                Text(
+                                    android.text.format.DateUtils.getRelativeTimeSpanString(
+                                        entry.savedAtMillis, System.currentTimeMillis(),
+                                        android.text.format.DateUtils.MINUTE_IN_MILLIS,
+                                    ).toString(),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                                )
+                                Text(
+                                    app.vela.ui.formatDateTime(androidx.compose.ui.platform.LocalContext.current, entry.savedAtMillis),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            if (isCurrent) {
+                                Text(
+                                    stringResource(R.string.parking_history_current),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            } else {
+                                IconButton(onClick = { onDelete(entry) }) {
+                                    Icon(Sym.Delete, contentDescription = stringResource(R.string.parking_history_delete), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// The list icon set (keys stored in PlaceList.icon). Small, recognizable, Google-list-like.
+private val LIST_ICONS: List<Pair<String, androidx.compose.ui.graphics.vector.ImageVector>> = listOf(
+    "bookmark" to Sym.Bookmark,
+    "star" to Sym.Star,
+    "favorite" to Sym.Favorite,
+    "flag" to Sym.Flag,
+    "place" to Sym.Place,
+    "restaurant" to Sym.Restaurant,
+    "car" to Sym.DirectionsCar,
+    "home" to Sym.Home,
+    "work" to Sym.Work,
+    "shopping" to Sym.ShoppingCart,
+)
+private val LIST_COLORS: List<Long> = listOf(
+    0xFF1A73E8, 0xFF00897B, 0xFFE8710A, 0xFFD93025, 0xFF9334E6, 0xFF1E8E3E, 0xFFF9AB00, 0xFF5F6368,
+)
+
+private fun listIcon(key: String): androidx.compose.ui.graphics.vector.ImageVector =
+    LIST_ICONS.firstOrNull { it.first == key }?.second ?: Sym.Bookmark
+
+// A curated emoji palette for list icons (issue #173) — picked from a D-pad-focusable grid, so
+// keypad phones (whose keyboards have no emoji) get the feature too; touch users can also type
+// any emoji into the free-text field. Stored as "emoji:X" in PlaceList.icon (old payloads and
+// old builds decode it fine: unknown keys fall back to the bookmark vector).
+private val LIST_EMOJI = listOf(
+    "❤️", "⭐", "📍", "🎯", "🍕", "🍔", "🍜", "🍣", "🌮", "☕", "🍰", "🍺",
+    "🛒", "🎁", "🏖️", "⛰️", "🎡", "🎬", "🎵", "🏛️", "⛽", "🏥", "🐾", "✈️",
+)
+
+/** Renders a list's icon: the emoji itself for an "emoji:X" key, else the tinted vector. */
+@Composable
+private fun ListIconBadge(key: String, tint: Color, size: androidx.compose.ui.unit.Dp) {
+    if (key.startsWith("emoji:")) {
+        Text(key.removePrefix("emoji:"), fontSize = with(LocalDensity.current) { (size * 0.86f).toSp() })
+    } else {
+        Icon(listIcon(key), contentDescription = null, tint = tint, modifier = Modifier.size(size))
+    }
+}
+
+/** The icon choice shared by the list editor and a saved place's own icon (issue #629): the
+ *  glyph set, and an emoji tile that opens a D-pad-focusable emoji grid plus a free-type field. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun IconPicker(icon: String, color: Long, onPick: (String) -> Unit) {
+    var emojiOpen by remember { mutableStateOf(false) }
+    var emojiText by remember { mutableStateOf("") }
+    Column {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            LIST_ICONS.forEach { (key, vec) ->
+                val sel = key == icon
+                Surface(
+                    shape = CircleShape,
+                    color = if (sel) Color(color).copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant,
+                    border = if (sel) BorderStroke(2.dp, Color(color)) else null,
+                    modifier = Modifier.size(44.dp).dpadHighlight(CircleShape).clickable { onPick(key) },
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(vec, contentDescription = key, tint = Color(color), modifier = Modifier.size(22.dp))
+                    }
+                }
+            }
+            // Custom EMOJI icon (issue #173): the tail tile shows the picked emoji (selected
+            // state) or a face, and toggles the picker grid below. The grid, not a bare text
+            // field, is the primary picker so key-only phones can use it (docs/dpad.md).
+            val isEmoji = icon.startsWith("emoji:")
+            Surface(
+                shape = CircleShape,
+                color = if (isEmoji) Color(color).copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant,
+                border = if (isEmoji) BorderStroke(2.dp, Color(color)) else null,
+                modifier = Modifier.size(44.dp).dpadHighlight(CircleShape).clickable { emojiOpen = !emojiOpen },
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(if (isEmoji) icon.removePrefix("emoji:") else "😀", fontSize = 20.sp)
+                }
+            }
+        }
+        if (emojiOpen) {
+            Spacer(Modifier.height(10.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                LIST_EMOJI.forEach { e ->
+                    val sel = icon == "emoji:$e"
+                    Surface(
+                        shape = CircleShape,
+                        color = if (sel) Color(color).copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant,
+                        border = if (sel) BorderStroke(2.dp, Color(color)) else null,
+                        modifier = Modifier.size(40.dp).dpadHighlight(CircleShape).clickable { onPick("emoji:$e") },
+                    ) {
+                        Box(contentAlignment = Alignment.Center) { Text(e, fontSize = 18.sp) }
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            // Free-type field for any emoji the grid lacks (touch keyboards have the full set).
+            OutlinedTextField(
+                value = emojiText,
+                onValueChange = { v ->
+                    emojiText = v.take(16)
+                    if (emojiText.isNotBlank()) onPick("emoji:${emojiText.trim()}")
+                },
+                label = { Text(stringResource(R.string.list_emoji_label)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().dpadFieldEscape(),
+            )
+        }
+    }
+}
+
+/** Pick a saved place's own map icon (issue #629), or go back to its list's icon. */
+@Composable
+private fun PlaceIconDialog(
+    placeName: String,
+    initial: String?,
+    color: Long,
+    onSave: (String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var icon by remember { mutableStateOf(initial ?: "bookmark") }
+    val cancelFocus = app.vela.ui.rememberDpadAutoFocus() // D-pad: the dialog opens on Cancel
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        val maxDialogHeight = (LocalConfiguration.current.screenHeightDp * 0.9f).dp
+        Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
+            Column(Modifier.padding(20.dp).widthIn(max = 420.dp).heightIn(max = maxDialogHeight)) {
+                Text(stringResource(R.string.place_icon_title, placeName), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(12.dp))
+                Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                    IconPicker(icon, color) { icon = it }
+                }
+                Spacer(Modifier.height(20.dp))
+                // Two rows: "Use the list's icon" beside Cancel and Save squeezed Save to one letter per line.
+                TextButton(onClick = { onSave(null) }, modifier = Modifier.dpadHighlight(RoundedCornerShape(20.dp))) { Text(stringResource(R.string.place_icon_default)) }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = onDismiss, modifier = Modifier.focusRequester(cancelFocus).dpadHighlight(RoundedCornerShape(20.dp))) { Text(stringResource(R.string.list_cancel)) }
+                    Spacer(Modifier.width(4.dp))
+                    Button(onClick = { onSave(icon) }, modifier = Modifier.dpadHighlight(RoundedCornerShape(20.dp))) { Text(stringResource(R.string.list_save)) }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The parking button, above the locate button. A tap with no spot saves one here. A tap with a
+ * spot set opens a small menu (Find my car, Move parking here, Earlier spots, Clear). A long
+ * press opens the history. A Surface, not a FAB: the FAB's own clickable takes the press and a
+ * long press never fires, so the inner Box owns both gestures.
+ *
+ * By keys the button is a focus stop and OK is the tap. Keys have no long press here, so with no
+ * spot set and a history to open, OK asks which (docs/dpad.md, rule 3).
+ */
+@Composable
+private fun BoxScope.ParkingControl(state: MapUiState, vm: MapViewModel, darkTheme: Boolean, chromeLift: androidx.compose.ui.unit.Dp) {
+    val context = LocalContext.current
+    val parkingSavedMsg = stringResource(R.string.map_parking_saved)
+    val parkingNoFixMsg = stringResource(R.string.map_parking_no_fix)
+    val parkingMovedMsg = stringResource(R.string.map_parking_moved)
+    val parkingClearedMsg = stringResource(R.string.map_parking_cleared)
+    val parkedCarLabel = stringResource(R.string.map_parked_car)
+    val parkingSet = state.parkingSpot != null
+    val hasHistory = state.parkingHistory.isNotEmpty()
+    var showParkingHistory by remember { mutableStateOf(false) }
+    var showParkingMenu by remember { mutableStateOf(false) }
+    val save = {
+        val msg = if (vm.saveParkingSpot()) parkingSavedMsg else parkingNoFixMsg
+        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+    }
+    val onTap = { if (parkingSet) showParkingMenu = true else save() }
+    val onOk = { if (!parkingSet && hasHistory) showParkingMenu = true else onTap() }
+    // Settings > Map can hide it (issue #626); a saved spot keeps it, the way back to the car.
+    if (app.vela.ui.ParkingButton.on.value || parkingSet) {
+        Surface(
+            shape = mapButtonShape,
+            // Same surface as the locate button, saved spot or not; the glyph carries the state.
+            color = mapButtonColor(darkTheme),
+            contentColor = mapButtonInk(darkTheme, accent = if (parkingSet) Color(0xFF8AB4F8) else null),
+            border = mapButtonRing(darkTheme),
+            shadowElevation = 6.dp,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .navigationBarsPadding()
+                .padding(end = 20.dp, bottom = chromeLift + 92.dp)
+                .dpadHighlight(mapButtonShape),
+        ) {
+            Box(
+                Modifier
+                    .size(48.dp)
+                    .onKeyEvent { ev ->
+                        val ok = ev.key == androidx.compose.ui.input.key.Key.DirectionCenter || ev.key == androidx.compose.ui.input.key.Key.Enter
+                        if (ok && ev.type == androidx.compose.ui.input.key.KeyEventType.KeyUp) { onOk(); true } else false
+                    }
+                    .focusable()
+                    .pointerInput(parkingSet, state.parkingHistory.size) {
+                        detectTapGestures(
+                            onTap = { onTap() },
+                            onLongPress = { if (hasHistory) showParkingHistory = true },
+                        )
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Sym.LocalParking,
+                    contentDescription = stringResource(
+                        if (parkingSet) R.string.map_parked_car else R.string.map_parking_save,
+                    ),
+                )
+                // VelaMenu, not a bare DropdownMenu: a popup cannot be focused before the first
+                // key press, so a key-first device gets the chooser that opens focused.
+                app.vela.ui.VelaMenu(expanded = showParkingMenu, onDismissRequest = { showParkingMenu = false }) {
+                    if (parkingSet) {
+                        item(stringResource(R.string.map_parking_find), Sym.DirectionsCar) {
+                            showParkingMenu = false; vm.showParkedCar(parkedCarLabel)
+                        }
+                        // "Move parking here" overwrites the spot with your live fix. The old one
+                        // is kept: saveParkingSpot moves it to the history. Hidden with no fix.
+                        if (state.myLocation != null) {
+                            item(stringResource(R.string.map_parking_move_here), Sym.MyLocation) {
+                                showParkingMenu = false
+                                val msg = if (vm.saveParkingSpot()) parkingMovedMsg else parkingNoFixMsg
+                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        if (state.parkingHistory.size > 1) {
+                            item(stringResource(R.string.map_parking_earlier), Sym.History) {
+                                showParkingMenu = false; showParkingHistory = true
+                            }
+                        }
+                        item(stringResource(R.string.map_parking_clear), Sym.Delete) {
+                            showParkingMenu = false
+                            vm.clearParkingSpot()
+                            Toast.makeText(context, parkingClearedMsg, Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        // Reached by keys only: the long press's key path.
+                        item(stringResource(R.string.map_parking_save), Sym.LocalParking) {
+                            showParkingMenu = false; save()
+                        }
+                        item(stringResource(R.string.parking_history_title), Sym.History) {
+                            showParkingMenu = false; showParkingHistory = true
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if (showParkingHistory) {
+        ParkingHistorySheet(
+            history = state.parkingHistory,
+            currentAtMillis = state.parkedAtMillis,
+            onRestore = { vm.restoreParkingFromHistory(it); showParkingHistory = false },
+            onDelete = { vm.deleteParkingHistoryEntry(it) },
+            onClearAll = { vm.clearParkingHistory(); showParkingHistory = false },
+            onDismiss = { showParkingHistory = false },
+        )
+    }
+}
+
+/** Create / edit a place-list: name, icon and color; Delete when editing. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun ListEditorDialog(
+    initial: app.vela.core.model.PlaceList?,
+    onSave: (name: String, icon: String, color: Long, alert: String?) -> Unit,
+    onDelete: (() -> Unit)?,
+    onDismiss: () -> Unit,
+    onPreviewSound: (sound: String, name: String) -> Unit = { _, _ -> },
+    onExport: (() -> Unit)? = null,
+) {
+    var name by remember { mutableStateOf(initial?.name ?: "") }
+    var icon by remember { mutableStateOf(initial?.icon ?: "bookmark") }
+    var color by remember { mutableStateOf(initial?.color ?: LIST_COLORS.first()) }
+    var alert by remember { mutableStateOf(initial?.alert) }
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        // Cap the dialog to most of the screen: with the emoji grid + free-type field open the
+        // content grows past a short screen, which pushed the color row and Save button off the
+        // bottom with no way to reach them (issue #193). The title and the action buttons stay
+        // pinned; only the middle scrolls.
+        val maxDialogHeight = (LocalConfiguration.current.screenHeightDp * 0.9f).dp
+        Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
+            Column(Modifier.padding(20.dp).widthIn(max = 420.dp).heightIn(max = maxDialogHeight)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        stringResource(if (initial == null) R.string.list_new_title else R.string.list_edit_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f),
+                    )
+                    // This one list as a file (#822), up here: a fourth control in the button row
+                    // below wrapped Save letter by letter.
+                    if (onExport != null) {
+                        IconButton(onClick = onExport, modifier = Modifier.dpadHighlight(CircleShape)) {
+                            Icon(Sym.Share, contentDescription = stringResource(R.string.list_export))
+                        }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                // The form fields scroll; `fill = false` lets the column shrink to content on tall
+                // screens (no dead space) but cap + scroll on short ones so Save is always reachable.
+                Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(stringResource(R.string.list_name_label)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().dpadFieldEscape(),
+                )
+                Spacer(Modifier.height(16.dp))
+                Text(stringResource(R.string.list_icon_label), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(6.dp))
+                IconPicker(icon, color) { icon = it }
+                Spacer(Modifier.height(16.dp))
+                Text(stringResource(R.string.list_color_label), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(6.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LIST_COLORS.forEach { c ->
+                        val sel = c == color
+                        Box(
+                            Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .background(Color(c))
+                                .then(if (sel) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier)
+                                .dpadHighlight(CircleShape)
+                                .clickable { color = c },
+                        )
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+                // A sound as a drive passes one of the list's places (PassAlerts). Picking one plays it.
+                Text(stringResource(R.string.list_sound_label), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(6.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    val choices = listOf<Pair<String?, Int>>(
+                        null to R.string.list_sound_off, "ping" to R.string.list_sound_ping, "bell" to R.string.list_sound_bell,
+                        "double" to R.string.list_sound_double, "low" to R.string.list_sound_low,
+                        app.vela.core.nav.PassAlerts.NAME to R.string.list_sound_name,
+                    )
+                    choices.forEach { (key, label) ->
+                        FilterChip(
+                            selected = alert == key,
+                            onClick = { alert = key; if (key != null) onPreviewSound(key, initial?.places?.firstOrNull()?.name ?: name) },
+                            label = { Text(stringResource(label)) },
+                            shape = androidx.compose.foundation.shape.CircleShape,
+                            modifier = Modifier.dpadHighlight(androidx.compose.foundation.shape.CircleShape),
+                        )
+                    }
+                }
+                } // end scrolling form column
+                Spacer(Modifier.height(20.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (onDelete != null) {
+                        TextButton(onClick = onDelete, modifier = Modifier.dpadHighlight(RoundedCornerShape(20.dp))) {
+                            Text(stringResource(R.string.list_delete), color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = onDismiss, modifier = Modifier.dpadHighlight(RoundedCornerShape(20.dp))) { Text(stringResource(R.string.list_cancel)) }
+                    Spacer(Modifier.width(4.dp))
+                    Button(onClick = { if (name.isNotBlank()) onSave(name.trim(), icon, color, alert) }, enabled = name.isNotBlank(), modifier = Modifier.dpadHighlight(RoundedCornerShape(20.dp))) {
+                        Text(stringResource(R.string.list_save))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The posted speed-limit sign shown by the speedometer during nav - US MUTCD style (white rounded
+ * rectangle, "SPEED LIMIT" + number) in imperial units, EU/RoW style (white disc, red ring, number)
+ * in metric. The number turns red when the current GPS speed exceeds the limit by a tolerance (GPS
+ * speed is noisy, so a plain > would flap). [limitKmh] is the OSM value in km/h.
+ */
+/** The right edge of the speed readout in window px, 0 while it is not shown. Read in the road
+ *  pill's layout pass, so the pill takes exactly the room beside it. File-level on purpose: a
+ *  `remember` in MapScreen is a composable call, and that function is at the verifier's limit. */
+private val speedBoxRightPx = androidx.compose.runtime.mutableIntStateOf(0)
+/** The drive bar's right edge in window px: in landscape the speed box and Re-center sit just past it. */
+private val navBarRightPx = androidx.compose.runtime.mutableIntStateOf(0)
+/** The top of the nav button column, in window px: the compass sits on it, as the column's first button. */
+internal val navFabTopPx = androidx.compose.runtime.mutableIntStateOf(0)
+
+/** The road name in the floating pill: street words shortened as a sign does it (issue #837),
+ *  the text shrunk to 80 percent before it is cut with an ellipsis. */
+@Composable
+private fun RoadPillText(name: String) {
+    val text = remember(name) { app.vela.core.util.RoadNameShort.shorten(name) }
+    val scale = remember(text) { androidx.compose.runtime.mutableFloatStateOf(1f) }
+    val style = MaterialTheme.typography.titleMedium
+    // Its height (the tallest at this density and font scale) is what the drive camera leaves
+    // under the arrow for it.
+    val dens = LocalDensity.current
+    val pillKey = dens.density * 100f + dens.fontScale
+    Text(
+        text,
+        style = style,
+        fontSize = style.fontSize * scale.floatValue,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.primary,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
+        onTextLayout = { if (it.hasVisualOverflow && scale.floatValue > 0.8f) scale.floatValue = (scale.floatValue * 0.94f).coerceAtLeast(0.8f) },
+        modifier = Modifier
+            .onSizeChanged { NavChromeEdges.pill(it.height, pillKey) }
+            .padding(horizontal = 14.dp, vertical = 6.dp),
+    )
+}
+
+@Composable
+private fun SpeedWidget(
+    speedMps: Float?,
+    limitKmh: Double?,
+    imperial: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { speedBoxRightPx.intValue = 0 } }
+    val modifier = modifier.onGloballyPositioned { c ->
+        val at = c.positionInWindow()
+        speedBoxRightPx.intValue = (at.x + c.size.width).roundToInt()
+        // The drive camera keeps the arrow above the box once large text widens it under the arrow.
+        NavChromeEdges.speedTopPx = at.y.roundToInt()
+        NavChromeEdges.speedRightPx = speedBoxRightPx.intValue
+    }
+    val dark = isAppInDarkTheme()
+    val amoled = isAppInAmoled()
+    // Smooth the DISPLAYED speed (Google shows the fused estimate, not each raw doppler sample - the
+    // raw 1 Hz readout flickered 59/60/61 at a steady cruise), with a small deadband so a stop reads
+    // a clean 0 instead of 1 mph jitter.
+    val speedAnim = animateFloatAsState(
+        targetValue = (speedMps ?: 0f).let { if (it < 0.4f) 0f else it },
+        animationSpec = tween(durationMillis = 600),
+        label = "speed",
+    )
+    // Read through the DISPLAYED number: the tween changes every frame for 600 ms of each second,
+    // and reading it directly recomposed the widget ~36 times a second to show the same digits.
+    val shownSpeed by remember(imperial) {
+        androidx.compose.runtime.derivedStateOf {
+            val k = if (imperial) 2.236936f else 3.6f
+            kotlin.math.round(speedAnim.value * k) / k
+        }
+    }
+    val (value, unit) = formatSpeed(shownSpeed)
+    val speedDisp = if (imperial) shownSpeed * 2.236936f else shownSpeed * 3.6f
+    val limitDisp = limitKmh?.let { formatSpeedLimit(it).first }
+    val tol = if (imperial) 3f else 5f
+    val over = limitDisp != null && speedDisp > limitDisp + tol
+    val overColor = Color(0xFFE8514A)
+    val signInk = Color(0xFF202124)
+
+    // ONE rounded rectangle in both states (user 2026-07-14): without a posted limit it's a
+    // snug box around just the speed, and when a limit is known the box simply WIDENS as the
+    // sign joins it - the same surface growing, never a second widget or a shape change.
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        border = if (amoled) BorderStroke(1.dp, SheetPalette.BorderAmoled) else null,
+        color = SheetPalette.bg(dark, amoled),
+        contentColor = SheetPalette.ink(dark),
+        shadowElevation = 4.dp,
+        modifier = modifier,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+        ) {
+            if (limitDisp != null) {
+                if (imperial) {
+                    Surface(
+                        shape = RoundedCornerShape(7.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.5.dp, signInk),
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
+                        ) {
+                            Text("SPEED", color = Color(0xFF3C4043), fontSize = 7.sp, fontWeight = FontWeight.SemiBold, lineHeight = 8.sp)
+                            Text("LIMIT", color = Color(0xFF3C4043), fontSize = 7.sp, fontWeight = FontWeight.SemiBold, lineHeight = 8.sp)
+                            Text("$limitDisp", color = if (over) overColor else signInk, fontSize = 19.sp, fontWeight = FontWeight.Bold, lineHeight = 21.sp)
+                        }
+                    }
+                } else {
+                    Surface(
+                        shape = CircleShape,
+                        color = Color.White,
+                        border = BorderStroke(3.5.dp, Color(0xFFD32F2F)),
+                        modifier = Modifier.size(42.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Text("$limitDisp", color = if (over) overColor else signInk, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("$value", fontSize = 25.sp, fontWeight = FontWeight.Bold, lineHeight = 27.sp, color = if (over) overColor else SheetPalette.ink(dark))
+                Text(unit, fontSize = 9.sp, color = SheetPalette.dim(dark), lineHeight = 10.sp)
+            }
+        }
+    }
+}
+
+/** Reads scale-bar state from an isolated [MutableState] so per-frame scale changes
+ *  recompose only the scale bar, not the entire [MapScreen]. Bottom-left, 30 dp up (the OSM
+ *  credit owns the strip under it), and above the free-drive speed box while that is drawn
+ *  ([speedBoxLift]). */
+@Composable
+private fun androidx.compose.foundation.layout.BoxScope.ScaleBarReader(
+    state: MutableState<Double>,
+    movingFree: Boolean,
+    chromeLift: androidx.compose.ui.unit.Dp,
+) {
+    // Drawn on the map, so it follows the MAP's theme (Settings > Appearance > Map), read here
+    // rather than in MapScreen, which has no bytecode to spare (see PipNavOverlay).
+    ScaleBar(
+        metersPerPixel = state.value,
+        dark = app.vela.ui.theme.isMapDark(),
+        modifier = Modifier
+            .align(Alignment.BottomStart)
+            .navigationBarsPadding()
+            .padding(start = 46.dp, bottom = 30.dp + chromeLift + speedBoxLift(movingFree)),
+    )
+}
+
+/**
+ * How far the map credit and the scale bar rise to clear the free-drive speed box, which takes
+ * their low corner while it is drawn: [SPEED_BOX_LIFT_DP] while the box shows (moving without a
+ * route, Show speed on), else nothing. The scale used to hide instead, and for two minutes after
+ * any motion while the map followed the dot, whether the box was on or off, which left an
+ * empty corner (issue #848). The credit may never hide: the ODbL wants it in every map state.
+ */
+private fun speedBoxLift(movingFree: Boolean): androidx.compose.ui.unit.Dp =
+    if (movingFree && app.vela.ui.SpeedDisplay.on.value) SPEED_BOX_LIFT_DP else 0.dp
+
+/**
+ * Route and nav chrome in landscape is a LEFT column (issue #297): width-capped to the side panel
+ * and kept clear of a display cutout on that edge. In landscape the notch sits on the left, outside
+ * the status-bar insets these cards already pad, so without this the turn card's 12 dp margin ran
+ * under it (review 2026-09-12). Portrait is untouched. The caller keeps its own `.align`.
+ */
+@Composable
+internal fun Modifier.landscapeColumn(landscape: Boolean, widthDp: androidx.compose.ui.unit.Dp): Modifier =
+    if (!landscape) this
+    else this.widthIn(max = widthDp).windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Start))
+
+/** Where each route's time bubble goes (the Google-style chooser experiment): on the part of the
+ *  route that runs farthest from the other routes, so the bubbles sit where the choices differ
+ *  instead of stacking on the shared stretch. Sampled (routes can be thousands of points long). */
+private fun routeBubblesFor(
+    routes: List<app.vela.core.model.Route>,
+    activeIdx: Int,
+    detailed: Boolean = false,
+): List<app.vela.ui.map.RouteBubble> {
+    if (routes.isEmpty()) return emptyList()
+    // Where each bubble goes is RouteBubblePoints' job (a route's own stretch, never a shared one).
+    val points = RouteBubblePoints.of(routes.map { it.polyline })
+    return routes.mapIndexedNotNull { i, r ->
+        val at = points[i] ?: return@mapIndexedNotNull null
+        // With the list open the bubble says what the row says: the distance, and for a slower
+        // route how much longer it is than the fastest (user 2026-09-17).
+        val fastest = routes.minOf { it.durationInTrafficSeconds ?: it.durationSeconds }
+        val eta = r.durationInTrafficSeconds ?: r.durationSeconds
+        val delta = (eta - fastest).toInt()
+        val sub = if (!detailed) null else buildString {
+            append(app.vela.ui.formatDistance(r.distanceMeters))
+            if (delta >= 60) append("  +").append(app.vela.ui.formatDuration(delta.toDouble()))
+        }
+        app.vela.ui.map.RouteBubble(
+            index = i,
+            at = at,
+            label = app.vela.ui.formatDuration(eta),
+            selected = i == activeIdx,
+            sub = sub,
+        )
+    }
+}
+
+/** The road the pill names while navigating: the one you are ON (the leg's road, or the last
+ *  silent rename already passed on it), else, on an unnamed stretch such as an on- or off-ramp,
+ *  the road it leads onto, the one the next instruction names. The pill used to vanish the moment
+ *  a ramp began (user 2026-09-23), which is exactly when the driver wants to know where the lane
+ *  is taking them. Name or number, and the compass letter, are `roadLabelAt`'s choice. */
+private fun navRoadLabel(state: MapUiState): String? {
+    val mans = state.activeRoute?.maneuvers ?: return null
+    return app.vela.core.nav.roadLabelAt(mans, state.nav.stepIndex, state.nav.distanceToNextManeuver, orNext = true)
+}
+
+/** The road you are on, for the "Inside the bottom bar" road-name placement (issue #553), or null
+ *  when that placement is not chosen or there is nothing to show. Same source as the floating
+ *  pill, and the same name-or-number choice. */
+private fun barRoadName(state: MapUiState): String? {
+    if (app.vela.ui.RoadLabel.mode.value != app.vela.ui.RoadLabel.IN_BAR) return null
+    if (!state.navigating || state.previewStepIndex != null) return null
+    val road = navRoadLabel(state) ?: return null
+    if (state.roadNameLatin.isEmpty()) return road
+    return app.vela.core.voice.SpokenScript.forDisplay(road, app.vela.ui.AppLocale.effective().language, state.roadNameLatin)
+}
+
+/**
+ * The offline area picker (issue #609, Google's shape): the map dimmed outside a frame, a hint
+ * above it and a card below with the live size, the whole-region choice and Download. The frame's
+ * insets are MapViewModel.AREA_FRAME_*, the same fractions the view model turns into the saved
+ * bounds, so what the frame shows is what gets saved. Pan and pinch reach the map through the
+ * frame (nothing here takes the gesture); the cards take their own taps.
+ */
+@Composable
+private fun BoxScope.AreaPickOverlay(state: MapUiState, vm: MapViewModel, zoomButtons: Boolean, onZoom: (Double) -> Unit) {
+    val plan = state.areaPick
+    // Cells (part of the region, SPEC 7.6) are the default where the region has them baked; the
+    // whole region stays a choice. Picking one clears the other: they pull the same kind of data.
+    var withRegion by remember { mutableStateOf(true) }
+    var withCells by remember { mutableStateOf(true) }
+    val scrim = Color.Black.copy(alpha = 0.45f)
+    val edge = MaterialTheme.colorScheme.primary
+    androidx.compose.foundation.Canvas(Modifier.matchParentSize()) {
+        val l = size.width * MapViewModel.AREA_FRAME_L.toFloat()
+        val r = size.width * (1 - MapViewModel.AREA_FRAME_R.toFloat())
+        val t = size.height * MapViewModel.AREA_FRAME_T.toFloat()
+        val b = size.height * (1 - MapViewModel.AREA_FRAME_B.toFloat())
+        drawRect(scrim, androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Size(size.width, t))
+        drawRect(scrim, androidx.compose.ui.geometry.Offset(0f, b), androidx.compose.ui.geometry.Size(size.width, size.height - b))
+        drawRect(scrim, androidx.compose.ui.geometry.Offset(0f, t), androidx.compose.ui.geometry.Size(l, b - t))
+        drawRect(scrim, androidx.compose.ui.geometry.Offset(r, t), androidx.compose.ui.geometry.Size(size.width - r, b - t))
+        drawRoundRect(
+            edge, androidx.compose.ui.geometry.Offset(l, t), androidx.compose.ui.geometry.Size(r - l, b - t),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx()),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3.dp.toPx()),
+        )
+    }
+    Surface(
+        modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Text(
+            stringResource(R.string.area_pick_hint),
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+        )
+    }
+    Surface(
+        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(12.dp),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+            val region = plan?.region
+            Text(
+                when {
+                    plan == null -> stringResource(R.string.area_pick_estimating)
+                    plan.tooLarge && region != null && !plan.regionInstalled -> stringResource(R.string.area_pick_too_large, region.name)
+                    plan.tooLarge -> stringResource(R.string.area_pick_too_large_plain)
+                    else -> stringResource(R.string.area_pick_estimate, app.vela.ui.settings.sections.fmtMb(plan.viewMb))
+                },
+                style = MaterialTheme.typography.titleMedium,
+                color = if (plan?.tooLarge == true) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+            )
+            if (plan != null && region != null && plan.regionInstalled) {
+                Text(
+                    stringResource(R.string.settings_area_confirm_region_have, region.name),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            } else if (plan != null && region != null) {
+                val cellsOffered = plan.cells.isNotEmpty()
+                if (cellsOffered) {
+                    Row(
+                        Modifier.padding(top = 8.dp)
+                            .dpadHighlight(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                            .toggleable(value = withCells, onValueChange = { v -> withCells = v; withRegion = false }), // off leaves both off: the whole region is its own choice
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        androidx.compose.material3.Checkbox(checked = withCells, onCheckedChange = null)
+                        Text(
+                            androidx.compose.ui.res.pluralStringResource(R.plurals.area_pick_cells, plan.cells.size, app.vela.ui.settings.sections.fmtMb(plan.cellsMb), plan.cells.size),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
+                }
+                val regionOn = withRegion && !(cellsOffered && withCells)
+                Row(
+                    Modifier.padding(top = 8.dp)
+                        .dpadHighlight(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                        .toggleable(value = regionOn, onValueChange = { v -> withRegion = v; if (v) withCells = false }),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    androidx.compose.material3.Checkbox(checked = regionOn, onCheckedChange = null)
+                    Text(
+                        stringResource(R.string.settings_area_confirm_region, region.name, app.vela.ui.settings.sections.fmtMb(plan.regionMb)),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                // The key path for keypad phones and "Prefer buttons over swipes": touch pinches.
+                if (zoomButtons) {
+                    androidx.compose.material3.FilledTonalIconButton(
+                        onClick = { onZoom(-1.0) },
+                        modifier = Modifier.dpadHighlight(androidx.compose.foundation.shape.CircleShape),
+                    ) { Icon(Sym.Remove, contentDescription = stringResource(R.string.mapscreen_zoom_out)) }
+                    androidx.compose.material3.FilledTonalIconButton(
+                        onClick = { onZoom(1.0) },
+                        modifier = Modifier.dpadHighlight(androidx.compose.foundation.shape.CircleShape),
+                    ) { Icon(Sym.Add, contentDescription = stringResource(R.string.mapscreen_zoom_in)) }
+                }
+                Spacer(Modifier.weight(1f))
+                TextButton(
+                    onClick = { vm.cancelAreaPick() },
+                    modifier = Modifier.dpadHighlight(androidx.compose.foundation.shape.CircleShape),
+                ) { Text(stringResource(R.string.settings_cancel)) }
+                Spacer(Modifier.width(8.dp))
+                Button(
+                    onClick = {
+                        val cellsOffered = plan?.cells?.isNotEmpty() == true
+                        val cellsPick = cellsOffered && withCells
+                        vm.downloadPickedArea(
+                            withRegion = withRegion && !cellsPick && region != null && plan?.regionInstalled == false,
+                            withCells = cellsPick,
+                        )
+                    },
+                    enabled = plan != null && !plan.tooLarge,
+                    shape = androidx.compose.foundation.shape.CircleShape,
+                    modifier = Modifier.dpadHighlight(androidx.compose.foundation.shape.CircleShape),
+                ) { Text(stringResource(R.string.settings_download)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SheetSectionLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 20.dp, top = 14.dp, bottom = 4.dp),
+    )
+}
+
+/** A row in the Saved sheet: tap opens it, the pin puts it on (or takes it off) the search page. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun SavedSheetRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    sub: String?,
+    pinned: Boolean,
+    onOpen: () -> Unit,
+    onPin: () -> Unit,
+    onLongPress: (() -> Unit)? = null,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .dpadHighlight(RoundedCornerShape(8.dp))
+            .combinedClickable(onClick = onOpen, onLongClick = onLongPress)
+            .padding(start = 20.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
+            if (sub != null) Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        }
+        IconButton(onClick = onPin, modifier = Modifier.size(40.dp).dpadHighlight(CircleShape)) {
+            Icon(
+                if (pinned) Sym.PushPin else SymOutlined.PushPin,
+                contentDescription = stringResource(if (pinned) R.string.saved_unpin else R.string.saved_pin),
+                tint = if (pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * The place sheet's top edge, read in LAYOUT by what follows it, plus the three yes/no answers
+ * composition needs, which change only when the edge crosses a line. Composition reading the
+ * edge itself recomposed all of MapScreen on every frame of a sheet drag or settle.
+ */
+internal class SheetEdge {
+    val top = mutableStateOf(0)
+    /** The place sheet is on screen. False while the search page or another surface has taken
+     *  its place with the place still selected: what floats beside the sheet goes with it. */
+    val shown = mutableStateOf(false)
+    /** Reports the sheet's top edge as it moves, and its leaving. */
+    val report: Modifier = SheetEdgeElement(this)
+
+    fun gone() {
+        if (shown.value) shown.value = false
+        set(0)
+    }
+    val above40 = mutableStateOf(true)      // top < 40% of the screen (it covers the search bar)
+    val below55 = mutableStateOf(false)     // top > 55% (room for the recenter button above it)
+    val clearLayers = mutableStateOf(false) // top below the layers button
+    var screenH = 0f
+    var layersBottom = 0f
+
+    fun seen(y: Int) {
+        if (!shown.value) shown.value = true
+        set(y)
+    }
+
+    fun set(y: Int) {
+        top.value = y
+        val a = y < screenH * 0.40f
+        val b = y > screenH * 0.55f
+        val c = y > layersBottom
+        if (above40.value != a) above40.value = a
+        if (below55.value != b) below55.value = b
+        if (clearLayers.value != c) clearLayers.value = c
+    }
+}
+
+private class SheetEdgeElement(val edge: SheetEdge) : androidx.compose.ui.node.ModifierNodeElement<SheetEdgeNode>() {
+    override fun create() = SheetEdgeNode(edge)
+    override fun update(node: SheetEdgeNode) { node.edge = edge }
+    override fun equals(other: Any?) = other is SheetEdgeElement && other.edge === edge
+    override fun hashCode() = System.identityHashCode(edge)
+}
+
+private class SheetEdgeNode(var edge: SheetEdge) : Modifier.Node(), androidx.compose.ui.node.GlobalPositionAwareModifierNode {
+    override fun onGloballyPositioned(coordinates: androidx.compose.ui.layout.LayoutCoordinates) =
+        edge.seen(coordinates.positionInRoot().y.roundToInt())
+    override fun onDetach() = edge.gone()
+}
+
+/** The nav puck's screen position, read in layout by the labels pinned to it, plus whether it
+ *  has one, which is all composition reads (the position moves every frame of a turn). */
+internal class PuckScreen {
+    val at = mutableStateOf<Offset?>(null)
+    val have = mutableStateOf(false)
+
+    fun set(o: Offset?) {
+        at.value = o
+        if (have.value != (o != null)) have.value = o != null
+    }
+}
+
+/** The Save offer for a custom map that has only lines and areas (issue #669): the map's name and
+ *  a Save pill along the bottom, with a close button that drops the preview. */
+@Composable
+private fun BoxScope.ShapeBottomBar(state: MapUiState, vm: MapViewModel) {
+    val d = state.drawing
+    if (d != null) DrawBar(d, vm) else state.pendingImport?.let { ShapesOnlySaveBar(it.title, vm) }
+}
+
+@Composable
+private fun BoxScope.ShapesOnlySaveBar(title: String, vm: MapViewModel) {
+    val context = LocalContext.current
+    val savedMsg = stringResource(R.string.map_list_saved, title)
+    Surface(
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shadowElevation = 6.dp,
+        // Clear of the scale bar below it and the button column on the right edge.
+        modifier = Modifier.align(Alignment.BottomStart).navigationBarsPadding().padding(start = 16.dp, end = 88.dp, bottom = 72.dp).fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Button(
+                onClick = { vm.saveImportedList(); Toast.makeText(context, savedMsg, Toast.LENGTH_SHORT).show() },
+                shape = CircleShape, modifier = Modifier.dpadHighlight(CircleShape),
+            ) { Text(stringResource(R.string.map_save_mymap)) }
+            IconButton(onClick = vm::clearSearch, modifier = Modifier.dpadHighlight(CircleShape)) {
+                Icon(Sym.Close, contentDescription = stringResource(R.string.place_close))
+            }
+        }
+    }
+}
+
+/** An open custom map's layers for the results sheet's Layers chip (issue #669). */
+class MapLayers(val names: List<String>, val hidden: Set<String>, val onToggle: (String) -> Unit)
+
+
+/** The card shown when no location has come after a few seconds. With no network location on,
+ *  it names that setting and offers the system's location page; else it suggests PSDS. */
+@Composable
+private fun BoxScope.LocationTip(networkOff: Boolean, vm: MapViewModel) {
+    val context = LocalContext.current
+    InfoCard(
+        title = stringResource(if (networkOff) R.string.mapscreen_location_tip_title else R.string.mapscreen_psds_tip_title),
+        body = stringResource(if (networkOff) R.string.mapscreen_location_tip_body else R.string.mapscreen_psds_tip_body),
+        actionLabel = stringResource(R.string.mapscreen_got_it),
+        onAction = vm::dismissPsdsTip,
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .navigationBarsPadding()
+            .padding(16.dp),
+        pillLabel = if (networkOff) stringResource(R.string.mapscreen_location_tip_settings) else null,
+        onPill = if (networkOff) {
+            { runCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) } }
+        } else null,
+    )
+}
+
+/** "Save list · 12 places", with the count's own plural. A function of its own keeps the call
+ *  in MapScreen as small as the one it replaced. */
+@Composable
+private fun saveListLabel(count: Int): String =
+    androidx.compose.ui.res.pluralStringResource(R.plurals.map_save_list, count, count)
+
+/** The bulk actions for the list the results sheet is showing, or null when it is not showing
+ *  one of your lists (a search, an import not yet saved). */
+@Composable
+private fun listBulkOf(state: MapUiState, vm: MapViewModel): ListBulk? {
+    val listId = state.openListId ?: return null
+    if (state.pendingImport != null) return null
+    return remember(listId, state.lists) {
+        val list = state.lists.firstOrNull { it.id == listId }
+        ListBulk(
+            targets = state.lists.filter { it.id != listId }.map { it.id to it.name },
+            onRemove = { ids -> vm.removePlacesFromList(listId, ids) },
+            onMove = { ids, to -> vm.movePlacesToList(listId, ids, to) },
+            onCreateList = { name -> vm.createList(name) },
+            nameOf = { id -> list?.places?.firstOrNull { it.id == id }?.name },
+            onRename = { id, name -> vm.renameListEntry(listId, id, name) },
+        )
+    }
+}
+
+/** Non-null when the open list is a saved custom map with two or more layers. */
+private fun mapLayersOf(state: MapUiState, vm: MapViewModel): MapLayers? {
+    // A custom map still being looked at (not saved yet): the same chip over the import itself.
+    state.pendingImport?.let { imp ->
+        val names = (imp.places.mapNotNull { it.mapLayer } + imp.shapes.mapNotNull { it.layer }).distinct()
+        return if (names.size < 2) null else MapLayers(names, state.pendingHiddenLayers) { vm.togglePendingLayer(it) }
+    }
+    val list = state.openListId?.let { id -> state.lists.firstOrNull { it.id == id } } ?: return null
+    val names = list.layers
+    if (names.size < 2) return null
+    return MapLayers(names, list.hiddenLayers.toSet()) { vm.toggleListLayer(list.id, it) }
+}

@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vela Maps · OpenStreetMap and Google Maps in one app</title>
+  <meta name="description" content="Vela is a free, open-source Google Maps alternative for Android: OpenStreetMap maps with Google's live traffic, hours and reviews, for degoogled phones and stock Android. Turn-by-turn navigation, offline regions, transit boards and Flock cameras on the map. No account, no API key, no Play Services.">
+  <meta property="og:title" content="Vela Maps">
+  <meta property="og:description" content="The best of OpenStreetMap and Google Maps, in one app. Free and open source, no account, no tracking.">
+  <meta property="og:image" content="assets/05-navigation.webp">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://velamaps.org/">
+  <link rel="canonical" href="https://velamaps.org/">
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <a class="brand" href="./"><img src="assets/logo.svg" alt=""> Vela Maps</a>
+  <nav>
+    <a href="#what">What it does</a>
+    <a href="privacy.html">Privacy</a>
+    <a href="#install">Install</a>
+    <a href="#docs">Docs</a>
+    <a href="press.html">Press</a>
+    <a href="https://github.com/PimpinPumpkin/Vela">GitHub</a>
+  </nav>
+</header>
+
+<main>
+
+<div class="hero wide herogrid">
+  <div>
+    <div class="kicker">Android · free · open source · beta</div>
+    <h1>The best of OpenStreetMap and Google Maps, in one app.</h1>
+    <p class="lede">Vela is a free, open-source Google Maps alternative for Android. The map is open data. Live traffic, hours and reviews come from Google when you ask, with no Google account, no Play Services and no Google code on your phone.</p>
+    <div class="get">
+      <a class="btn" href="#install">Install Vela</a>
+      <a class="btn plain" href="https://github.com/PimpinPumpkin/Vela">See the source</a>
+    </div>
+    <p class="small">Built for degoogled phones such as GrapheneOS, and it runs on stock Android too. Android 8 and up.</p>
+  </div>
+  <figure class="phone herophone"><img src="assets/05-navigation.webp" width="720" height="1560" alt="Turn-by-turn navigation in Vela, with the speed limit and the next turn"></figure>
+</div>
+
+<section class="tubsec">
+  <div class="wide tub">
+    <figure class="polaroid">
+      <img src="assets/not-google-maps.png" width="391" height="297" alt="A tub of I Can't Believe It's Not Butter with the word Butter replaced by the Google Maps logo">
+    </figure>
+    <div>
+      <h2>It looks like Google Maps. That is the point.</h2>
+      <p>You already know how to use it. Underneath, almost none of it is Google: it is a native Android app drawing open map tiles, with no Google SDK and nothing to sign in to.</p>
+      <p>It is <mark>not a wrapper</mark> around the Google Maps website and it is not a modified copy of the Google Maps app.</p>
+    </div>
+  </div>
+</section>
+
+<div class="shots" aria-label="Screenshots of Vela">
+  <figure class="phone"><img src="assets/01-map.webp" width="720" height="1560" alt="Vela's map in dark mode with shops and restaurants marked" loading="lazy"><figcaption>The map is open data</figcaption></figure>
+  <figure class="phone"><img src="assets/03-place.webp" width="720" height="1560" alt="A place page in Vela showing hours, rating and photos" loading="lazy"><figcaption>Hours, reviews, photos</figcaption></figure>
+  <figure class="phone"><img src="assets/04-directions.webp" width="720" height="1560" alt="Route options in Vela with traffic-aware times" loading="lazy"><figcaption>Routes with real traffic</figcaption></figure>
+  <figure class="phone"><img src="assets/06-transit.webp" width="720" height="1560" alt="A transit departure board in Vela" loading="lazy"><figcaption>Transit boards</figcaption></figure>
+  <figure class="phone"><img src="assets/08-map-light.webp" width="720" height="1560" alt="Vela's map in light mode" loading="lazy"><figcaption>Light or dark</figcaption></figure>
+</div>
+
+<section class="note">
+  <div class="col">
+    <h2>Why this exists</h2>
+    <p>I made Vela to solve my own problem. I run GrapheneOS, and Google Maps stopped working for me without Google's services on the phone. I need traffic, and a handful of other things that pretty much only Google does well. I tried every maps app under the sun and none of them fit.</p>
+    <p>So I built one. The map is OpenStreetMap and other open data. When you search, tap a place or ask for a route, your phone asks Google the way a logged-out browser would, as anonymously as it can, and shows you the answer. No account, no API key, no server of mine in the middle. <span class="wavy">It is what NewPipe is to YouTube, for maps.</span></p>
+    <p>It looks like Google Maps on purpose. I think that interface is the best there is, and muscle memory matters when you are driving. I needed this to just work.</p>
+    <p>It is in beta and I am one person, so it has bugs. I build it with heavy use of AI assistants and test it on real phones. It is GPLv3 so it can outlive me, and I will never charge money for it.</p>
+    <p class="sig">PimpinPumpkin, developer of Vela</p>
+  </div>
+</section>
+
+<section id="what" class="tint">
+  <div class="wide">
+    <h2>What it does</h2>
+    <div class="things">
+      <div><h3>Traffic that is real</h3><p>Arrival times use the same live traffic Google Maps shows, and each route says light, moderate or heavy in plain words.</p></div>
+      <div><h3>Places you can trust</h3><p>Hours, ratings, reviews and photos for the place you tapped, looked up fresh when you ask.</p></div>
+      <div><h3>Works with no signal</h3><p>Download a state or a country once. The map, search, routing and navigation keep working offline.</p></div>
+      <div><h3>Transit that is live</h3><p>Departure boards and stop-by-stop timelines, from open transit data where it exists.</p></div>
+      <div><h3>Plate cameras on the map</h3><p>Flock and other license-plate readers from the community DeFlock project, plus fixed speed cameras, on the map and along your route.</p></div>
+      <div><h3>A voice that stays on the phone</h3><p>Spoken directions come from a neural voice that runs entirely on the device. Voice search works offline too.</p></div>
+      <div><h3>Street View, gas prices, parking</h3><p>Look around a street before you get there, see fuel prices in search results, and tap P to remember where you parked.</p></div>
+      <div><h3>The rest</h3><p>Saved lists (and importing a shared Google Maps list), 15 languages, light and dark, and full keypad control for dumbphones.</p></div>
+    </div>
+    <p class="small more"><a href="docs/features/">The full feature list →</a></p>
+  </div>
+</section>
+
+<section id="google">
+  <div class="col">
+    <h2>What Google sees</h2>
+    <p>This is the question everybody asks first, so here is the whole answer. With the default settings:</p>
+  </div>
+  <div class="wide">
+    <div class="tablewrap card">
+      <table>
+        <thead><tr><th>When you</th><th>Google gets</th></tr></thead>
+        <tbody>
+          <tr><td>Pan and zoom the map</td><td><span class="nothing">Nothing.</span> Tiles come from OpenFreeMap, streets and labels from OpenStreetMap, and the places on the map from open data built in Vela's own repository.</td></tr>
+          <tr><td>Type a search</td><td>Your text, anonymously, the way a logged-out browser sends it.</td></tr>
+          <tr><td>Tap a place</td><td>An anonymous lookup of that one place. That is where the hours, reviews and photos come from.</td></tr>
+          <tr><td>Ask for directions</td><td>Where the trip starts and ends, anonymously. A driving route comes from Google so it knows about traffic and closed roads. Walking asks Google once. Cycling uses open routers, and offline the route is worked out on the phone.</td></tr>
+          <tr><td>Drive with navigation on</td><td>A traffic check from your current position every couple of minutes, so the arrival time stays right. You can turn that off.</td></tr>
+          <tr><td>Save a place, build a list</td><td><span class="nothing">Nothing, ever.</span> Saved places, history and settings stay on the phone.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="col">
+    <p>Google sees an IP address and a question. It does not see an account, a device ID or an app key, because there are none. Vela also throws away Google's logged-out cookie every week by default.</p>
+    <p>Want none of it? One switch, <strong>Settings → Privacy → Use Vela without Google</strong>, and no request goes to a Google server at all. With a downloaded region the app works fully offline.</p>
+    <p><a href="privacy.html">The privacy page</a> lists every service Vela contacts and what each one receives.</p>
+  </div>
+</section>
+
+<section class="tint">
+  <div class="col">
+    <h2>The honest part</h2>
+    <div class="box warn">
+      <p><strong>Vela is in beta.</strong> Things break. If you need a maps app you can bet a road trip on, keep a second one installed.</p>
+    </div>
+    <ul class="plain">
+      <li><strong>Google can move things.</strong> When Google changes a page, search or place details can stop working. The fix usually reaches your phone on its own, without an app update, but there can be a gap.</li>
+      <li><strong>Open place data has ghosts.</strong> Some businesses on the map closed years ago. Tapping one checks it against Google, and the data gets cleaned with every build.</li>
+      <li><strong>It is not on Google Play</strong>, and it is not in the main F-Droid catalog. You install it from GitHub, Obtainium or Vela's own F-Droid repository.</li>
+      <li><strong>Some things cannot be built.</strong> Police reports, crash reports and anything else that needs a Google account or a server of mine. <a href="https://github.com/PimpinPumpkin/Vela/blob/main/ROADMAP.md">The list is written down.</a></li>
+      <li><strong>One person maintains it.</strong> Feature requests get read. They do not get voted on.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="install" class="band">
+  <div class="wide">
+    <h2>Install</h2>
+    <p>Free, no account, no ads. Pick whichever you already use.</p>
+    <div class="ways">
+      <div class="way">
+        <h3>Obtainium</h3>
+        <p>Follows the weekly stable release and updates it for you. The easiest way if you already have Obtainium.</p>
+        <a class="go" href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/PimpinPumpkin/Vela">Add to Obtainium →</a>
+      </div>
+      <div class="way">
+        <h3>F-Droid</h3>
+        <p>Vela runs its own repository. Add it to any F-Droid client and you get the same signed builds.</p>
+        <a class="go" href="docs/fdroid/">Repository address and setup →</a>
+      </div>
+      <div class="way">
+        <h3>Plain APK</h3>
+        <p>Download the file from the releases page. The app checks for updates itself after that.</p>
+        <a class="go" href="https://github.com/PimpinPumpkin/Vela/releases/latest">Latest stable release →</a>
+      </div>
+    </div>
+    <details>
+      <summary>Check that you got the real thing</summary>
+      <p class="small" style="margin-top:.8rem">Every Vela build, on every channel, is signed with one key. Its SHA-256 certificate fingerprint is below. Android also refuses any update signed with a different key.</p>
+      <pre>29:93:8B:48:58:06:3E:42:E6:77:FF:95:C9:01:CD:48:24:8A:7F:03:2A:3A:E8:5F:9B:9E:56:17:56:8B:0D:36</pre>
+    </details>
+  </div>
+</section>
+
+<section id="docs">
+  <div class="wide">
+    <h2>Every answer, written down</h2>
+    <p>Vela is documented in the open, from "why is this shop missing" to the format of every request.</p>
+    <div class="docs">
+      <a class="doc" href="docs/faq/"><h3>Questions and answers</h3><p>What each part of the app uses, what works without Google, why a place is missing.</p></a>
+      <a class="doc" href="privacy.html"><h3>Privacy</h3><p>Every service Vela contacts, when, and what it receives.</p></a>
+      <a class="doc" href="docs/book/"><h3>The Vela book</h3><p>How each part works, in plain language: places, routing, navigation, offline, transit.</p></a>
+      <a class="doc" href="docs/spec/"><h3>Technical specification</h3><p>Every rule, constant and threshold, for people reading or changing the code.</p></a>
+      <a class="doc" href="docs/features/"><h3>Features</h3><p>One line for each thing the app does.</p></a>
+      <a class="doc" href="docs/roadmap/"><h3>Roadmap</h3><p>What is open, what is next, and what will not be built.</p></a>
+    </div>
+  </div>
+</section>
+
+<section class="tint">
+  <div class="col">
+    <h2>Found a bug? Want to help?</h2>
+    <ul class="plain">
+      <li><strong>Bugs go on GitHub</strong>, through <a href="https://github.com/PimpinPumpkin/Vela/issues/new/choose">the report form</a>. It asks for the version and the steps, which is what it takes to fix anything. Reports left on forums get lost.</li>
+      <li><strong>Translate it.</strong> Vela speaks 15 languages and <a href="https://hosted.weblate.org/engage/vela-maps/">translations happen in the browser on Weblate</a>.</li>
+      <li><strong>Build it yourself.</strong> <a href="docs/building/">The build guide</a> says where every piece comes from.</li>
+      <li><strong>Buy me a coffee.</strong> Vela costs nothing and has no ads. <a href="https://buymeacoffee.com/PimpinPumpkin">If it saved you from reinstalling Google Maps, this is the tip jar.</a></li>
+    </ul>
+    <p class="small">Writing about Vela? <a href="press.html">The press page</a> has the facts, the screenshots and the things people usually get wrong.</p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wide footgrid">
+    <div>
+      <a class="brand" href="./"><img src="assets/logo.svg" alt=""> Vela Maps</a>
+      <p>Free software under the <a href="https://github.com/PimpinPumpkin/Vela/blob/main/LICENSE">GPLv3</a>.</p>
+    </div>
+    <div><h4>The app</h4><a href="#install">Install</a><a href="docs/features/">Features</a><a href="privacy.html">Privacy</a><a href="docs/faq/">Questions</a></div>
+    <div><h4>The project</h4><a href="https://github.com/PimpinPumpkin/Vela">Source</a><a href="docs/roadmap/">Roadmap</a><a href="https://hosted.weblate.org/engage/vela-maps/">Translate</a><a href="press.html">Press</a></div>
+    <div><h4>The docs</h4><a href="docs/book/">The book</a><a href="docs/spec/">Specification</a><a href="docs/building/">Building</a><a href="docs/security/">Security</a></div>
+  </div>
+  <div class="wide legal">
+    <p>Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors. Vela is not affiliated with or endorsed by Google. Google Maps is a trademark of Google LLC.</p>
+    <p>This site sets no cookies and loads nothing from anyone else.</p>
+  </div>
+</footer>
+
+</body>
+</html>

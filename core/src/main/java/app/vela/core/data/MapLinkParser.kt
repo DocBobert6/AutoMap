@@ -1,0 +1,353 @@
+package app.vela.core.data
+
+import app.vela.core.model.TravelMode
+import java.net.URLDecoder
+
+/** A target extracted from an external `geo:` URI or Google-Maps web link. [zoom] is the
+ *  caller's requested camera zoom (`geo:...?z=17`, `/@lat,lng,15z`) when it carried one. */
+data class MapLink(
+    val query: String? = null, val lat: Double? = null, val lng: Double? = null, val zoom: Double? = null,
+    /** A directions link: the target is the DESTINATION and the route chooser should open on it. */
+    val directions: Boolean = false,
+    /** Where the trip starts, when the link names somewhere other than the user's own position. */
+    val origin: MapLink? = null,
+    /** The travel mode the link asked for, when it asked. */
+    val mode: TravelMode? = null,
+    /** The places a directions link passes through between its start and its end, in order.
+     *  One marked [via] only shapes the route (a point dragged onto it on a desktop). */
+    val stops: List<MapLink> = emptyList(),
+    /** A point the route passes through without stopping; it has a coordinate and no name. */
+    val via: Boolean = false,
+    /** A place link's `!1s0x<cell>:0x<id>`, what a short share link's target carries instead of a
+     *  coordinate. Its first half is an S2 cell near the place ([MapLinkParser.featureCell]). */
+    val featureId: String? = null,
+    /** A Street View link (issue #847): open the panorama at [lat], [lng], not a pin there. */
+    val streetView: Boolean = false,
+    /** The direction a Street View link looks, in degrees from north, when it says. */
+    val heading: Double? = null,
+    /** The panorama a Street View link names, when it names one. */
+    val panoId: String? = null,
+) {
+    val hasTarget: Boolean get() = !query.isNullOrBlank() || (lat != null && lng != null) || (streetView && panoId != null)
+
+    /** What the link calls this place, for showing it before it is looked up: its name or
+     *  address as the link spells it, else its coordinate. */
+    val label: String
+        get() = query?.trim()?.takeIf { it.isNotEmpty() }
+            ?: if (lat != null && lng != null) String.format(java.util.Locale.US, "%.5f, %.5f", lat, lng) else ""
+}
+
+/**
+ * Parses the links other apps hand to a maps app, so Vela can be the system maps
+ * handler on a de-Googled phone:
+ *  - `geo:38.5,-121.7`               → a point
+ *  - `geo:0,0?q=Coffee`              → a search
+ *  - `geo:38.5,-121.7?q=Pier 39`     → a named place near a point
+ *  - `geo:0,0?q=38.5,-121.7(Label)`  → a labeled point
+ *  - `https://www.google.com/maps/place/Foo/@38.5,-121.7,15z` → a place / point
+ *  - `https://www.google.com/maps/search/coffee` / `?q=...`    → a search
+ *  - directions (issue #632), each opening the route chooser on the destination:
+ *      `maps.google.com/maps?saddr=A&daddr=B&dirflg=w`, `google.com/maps/dir/?api=1&destination=B
+ *      &origin=A&travelmode=walking`, `google.com/maps/dir/A/B/@...`, `google.navigation:q=B&mode=w`.
+ *      A link with more than two places (`/dir/A/B/C/D`, `daddr=B+to:C`, `waypoints=B|C`) keeps
+ *      the ones between as [MapLink.stops].
+ *  - Street View (issue #847), each opening the panorama with [MapLink.streetView]:
+ *      `google.com/maps/@38.5,-121.7,3a,75y,90h,90t/data=!3m6!1e1!3m4!1s<pano>!2e0`,
+ *      `google.com/maps/@?api=1&map_action=pano&viewpoint=38.5,-121.7&heading=90&pano=<pano>`,
+ *      `maps.google.com/maps?layer=c&cbll=38.5,-121.7&cbp=12,90,0,0,0&panoid=<pano>`.
+ *
+ * Pure Kotlin (no `android.net.Uri`) so it's unit-testable in `:core`.
+ */
+object MapLinkParser {
+    private val COORD = Regex("""(-?\d{1,3}\.\d+),\s*(-?\d{1,3}\.\d+)""")
+
+    /** A BARE typed coordinate ("37.77, -122.42", also "geo:37.77,-122.42"), so pasting
+     *  coordinates into the search box drops a pin instead of running a text search.
+     *  Strict: the whole string must be the pair (a street address with numbers stays a
+     *  search), both halves need a decimal point, and the values must be a plausible
+     *  lat/lng. Null otherwise. */
+    fun parseBareCoordinate(raw: String): MapLink? {
+        val text = raw.trim().removePrefix("geo:").trim()
+        val m = COORD.matchEntire(text) ?: return null
+        val lat = m.groupValues[1].toDoubleOrNull() ?: return null
+        val lng = m.groupValues[2].toDoubleOrNull() ?: return null
+        if (lat !in -90.0..90.0 || lng !in -180.0..180.0) return null
+        return MapLink(lat = lat, lng = lng)
+    }
+    private val AT = Regex("""@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)""")
+
+    /** A pasted share link worth resolving over the network (short links carry nothing
+     *  parseable locally) — a single URL token, not a text query that mentions maps. */
+    fun isShareLink(raw: String): Boolean {
+        val t = raw.trim()
+        if (t.any { it.isWhitespace() }) return false
+        return "maps.app.goo.gl/" in t || "goo.gl/maps/" in t || "google.com/maps/placelists" in t || myMapId(t) != null
+    }
+
+    private val MY_MAP = Regex("""google\.[a-z.]+/maps/d/[^\s]*?[?&]mid=([A-Za-z0-9_.-]{10,})""")
+
+    /** The id of a Google My Maps custom map link (`google.com/maps/d/viewer?mid=...`, also the
+     *  `edit`, `embed` and `u/0/` forms), or null (issue #669). */
+    fun myMapId(raw: String): String? = MY_MAP.find(raw.trim())?.groupValues?.get(1)
+
+    /** A whole Google Maps web address typed or pasted where a search goes: one token, on a
+     *  Google host, with a maps path. Short share links are [isShareLink]'s. */
+    fun isMapsUrl(raw: String): Boolean {
+        val t = raw.trim()
+        if (t.any { it.isWhitespace() }) return false
+        return MAPS_URL.containsMatchIn(t)
+    }
+
+    private val MAPS_URL = Regex("""^(?:https?://)?(?:(?:www\.|maps\.)?google\.[a-z.]{2,6}/maps[/?]|maps\.google\.[a-z.]{2,6}/)""", RegexOption.IGNORE_CASE)
+
+    fun parse(raw: String): MapLink? {
+        val link = when {
+            raw.startsWith("google.navigation:", ignoreCase = true) -> parseNavigation(raw)
+            raw.startsWith("geo:", ignoreCase = true) -> parseGeo(raw)
+            "/maps" in raw || "maps.google" in raw || "maps.app.goo.gl" in raw -> parseStreetView(raw) ?: parseDirections(raw) ?: parseMaps(raw)
+            else -> null
+        }
+        return link?.takeIf { it.hasTarget }
+    }
+
+    /** `google.navigation:q=<dest>&mode=d|w|b|l` (also `ll=lat,lng`): Google's own navigate intent. */
+    private fun parseNavigation(raw: String): MapLink? {
+        // The parameters follow the colon, with or without a "?" ("google.navigation:q=X&mode=w").
+        val params = "?" + raw.substringAfter(':').removePrefix("?")
+        val dest = endpoint(queryParam(params, "q") ?: queryParam(params, "ll")) ?: return null
+        val mode = when (queryParam(params, "mode")?.lowercase()) {
+            "w" -> TravelMode.WALK; "b" -> TravelMode.BICYCLE; "d", "l" -> TravelMode.DRIVE; else -> null
+        }
+        return dest.copy(directions = true, mode = mode)
+    }
+
+    /** The web directions forms; null when [raw] is not one, so the place/search parse runs. */
+    private fun parseDirections(raw: String): MapLink? {
+        // Classic: /maps?saddr=A&daddr=B[&dirflg=w]. daddr can chain stops ("B+to:C"); the last one
+        // is where the trip ends.
+        queryParam(raw, "daddr")?.let { d ->
+            // Split on the raw value and let endpoint decode the piece, once: decoded here first,
+            // a plus code's own "+" (%2B) came out of the second pass as a space.
+            val chain = d.split(DADDR_TO)
+            val dest = endpoint(chain.last()) ?: return null
+            val mode = when (queryParam(raw, "dirflg")?.lowercase()?.firstOrNull { it in "dwbr" }) {
+                'w' -> TravelMode.WALK; 'b' -> TravelMode.BICYCLE; 'r' -> TravelMode.TRANSIT; 'd' -> TravelMode.DRIVE; else -> null
+            }
+            return dest.copy(directions = true, origin = endpoint(queryParam(raw, "saddr")), mode = mode, stops = chain.dropLast(1).mapNotNull { endpoint(it) })
+        }
+        if ("/dir/" !in raw && !raw.substringBefore('?').endsWith("/dir")) return null
+        val mode = when (queryParam(raw, "travelmode")?.lowercase()) {
+            "walking" -> TravelMode.WALK; "bicycling" -> TravelMode.BICYCLE; "transit" -> TravelMode.TRANSIT
+            "driving", "two-wheeler" -> TravelMode.DRIVE; else -> null
+        }
+        // Maps URLs API: /maps/dir/?api=1&destination=B&origin=A&waypoints=C|D&travelmode=walking
+        queryParam(raw, "destination")?.let { d ->
+            val dest = endpoint(d) ?: return null
+            val stops = queryParam(raw, "waypoints")?.split(WAYPOINT_SEP)?.mapNotNull { endpoint(it) }.orEmpty()
+            return dest.copy(directions = true, origin = endpoint(queryParam(raw, "origin")), mode = mode, stops = stops)
+        }
+        // Path form: /maps/dir/A/B/C/@lat,lng,z/data=... (an empty A = "from where I am"). The
+        // first is the start, the last the end, any between are stops.
+        val parts = raw.substringBefore('?').substringAfter("/dir/", "").split('/')
+            .takeWhile { !it.startsWith("@") && !it.startsWith("data=") }
+            .let { if (it.lastOrNull()?.isEmpty() == true) it.dropLast(1) else it }
+        if (parts.isEmpty()) return null
+        // The data blob carries each place's own coordinate, which saves looking the names up
+        // and cannot land on another town of the same name, and the points dragged onto the
+        // route. Used only when it lists exactly the places of the path.
+        val blob = dirBlob(raw).takeIf { it.size == parts.size }
+        val ends = parts.mapIndexed { i, part ->
+            val e = endpoint(part)
+            val pin = blob?.get(i)?.pin
+            if (e != null && e.lat == null && pin != null) e.copy(lat = pin.first, lng = pin.second) else e
+        }
+        val dest = ends.last() ?: return null
+        val origin = if (ends.size >= 2) ends.first() else null
+        // In travel order: each place after the start, and after every place but the end the
+        // points dragged onto the leg that leaves it.
+        val stops = ArrayList<MapLink>()
+        for (k in 0 until ends.size - 1) {
+            if (k > 0) ends[k]?.let { stops += it }
+            blob?.get(k)?.vias?.forEach { (la, ln) -> stops += MapLink(lat = la, lng = ln, via = true) }
+        }
+        val blobMode = when (DATA_MODE.find(raw.substringAfter("/data=", ""))?.groupValues?.get(1)) {
+            "0" -> TravelMode.DRIVE; "1" -> TravelMode.BICYCLE; "2" -> TravelMode.WALK; "3" -> TravelMode.TRANSIT; else -> null
+        }
+        return dest.copy(directions = true, origin = origin, mode = mode ?: blobMode, stops = stops)
+    }
+
+    /** Between the stops of a Maps URLs `waypoints`: a pipe, plain or encoded. */
+    private val WAYPOINT_SEP = Regex("""\||%7C""", RegexOption.IGNORE_CASE)
+    private val DATA_MODE = Regex("""!3e([0-3])(?:!|$|\?)""")
+    private val DATA_WAYPOINT = Regex("""1m(\d+)""")
+    private val DATA_SUB = Regex("""3m(\d+)""")
+
+    /** One place of a directions link's blob: its own coordinate (lat, lng) or null, and the
+     *  points dragged onto the leg that leaves it. */
+    internal class BlobPlace(val pin: Pair<Double, Double>?, val vias: List<Pair<Double, Double>>)
+
+    /**
+     * The places in a directions link's `data=` blob, in order. The blob is "!"-separated
+     * fields; each place is a `1m<n>` field followed by its `n` fields:
+     * `!1m5!1m1!1s0x...!2m2!1d-121.7405!2d38.5449` (`2m2`, then `1d<lng>` and `2d<lat>`).
+     * A point dragged onto the route sits in the block of the place before it, as
+     * `!3m4!1m2!1d<lng>!2d<lat>!3s0x...`, which makes that block `1m10`, `1m15` and so on.
+     */
+    internal fun dirBlob(raw: String): List<BlobPlace> {
+        val data = raw.substringAfter("/data=", "").substringBefore('?').substringBefore('/')
+        if (data.isEmpty()) return emptyList()
+        val f = data.split('!').filter { it.isNotEmpty() }
+        var i = f.indexOfFirst { DATA_WAYPOINT.matches(it) }
+        if (i < 0) return emptyList()
+        fun coord(lngField: String?, latField: String?): Pair<Double, Double>? {
+            val lng = lngField?.takeIf { it.startsWith("1d") }?.drop(2)?.toDoubleOrNull() ?: return null
+            val lat = latField?.takeIf { it.startsWith("2d") }?.drop(2)?.toDoubleOrNull() ?: return null
+            return if (lat in -90.0..90.0 && lng in -180.0..180.0) lat to lng else null
+        }
+        val out = ArrayList<BlobPlace>()
+        while (i < f.size) {
+            val n = DATA_WAYPOINT.matchEntire(f[i])?.groupValues?.get(1)?.toIntOrNull() ?: break
+            val block = f.subList(i + 1, minOf(f.size, i + 1 + n))
+            var pin: Pair<Double, Double>? = null
+            val vias = ArrayList<Pair<Double, Double>>()
+            var k = 0
+            while (k < block.size) {
+                val sub = DATA_SUB.matchEntire(block[k])
+                when {
+                    // The place's own coordinate comes before any dragged point.
+                    block[k] == "2m2" && pin == null && vias.isEmpty() -> { pin = coord(block.getOrNull(k + 1), block.getOrNull(k + 2)); k += 3 }
+                    sub != null -> {
+                        val len = sub.groupValues[1].toIntOrNull() ?: 0
+                        val inner = block.subList(minOf(block.size, k + 1), minOf(block.size, k + 1 + len))
+                        if (inner.firstOrNull() == "1m2") coord(inner.getOrNull(1), inner.getOrNull(2))?.let { vias += it }
+                        k += 1 + len
+                    }
+                    else -> k++
+                }
+            }
+            out += BlobPlace(pin, vias)
+            i += 1 + n
+        }
+        return out
+    }
+
+    /** The coordinate of each place in the blob, null where it has none ([dirBlob]). */
+    internal fun dirPins(raw: String): List<Pair<Double, Double>?> = dirBlob(raw).map { it.pin }
+
+    /** The separator between chained stops in a classic `daddr`, still URL-encoded: "+to:". */
+    private val DADDR_TO = Regex("""(?:\+|%20|\s)+to(?::|%3A)""", RegexOption.IGNORE_CASE)
+
+    /** One end of a directions link: a coordinate, a name or address, or null for "where I am". */
+    private fun endpoint(value: String?): MapLink? {
+        val v = value?.let { decode(it.replace('+', ' ')) }?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        if (v.lowercase() in HERE) return null
+        COORD.matchEntire(v)?.let {
+            val lat = it.groupValues[1].toDoubleOrNull() ?: return null
+            val lng = it.groupValues[2].toDoubleOrNull() ?: return null
+            if (lat !in -90.0..90.0 || lng !in -180.0..180.0) return null
+            return MapLink(lat = lat, lng = lng)
+        }
+        return MapLink(query = v)
+    }
+
+    private val HERE = setOf("current location", "my location", "your location", "current+location")
+
+    private fun parseGeo(raw: String): MapLink {
+        val body = raw.substring(4) // after "geo:"
+        val coordPart = body.substringBefore("?")
+        var lat = COORD.find(coordPart)?.groupValues?.get(1)?.toDoubleOrNull()
+        var lng = COORD.find(coordPart)?.groupValues?.get(2)?.toDoubleOrNull()
+        if (lat == 0.0 && lng == 0.0) { lat = null; lng = null } // 0,0 = "no point, see ?q"
+        // RFC-style zoom: geo:lat,lng?z=17 (1..21). Honored for the camera; junk is ignored.
+        val zoom = queryParam(raw, "z")?.toDoubleOrNull()?.takeIf { it in 1.0..21.0 }
+
+        val q = queryParam(raw, "q")?.let { decode(it) }
+        if (!q.isNullOrBlank()) {
+            // ?q can be "lat,lng(Label)", a bare "lat,lng", or an address/name.
+            val label = Regex("""\(([^)]+)\)""").find(q)?.groupValues?.get(1)
+            val qc = COORD.find(q)
+            if (qc != null && lat == null) {
+                return MapLink(query = label, lat = qc.groupValues[1].toDoubleOrNull(), lng = qc.groupValues[2].toDoubleOrNull(), zoom = zoom)
+            }
+            val text = label ?: q.takeUnless { COORD.matches(it.trim()) }
+            return MapLink(query = text, lat = lat, lng = lng, zoom = zoom)
+        }
+        return MapLink(lat = lat, lng = lng, zoom = zoom)
+    }
+
+    /** The three shapes of a Street View link (see the class doc), or null for any other link. */
+    internal fun parseStreetView(raw: String): MapLink? {
+        // The web map's own: the @ segment's "3a" marks the photo view, "<n>h" its heading.
+        AT_PANO.find(raw)?.let { m ->
+            val heading = AT_HEADING.find(raw)?.groupValues?.get(1)?.toDoubleOrNull()
+            val pano = DATA_PANO.find(raw)?.groupValues?.get(1)
+            return MapLink(lat = m.groupValues[1].toDoubleOrNull(), lng = m.groupValues[2].toDoubleOrNull(), streetView = true, heading = heading, panoId = pano)
+        }
+        // The documented Maps URL: map_action=pano with a viewpoint, or a pano id alone.
+        if (queryParam(raw, "map_action")?.equals("pano", ignoreCase = true) == true) {
+            val at = queryParam(raw, "viewpoint")?.let { COORD.find(decode(it)) }
+            val pano = queryParam(raw, "pano")?.takeIf { it.isNotBlank() }
+            if (at == null && pano == null) return null
+            return MapLink(
+                lat = at?.groupValues?.get(1)?.toDoubleOrNull(), lng = at?.groupValues?.get(2)?.toDoubleOrNull(),
+                streetView = true, heading = queryParam(raw, "heading")?.toDoubleOrNull(), panoId = pano,
+            )
+        }
+        // The old one: layer=c with cbll=<lat>,<lng> and cbp=<n>,<heading>,...
+        if (queryParam(raw, "layer") == "c") {
+            val at = queryParam(raw, "cbll")?.let { COORD.find(decode(it)) } ?: return null
+            val heading = queryParam(raw, "cbp")?.let { decode(it).split(',').getOrNull(1)?.trim()?.toDoubleOrNull() }
+            return MapLink(
+                lat = at.groupValues[1].toDoubleOrNull(), lng = at.groupValues[2].toDoubleOrNull(),
+                streetView = true, heading = heading, panoId = queryParam(raw, "panoid")?.takeIf { it.isNotBlank() },
+            )
+        }
+        return null
+    }
+
+    private val AT_PANO = Regex("""@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+),3a,""")
+    private val AT_HEADING = Regex("""@-?\d{1,3}\.\d+,-?\d{1,3}\.\d+,3a,[^/]*?,(\d+(?:\.\d+)?)h""")
+    private val DATA_PANO = Regex("""!1s([A-Za-z0-9_-]{16,})!2e0""")
+
+    private fun parseMaps(raw: String): MapLink {
+        // A place link's `data=...!3d<lat>!4d<lng>` is the PLACE's own coordinate; the `@lat,lng`
+        // is where the sharer's map was centered, which can be a block or more away. Prefer it.
+        val pin = Regex("""!3d(-?\d{1,3}\.\d+)!4d(-?\d{1,3}\.\d+)""").find(raw)
+        val lat = pin?.groupValues?.get(1)?.toDoubleOrNull() ?: AT.find(raw)?.groupValues?.get(1)?.toDoubleOrNull()
+        val lng = pin?.groupValues?.get(2)?.toDoubleOrNull() ?: AT.find(raw)?.groupValues?.get(2)?.toDoubleOrNull()
+        // Google web links carry zoom after the @coords: /@38.5,-121.7,15z (sometimes fractional).
+        val zoom = Regex("""@-?\d{1,3}\.\d+,-?\d{1,3}\.\d+,(\d+(?:\.\d+)?)z""")
+            .find(raw)?.groupValues?.get(1)?.toDoubleOrNull()?.takeIf { it in 1.0..21.0 }
+        val place = Regex("""/place/([^/@?]+)""").find(raw)?.groupValues?.get(1)
+        val search = Regex("""/search/([^/@?]+)""").find(raw)?.groupValues?.get(1)
+        val q = queryParam(raw, "q") ?: queryParam(raw, "query")
+        val query = (place ?: search ?: q)?.let { decode(it.replace('+', ' ')) }?.takeIf { it.isNotBlank() }
+        val featureId = FEATURE_ID.find(raw)?.groupValues?.get(1)
+        // A query that's really coordinates → treat as a point.
+        query?.trim()?.let { COORD.matchEntire(it) }?.let {
+            return MapLink(lat = it.groupValues[1].toDoubleOrNull(), lng = it.groupValues[2].toDoubleOrNull(), zoom = zoom)
+        }
+        return MapLink(query = query, lat = lat, lng = lng, zoom = zoom, featureId = featureId)
+    }
+
+    private val FEATURE_ID = Regex("""!1s(0x[0-9a-fA-F]+:0x[0-9a-fA-F]+)""")
+
+    /** Roughly where a place with [featureId] is, from the id's first half, an S2 cell: within a
+     *  hundred meters for a leaf cell. Null without an id. */
+    fun featureCell(featureId: String?): app.vela.core.model.LatLng? {
+        val hex = featureId?.substringBefore(':')?.removePrefix("0x")?.takeIf { it.isNotEmpty() } ?: return null
+        val id = runCatching { java.lang.Long.parseUnsignedLong(hex, 16) }.getOrNull() ?: return null
+        return app.vela.core.util.S2Cell.center(id)
+    }
+
+    private fun queryParam(raw: String, key: String): String? {
+        val q = raw.substringAfter('?', "")
+        if (q.isEmpty()) return null
+        return q.split('&').firstNotNullOfOrNull { p ->
+            val (k, v) = p.split('=', limit = 2).let { it[0] to it.getOrElse(1) { "" } }
+            if (k.equals(key, ignoreCase = true) && v.isNotEmpty()) v else null
+        }
+    }
+
+    private fun decode(s: String): String = runCatching { URLDecoder.decode(s, "UTF-8") }.getOrDefault(s)
+}

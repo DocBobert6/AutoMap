@@ -1,0 +1,314 @@
+package app.vela.core.model
+
+enum class TravelMode { DRIVE, WALK, BICYCLE, TRANSIT }
+
+enum class ManeuverType {
+    DEPART, ARRIVE, CONTINUE, STRAIGHT,
+    TURN_LEFT, TURN_RIGHT, SLIGHT_LEFT, SLIGHT_RIGHT, SHARP_LEFT, SHARP_RIGHT,
+    UTURN, MERGE, FORK_LEFT, FORK_RIGHT, RAMP_LEFT, RAMP_RIGHT,
+    ROUNDABOUT, EXIT_ROUNDABOUT, KEEP_LEFT, KEEP_RIGHT, UNKNOWN,
+}
+
+/** One step of a route. [instruction] is the human text fed to TTS + the banner. */
+data class Maneuver(
+    val type: ManeuverType,
+    val instruction: String,
+    val location: LatLng,
+    val distanceMeters: Double,   // travel AFTER this maneuver, to the next one (OSRM step.distance;
+                                  // the Google parser places each turn at the START of its step)
+    val durationSeconds: Double,
+    val road: String? = null,     // road being entered, for "… onto Elm Street"
+    val ref: String? = null,      // highway ref of the road entered ("I 80") for the shield badge —
+                                  // separate from [road] because a highway can have a name AND a ref
+    val laneHint: String? = null, // e.g. "Use the right 2 lanes" (from Google's step markup)
+    val side: String? = null,     // ARRIVE only: "left"/"right" — which side the destination is on
+                                  // (OSRM's arrive modifier); null = unknown/straight ahead
+    val lanes: List<Lane> = emptyList(), // per-lane turn guidance (from OSRM) for the Google-style diagram
+    val roundabout: RoundaboutGeometry? = null, // ROUNDABOUT/EXIT_ROUNDABOUT only: how to draw the glyph
+    val roundaboutExit: Int? = null, // ROUNDABOUT only: which exit to take (1 = first); every router phrases it, the car needs it as a number
+    // Where the road you are on changes its NAME with no turn, along this maneuver's leg: the
+    // "new name" steps foldRenames folded into it (a road that is called one thing here and
+    // another a mile on). Ascending by [RoadRename.atMeters] from this maneuver. The banner and
+    // the under-the-puck pill read the current name through [roadAt].
+    val renames: List<RoadRename> = emptyList(),
+    // The same instruction with the road left OUT, built by the same per-language template rather
+    // than by stripping a tail (issue #596). Spoken instead of [instruction] when the user has
+    // turned street names off in spoken directions; the banner and the step list always keep the
+    // named form. Null where the router gave us no way to rebuild it (Google's abbreviated steps),
+    // in which case speech falls back to [instruction] and simply keeps saying the name.
+    val instructionNoRoad: String? = null,
+    // Traffic lights the route drives through on the way to this maneuver, as meters before it
+    // along the line (RouteGeometry.enrichWithLights; "Traffic-light guidance"). The voice says
+    // "Pass the traffic light, then ..." for the ones still ahead of the car when it speaks.
+    val lightsBeforeM: List<Double> = emptyList(),
+) {
+    /** What the VOICE should say for this maneuver, honoring the spoken-street-names preference. */
+    fun spokenInstruction(): String =
+        if (app.vela.core.nav.SpokenRoadNames.enabled) instruction else instructionNoRoad ?: instruction
+
+    /** The road (name, ref) you are on [traveledM] meters past this maneuver: the last rename
+     *  already passed, else the road the maneuver itself entered. */
+    fun roadAt(traveledM: Double): Pair<String?, String?> {
+        var name = road; var r = ref
+        for (x in renames) { if (x.atMeters <= traveledM) { name = x.road; r = x.ref } else break }
+        return name to r
+    }
+}
+
+/** A name change along a maneuver's leg: [atMeters] past the maneuver the road becomes [road] / [ref]. */
+data class RoadRename(val atMeters: Double, val road: String?, val ref: String?)
+
+/**
+ * The shape of a roundabout maneuver, so its glyph can be DRAWN rather than picked from a fixed
+ * pair of icons (issue #259: the old glyph was Material's `RoundaboutLeft` for every roundabout on
+ * earth - permanently a 270-degree counter-clockwise exit, so it was wrong about the exit for
+ * nearly every roundabout and wrong about the direction of travel for every left-hand-traffic
+ * driver; a glance at it actively misinformed).
+ *
+ * [exitAngleDeg] is where the exit road leaves RELATIVE to the road you approached on: 0 = straight
+ * on through, +90 = a right turn out, -90 = a left turn out, +/-180 = back the way you came.
+ * Normalized to (-180, 180].
+ *
+ * [clockwise] is which way traffic circulates - true in left-hand-traffic countries, false in
+ * right-hand ones. It is DERIVED, never assumed: joining a roundabout you always veer toward the
+ * circulating lane, so the sign of the entry step's own turn is the driving side (verified against
+ * live OSRM: an entry in Paris turns +84 degrees, entries in Milton Keynes turn -24 to -52).
+ */
+data class RoundaboutGeometry(val exitAngleDeg: Double, val clockwise: Boolean)
+
+/** One approach lane's turn guidance: the arrow directions it permits ([indications], OSRM's set —
+ *  "straight", "left", "slight right", "sharp left", "uturn", "none", …) and whether it's a valid lane
+ *  for THIS maneuver ([valid] → drawn bright/highlighted; the others dimmed). */
+data class Lane(val indications: List<String>, val valid: Boolean)
+
+/** Which side of the roadway the lanes to use are on (for spoken/written lane guidance). */
+enum class LaneSide { LEFT, RIGHT, CENTER }
+
+/** A spoken-lane recommendation derived from OSRM's per-lane [Lane.valid] flags — the side the valid
+ *  lanes sit on and how many there are ("use the right 2 lanes"). */
+data class LaneGuidance(val side: LaneSide, val count: Int)
+
+/**
+ * Reduce a maneuver's [lanes] to a simple "use the <side> <n> lane(s)" hint, or null when there's
+ * nothing useful to say — fewer than 2 lanes, no valid lane, every lane valid (any lane works), or the
+ * valid lanes aren't a contiguous block at one edge (too fiddly to phrase; the arrow diagram covers it).
+ * Mirrors the bright/dim logic the banner already uses, so the spoken hint matches the arrows.
+ */
+fun laneGuidance(lanes: List<Lane>): LaneGuidance? {
+    if (lanes.size < 2) return null
+    val valid = lanes.indices.filter { lanes[it].valid }
+    if (valid.isEmpty() || valid.size == lanes.size) return null
+    if (valid.last() - valid.first() != valid.size - 1) return null // not contiguous
+    val side = when {
+        valid.first() == 0 -> LaneSide.LEFT
+        valid.last() == lanes.size - 1 -> LaneSide.RIGHT
+        else -> LaneSide.CENTER
+    }
+    return LaneGuidance(side, valid.size)
+}
+
+/**
+ * For a CONTINUE/STRAIGHT maneuver, whether the lanes represent a GENUINE fork worth announcing —
+ * an "off" (invalid) lane that itself offers a straight/slight onward path, i.e. a parallel road you
+ * could accidentally follow ("use the left 2 lanes to stay on I-80"). This is the case Google DOES
+ * voice. It is FALSE for a plain turn bay at an intersection (an off lane marked only left/right/uturn):
+ * you're sailing straight through, the turn lane is irrelevant, and Google stays silent — exactly the
+ * "it says use the lanes to continue when nothing changes but the name" report. Requires a real valid
+ * subset ([laneGuidance] != null) AND at least one off lane pointing straight-ish. When there are no
+ * lanes, or every lane continues, [laneGuidance] is null → false → the continue is silenced.
+ */
+fun continueHasGenuineFork(lanes: List<Lane>): Boolean {
+    if (laneGuidance(lanes) == null) return false
+    return lanes.any { lane ->
+        // Only an EXPLICIT straight/slight arrow on an off lane signals a parallel onward path. OSRM's
+        // "none" means the lane has NO painted arrow (its API's own wording), NOT "continues straight" — a
+        // plain turn bay or an unmarked outer lane is commonly emitted as "none", and treating it as
+        // straight-ish would re-speak the exact turn-bay case this gate silences. ("through" is never
+        // emitted — OSRM normalizes the OSM `turn:lanes` value `through` to `straight` — so it's omitted.)
+        !lane.valid && lane.indications.any { ind -> ind == "straight" || ind.startsWith("slight") }
+    }
+}
+
+data class RouteLeg(
+    val distanceMeters: Double,
+    val durationSeconds: Double,
+    val durationInTrafficSeconds: Double?, // null when no live traffic available
+    val maneuvers: List<Maneuver>,
+)
+
+/** One leg of a trip through stops as the router timed it: its length, its typical time and its
+ *  live one (null without traffic). See [Route.legTimes]. */
+data class LegTime(
+    val distanceMeters: Double,
+    val typicalSeconds: Double,
+    val trafficSeconds: Double?,
+)
+
+/** One live-traffic congestion span along the route. [level] is Google's
+ *  congestion grade (1 = moderate, 2 = heavy, 3+ = severe); free-flowing stretches
+ *  are NOT listed (they're the gaps). [startMeters]..[startMeters]+[lengthMeters]
+ *  locates it by distance from the route start — divide by the route distance for a
+ *  fraction-along-route, which drives the per-segment color of the route line. */
+data class TrafficSpan(
+    val level: Int,
+    val startMeters: Double,
+    val lengthMeters: Double,
+)
+
+/**
+ * A full route. When [durationInTrafficSeconds] is non-null it came straight
+ * out of Google's directions response — i.e. the traffic is already baked in,
+ * which is the entire reason for scraping directions rather than self-routing.
+ */
+/**
+ * Where a route came from, as ONE fact instead of four booleans. Every consumer that used to ask
+ * "is it provisional, is it abbreviated, is it offline, does it have traffic" in some combination
+ * asks [Route.drivable] or [Route.hasRealSteps] instead, and the trip log records the name so a
+ * replay says which router produced the line. The booleans stay for one release as the source of
+ * truth for the derived properties; the source is stamped at every constructor and the next step
+ * computes the booleans from it.
+ */
+enum class RouteSource {
+    /** The open router's own route (FOSSGIS OSRM), full turn-by-turn. */
+    OSRM,
+    /** OSRM driven through vias sampled from a Google polyline: Google's path, OSRM's steps. */
+    OSRM_VIA_SNAP,
+    /** Google's keyless directions with their own steps; long trips can carry abbreviated ones. */
+    GOOGLE_NAMED,
+    /** Google's route adopted while the open router was down: the steps are abbreviated and the
+     *  nav recheck upgrades them once OSRM answers again. */
+    GOOGLE_ABBREVIATED,
+    /** A Google alternate in the picker: polyline and ETA are real, the steps are placeholders
+     *  until it is picked and named. Never driven as is. */
+    GOOGLE_PROVISIONAL,
+    /** Google's line kept as is, turns taken from its bends and each stretch named from the map's
+     *  vector tiles (LineNamer). No lanes or sign destinations. */
+    GOOGLE_LINE_NAMED,
+    /** Google's line, with the open router's maneuvers where the two routes share the road and
+     *  tile-named turns (LineNamer) where Google leaves it (HybridRoute). */
+    GOOGLE_HYBRID,
+    /** On-device OsmAnd obf routing (downloaded region). */
+    OBF,
+    /** On-device GraphHopper graph (the retired offline engine; kept so old trip files read back). */
+    GRAPHHOPPER,
+    /** The FOSSGIS Valhalla bicycle profile (the bike-safe setting). */
+    VALHALLA,
+    /** A route read back from a trip file that predates the source field. */
+    UNKNOWN,
+}
+
+private val PLAIN_TURNS = setOf(
+    ManeuverType.TURN_LEFT, ManeuverType.TURN_RIGHT, ManeuverType.SLIGHT_LEFT, ManeuverType.SLIGHT_RIGHT,
+    ManeuverType.SHARP_LEFT, ManeuverType.SHARP_RIGHT, ManeuverType.UTURN,
+)
+
+data class Route(
+    val polyline: List<LatLng>,
+    val legs: List<RouteLeg>,
+    val distanceMeters: Double,
+    val durationSeconds: Double,
+    val durationInTrafficSeconds: Double?,
+    val summary: String? = null,
+    val trafficSpans: List<TrafficSpan> = emptyList(),
+    // Google's *typical* best-case→worst-case spread for this trip ("usually 1 hr 8 min
+    // to 1 hr 27 min"), independent of the current moment — its own depart-time planning
+    // hint, from the response's summary[10][4]. Null when Google ships no range (short
+    // trips, walk/bike). This is the keyless stand-in for a per-departure prediction:
+    // the future-departure request field is login/app-only (see DirectionsPb), so we
+    // surface the range Google itself shows rather than a false-precision single ETA.
+    val typicalLowSeconds: Double? = null,
+    val typicalHighSeconds: Double? = null,
+    // A "provisional" alternate: its polyline + ETA are good (Google's), but its turn-by-turn is a
+    // placeholder — it gets NAMED (map-matched / snapped) only when you actually pick it to navigate,
+    // so the picker loads fast and we don't snap routes you never drive. Primary route is never provisional.
+    val provisional: Boolean = false,
+    // Google's keyless fallback steps: the polyline is complete but the maneuvers are ABBREVIATED
+    // for longer trips (a 6-mile route once carried 2 of ~10 turns) — the banner can't match the
+    // drawn line. Set only on the OSRM-down fallback branches; NavSession's recheck silently
+    // upgrades an adopted abbreviated route to full steps once the open router recovers.
+    val abbreviatedSteps: Boolean = false,
+    // The user asked to avoid tolls/highways but this route came from a router that cannot
+    // honor that (online OSRM rejects excludes, Google keyless has no avoid param, and the
+    // on-device engine had no coverage or timed out) - the picker shows an honesty note so a
+    // toggled-on avoid is never silently ignored (the Reddit "still routed me through the
+    // motorway" report).
+    val avoidNotHonored: Boolean = false,
+    // Computed ON THE PHONE from a downloaded region (no network, or an avoid toggle Google could
+    // not honor). The picker says so instead of a traffic word: an offline route has no live
+    // traffic and the user should know which kind they are looking at (issue #350).
+    val offline: Boolean = false,
+    /** The ORDERED waypoint list this route was built through when the chooser's camera pass
+     *  added side-street detour points to the user's stops (issue #600): the user's stops plus the
+     *  invisible detour vias, in travel order. Empty for every ordinary route. Nav starts a drive on
+     *  such a route with the vias as SILENT stops, so a reroute or recheck keeps the detour instead
+     *  of routing straight back through the cameras. */
+    val detourPlan: List<LatLng> = emptyList(),
+    /** The name of the user's saved route this is (issue #622); shown on its row instead of the "via". */
+    val savedName: String? = null,
+    // See [RouteSource]. Stamped by every constructor; UNKNOWN only for old trip files.
+    val source: RouteSource = RouteSource.UNKNOWN,
+    /** Local road name -> its Latin alias (OSM `name:en`, else a Latin `name:latin`) for the roads this
+     *  route drives, from data the router had in hand (the obf carries the tags natively). Empty for
+     *  every online route: the tiles supply those names as they load. Merged into the drive's
+     *  romanized-name dictionary when the route is adopted, so offline guidance in a non-Latin
+     *  region says and shows real names instead of the ICU skeleton (issue #184). */
+    val roadNamesLatin: Map<String, String> = emptyMap(),
+    /** The line to DRAW, when it is not [polyline] (2026-10-03): a route that follows Google's line
+     *  is drawn on OpenStreetMap's geometry instead (the open router's line where the two agree,
+     *  the matched road shape where Google goes its own way), because the roads under it are drawn
+     *  from OpenStreetMap and Google's smoother line sat off their center on every curve. Guidance
+     *  keeps [polyline]. */
+    val drawPolyline: List<LatLng>? = null,
+    /** How the steps were put together, for the trip file (the `RD` line's flags): `key=value`
+     *  words joined by `;`, counts and milliseconds only. Never a name, a place or a comma. Empty
+     *  when the route was not stitched from more than one source. */
+    val made: String = "",
+    /** The street names fell short: a stretch of the line went out with its turns read from its
+     *  bends alone, because the services that name it did not answer before the deadline. The
+     *  drive re-checks such a route on the fast interval and swaps in the same course once it
+     *  comes back named ([app.vela.core.nav.RouteHeal]). */
+    val namesShort: Boolean = false,
+    /** The legs of a trip through stops, each with its own time, in trip order: Google answers a
+     *  waypointed request with one per leg (read by `DirectionsParser`), and the on-device chain
+     *  keeps each leg's. The steps stay in [legs] as one leg; this is only the figures, so the
+     *  time to a stop is its legs' own rather than a share of the trip's
+     *  (`NavEngine.legSecondsBeyond`). Empty for a direct trip and for a route whose router gave
+     *  no per-leg times. */
+    val legTimes: List<LegTime> = emptyList(),
+) {
+    val hasLiveTraffic: Boolean get() = durationInTrafficSeconds != null
+
+    /** The plain turns of this route: lefts, rights and U-turns. Ramps, exits, merges, forks and
+     *  roundabouts are not counted: a sign names them, and no fallback produces them bare. */
+    val turns: Int get() = maneuvers.count { it.type in PLAIN_TURNS }
+
+    /** How many of [turns] name a road or a number. */
+    val namedTurns: Int get() = maneuvers.count { it.type in PLAIN_TURNS && (!it.road.isNullOrBlank() || !it.ref.isNullOrBlank()) }
+
+    /** Safe to hand to the nav session as is: not a provisional picker alternate whose steps are
+     *  placeholders. The one question NavSession asks before adopting a candidate. */
+    val drivable: Boolean get() = !provisional && source != RouteSource.GOOGLE_PROVISIONAL
+
+    /** Its maneuvers match its line turn for turn: not Google's abbreviated fallback steps. The
+     *  question the recheck asks before it lets a candidate replace the current route. */
+    val hasRealSteps: Boolean get() = !abbreviatedSteps && source != RouteSource.GOOGLE_ABBREVIATED
+
+    /** Computed on the phone, no live traffic possible. */
+    val isOffline: Boolean get() = offline || source == RouteSource.OBF || source == RouteSource.GRAPHHOPPER
+    val maneuvers: List<Maneuver> get() = legs.flatMap { it.maneuvers }
+
+    /** Google's typical low→high spread, when present (and actually a spread, not a
+     *  degenerate point) — drives the depart-time chooser's "usually X–Y" hint. */
+    val typicalRangeSeconds: Pair<Double, Double>?
+        get() {
+            val lo = typicalLowSeconds ?: return null
+            val hi = typicalHighSeconds ?: return null
+            return if (hi - lo >= 30.0) lo to hi else null
+        }
+
+    /** How much slower the live, traffic-aware time is than the typical time
+     *  (1.0 = no traffic; 1.4 = 40% slower). Null when no live traffic is known —
+     *  drives the route line's congestion color. */
+    val trafficRatio: Double?
+        get() = durationInTrafficSeconds?.let { t -> if (durationSeconds > 0) t / durationSeconds else null }
+}

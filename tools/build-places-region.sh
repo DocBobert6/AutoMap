@@ -1,0 +1,1235 @@
+#!/usr/bin/env bash
+# Bake an open-data places layer for one region: Overture Places -> PMTiles.
+#
+#   tools/build-places-region.sh <id> <S> <W> <N> <E> <out.pmtiles> [overture-release] [local.parquet]
+#
+# Needs duckdb (with httpfs + spatial), tippecanoe. Reads Overture straight from its public S3
+# bucket unless a local parquet extract is given (a dev shortcut: the same columns, see the
+# SELECT below). Business places only: parks, schools, civic and transit stay with OSM, whose
+# area mapping is far better for them. Each feature carries the icon group the app already
+# themes with, a prominence on the ambient layer's 0-9.5 scale (category prior, brand, contact
+# details, Overture confidence), a rank within its ~400 m cell (`rank`) and within its ~1.6 km cell
+# (`crank`) by that prominence, and a tippecanoe minzoom from the ranks: the best place in each
+# 1.6 km cell is in the z13/z14 tiles, the top three per 400 m cell reach z15, the top twelve z16,
+# everything z17. The app then decides per zoom which of the features in a tile get an icon, a
+# label, or just a dot (VelaMapView), so a downtown thins to its landmarks the way Google's does
+# and a village keeps its one cafe at z15.
+#
+# ALLTHEPLACES (2026-09-15): Overture's places come mostly from Meta and Bing, so a chain store
+# with no Facebook page is simply absent. AllThePlaces (alltheplaces.xyz, CC0) scrapes every
+# chain's OWN store locator weekly and publishes the result as one world PMTiles; the region's
+# z15 tiles are pulled with `pmtiles extract` (a few range requests, seconds), decoded, filtered
+# to real businesses by their OSM-style tags, and merged into the Overture rows: a locator point
+# that has an Overture row of the same brand or the same leading name words within ~150 m is
+# dropped, the rest join with a lower confidence than Overture's own. Chain rows carry
+# `opening_hours`, which Overture never has. ATP_RUN=none skips it (also when the pmtiles or
+# tippecanoe-decode binaries are missing); ATP_LOCAL points at a local extract for dev runs.
+set -euo pipefail
+# The repo root, for files the bake reads beside itself (the generic-word list pinned to
+# core/util/PlaceNames.GENERIC); CI runs the script from the checkout root, a dev may not.
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ID="$1"; S="$2"; W="$3"; N="$4"; E="$5"; OUT="$6"; RELEASE="${7:-2026-08-19.0}"; LOCAL="${8:-}"
+# The AllThePlaces run: the NEWEST published one unless the caller pins ATP_RUN. It was a fixed
+# id until 2026-09-22, so every bake since 2026-09-15 carried the same week-old locator data
+# while AllThePlaces publishes weekly; the fixed id stays as the fallback when the pointer fetch
+# fails, so a bake never runs with no chain data because a JSON was unreachable.
+if [ -z "${ATP_RUN:-}" ]; then
+  ATP_RUN="$(curl -fsSL --max-time 30 https://data.alltheplaces.xyz/runs/latest.json 2>/dev/null | jq -r '.run_id // empty' 2>/dev/null || true)"
+  ATP_RUN="${ATP_RUN:-2026-09-05-13-32-25}"
+  echo "AllThePlaces run: $ATP_RUN"
+fi
+# TMPDIR decides where the scratch goes, and for a continent-sized region that matters: the
+# AllThePlaces extract, the OSM extract, DuckDB's spill and tippecanoe's temp files add up to more
+# than a CI runner's root disk holds (see the workflow, which points it at the big mount).
+WORK="$(mktemp -d)"
+echo "work dir $WORK ($(df -Pm "$WORK" | awk 'NR==2 {print $4}') MB free)"
+ATP_NDJSON=""
+if [ "$ATP_RUN" != "none" ] && command -v pmtiles >/dev/null 2>&1 && command -v tippecanoe-decode >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+  ATP_SRC="${ATP_LOCAL:-https://alltheplaces-data.openaddresses.io/runs/$ATP_RUN/output.pmtiles}"
+  # Both halves report what they cost. Silencing them meant a bake that died here died with no
+  # output at all, which reads as flaky infrastructure rather than as a step (five regions, three
+  # waves, 2026-09-18).
+  # The tag test is `isbiz` in cheap form, and it runs HERE rather than in DuckDB because
+  # AllThePlaces carries national ADDRESS registers alongside the store locators: Belgium's decode
+  # wrote a 3.5 GB ndjson of 7.1 million rows, nearly all of them addresses from one Flemish
+  # dataset, which DuckDB then parsed only to throw away. Nothing `isbiz` would accept lacks one of
+  # these keys, so the pre-filter cannot drop a business.
+  echo "alltheplaces: extracting z15 for $ID"
+  if pmtiles extract "$ATP_SRC" "$WORK/atp.pmtiles" --bbox="$W,$S,$E,$N" --minzoom=15 --maxzoom=15 >/dev/null 2>"$WORK/atp.err"; then
+    echo "alltheplaces: extract $(du -m "$WORK/atp.pmtiles" | cut -f1) MB, decoding"
+    # grep FIRST, and that is not a micro-optimization: tippecanoe-decode emits the whole tileset
+    # as ONE json document, so `jq ..` over it parses the entire thing into memory and a dense
+    # country took the CI runner down with it. Every feature is exactly one line, so grep turns the
+    # document into a stream jq reads one small value at a time, in constant memory.
+    tippecanoe-decode -z15 -Z15 "$WORK/atp.pmtiles" 2>/dev/null \
+      | grep -F '"type": "Feature",' \
+      | sed 's/,$//' \
+      | jq -c 'select(.geometry.type == "Point")
+               | select(.properties | has("shop") or has("amenity") or has("tourism") or has("leisure") or has("healthcare") or has("office"))
+               | {props: .properties, lng: .geometry.coordinates[0], lat: .geometry.coordinates[1]}' \
+      > "$WORK/atp.ndjson" || true
+    echo "alltheplaces: $(wc -l < "$WORK/atp.ndjson") rows, $(du -m "$WORK/atp.ndjson" | cut -f1) MB"
+    rm -f "$WORK/atp.pmtiles"
+    if [ -s "$WORK/atp.ndjson" ]; then ATP_NDJSON="$WORK/atp.ndjson"; else echo "alltheplaces: no rows in the box"; fi
+  else
+    echo "alltheplaces: extract failed for $ID, baking Overture only: $(tail -2 "$WORK/atp.err" 2>/dev/null | tr '\n' ' ')"
+  fi
+fi
+# OSM SHOPS (2026-09-17): the region's OpenStreetMap extract, filtered to named business nodes, is
+# the FIRST choice for a place's coordinate. OSM maps the shop where the shop is, and when it is
+# wrong anyone can fix it in a minute and every map benefits, which is not true of a parcel
+# centroid in a bulk dataset. Needs osmium; OSM_PBF is a catalog pbf_url (a Geofabrik URL or a
+# cut:, see scripts/fetch-pbf.sh) or a local file, and with it unset the bake behaves exactly as before.
+OSM_NDJSON=""
+MARKS_NDJSON=""
+if [ -n "${OSM_PBF:-}" ] && command -v osmium >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+  OSM_SRC="$OSM_PBF"
+  if [ "${OSM_PBF#http}" != "$OSM_PBF" ] || [ "${OSM_PBF#cut:}" != "$OSM_PBF" ]; then
+    echo "osm: fetching $OSM_PBF"
+    if bash "$ROOT/scripts/fetch-pbf.sh" "$OSM_PBF" "$WORK/region.osm.pbf"; then OSM_SRC="$WORK/region.osm.pbf"; else OSM_SRC=""; echo "osm: download failed, baking without it"; fi
+  fi
+  if [ -n "$OSM_SRC" ]; then
+    # Named NODES that are businesses. Ways/relations are the building, whose centroid is the same
+    # kind of guess the parcel point already is, so only nodes qualify.
+    osmium tags-filter --overwrite -R -o "$WORK/shops.osm.pbf" "$OSM_SRC"       n/shop n/amenity=restaurant,fast_food,cafe,bar,pub,pharmacy,bank,fuel,car_wash,car_rental,veterinary,dentist,doctors,clinic,cinema,post_office,atm       n/tourism=hotel,motel,guest_house,hostel n/leisure=fitness_centre >/dev/null 2>&1 || true
+    if [ -s "$WORK/shops.osm.pbf" ]; then
+      # --add-unique-id puts "n123456" in the feature's own `id` (NOT in properties, checked
+      # against osmium 1.16 output), which becomes the row's id and makes an OSM-sourced place
+      # traceable back to the node anyone can edit.
+      osmium export -f geojsonseq --add-unique-id=type_id --overwrite -o "$WORK/shops.geojsonseq" "$WORK/shops.osm.pbf" >/dev/null 2>&1 || true
+      if [ -s "$WORK/shops.geojsonseq" ]; then
+        # tr: geojsonseq writes an ASCII record separator (0x1e) before every line and jq will not
+        # parse it; the option that turns it off is not in every osmium build.
+        tr -d '\036' < "$WORK/shops.geojsonseq" \
+          | jq -c 'select(.geometry.type == "Point" and (.properties.name // "") != "") | {id: (.id // ""), name: .properties.name, props: .properties, lng: .geometry.coordinates[0], lat: .geometry.coordinates[1]}' \
+          > "$WORK/osm.ndjson" 2>/dev/null || true
+        [ -s "$WORK/osm.ndjson" ] && OSM_NDJSON="$WORK/osm.ndjson"
+      fi
+    fi
+    [ -n "$OSM_NDJSON" ] && echo "osm: $(wc -l < "$OSM_NDJSON") named business nodes" || echo "osm: no usable nodes"
+    # ONE SET OF MAP POINTS (2026-09-22). The basemap's own point layers (Liberty's poi_r*, built
+    # by OpenFreeMap from the same OSM) drew parks, temples, schools and museums as a second,
+    # separately ranked set the app had to reconcile on the device, and in Tokyo those layers cost
+    # half the frame rate. They come into THIS bake now, ranked and budgeted with everything else,
+    # and the app hides the basemap's copy wherever a places archive covers the view. Outlines
+    # count here (a park or a campus is mapped as an area), placed at the average of the outer
+    # ring's vertices; references are kept (no -R) so the ways have their nodes.
+    osmium tags-filter --overwrite -o "$WORK/marks.osm.pbf" "$OSM_SRC" \
+      nwr/tourism=museum,attraction,gallery,zoo,theme_park,aquarium,viewpoint \
+      nwr/amenity=place_of_worship,school,college,university,library,hospital,townhall,community_centre,theatre,arts_centre,courthouse,police,fire_station \
+      nwr/leisure=park,stadium,sports_centre,water_park,garden,nature_reserve \
+      nwr/historic=monument,memorial,castle,ruins,archaeological_site >/dev/null 2>&1 || true
+    if [ -s "$WORK/marks.osm.pbf" ]; then
+      # Points and areas only: a closed way is otherwise exported twice, as a line and as an area.
+      osmium export -f geojsonseq --add-unique-id=type_id --geometry-types=point,polygon --overwrite -o "$WORK/marks.geojsonseq" "$WORK/marks.osm.pbf" >/dev/null 2>&1 || true
+      if [ -s "$WORK/marks.geojsonseq" ]; then
+        tr -d '\036' < "$WORK/marks.geojsonseq" \
+          | jq -c 'def pts: if .type == "Point" then [.coordinates] elif .type == "LineString" then .coordinates
+                     elif .type == "Polygon" then .coordinates[0] elif .type == "MultiPolygon" then [.coordinates[][0][]] else [] end;
+                   select((.properties.name // "") != "") | (.geometry | pts) as $p | select(($p | length) > 0)
+                   | ($p | map(.[0])) as $xs | ($p | map(.[1])) as $ys
+                   | {id: (.id // ""), name: .properties.name, props: .properties,
+                      langs: ([.properties | keys[] | select(test("^name:[a-z]{2,3}(-[A-Za-z]{2,8})?$"))] | length),
+                      lng: ($xs | add / length), lat: ($ys | add / length),
+                      area: ((($xs | max) - ($xs | min)) * 111320 * ((($ys | add / length) * 3.14159265 / 180) | cos)
+                             * (($ys | max) - ($ys | min)) * 111320)}' \
+          > "$WORK/marks.ndjson" 2>/dev/null || true
+        [ -s "$WORK/marks.ndjson" ] && MARKS_NDJSON="$WORK/marks.ndjson"
+      fi
+    fi
+    # FAMOUS BUILDINGS (2026-10-04). A tower is usually mapped as a plain building with a Wikidata
+    # link and none of the tags above (the Chrysler Building: building=tower, tourism=yes), so the
+    # landmark rules never saw it and it ranked as one more tenant, and half of Midtown's named
+    # towers (the Bank of America Tower, the Javits Center) had no row at all. Every named building
+    # or tower with a Wikidata link joins the marks; the Wikidata CREDIT (the ranking boost) still
+    # needs a name in three or more languages, which is what separates the Chrysler Building from a
+    # listed house that merely has a Wikidata item (see `wiki` in the SQL). Two passes because osmium
+    # cannot AND two tags: everything with a Wikidata link first (small), then the buildings in it.
+    osmium tags-filter --overwrite -o "$WORK/wd.osm.pbf" "$OSM_SRC" wr/wikidata >/dev/null 2>&1 || true
+    if [ -s "$WORK/wd.osm.pbf" ]; then
+      osmium tags-filter --overwrite -o "$WORK/famous.osm.pbf" "$WORK/wd.osm.pbf" wr/building wr/man_made=tower >/dev/null 2>&1 || true
+      rm -f "$WORK/wd.osm.pbf"
+      if [ -s "$WORK/famous.osm.pbf" ]; then
+        osmium export -f geojsonseq --add-unique-id=type_id --geometry-types=polygon --overwrite -o "$WORK/famous.geojsonseq" "$WORK/famous.osm.pbf" >/dev/null 2>&1 || true
+        if [ -s "$WORK/famous.geojsonseq" ]; then
+          tr -d '\036' < "$WORK/famous.geojsonseq" \
+            | jq -c 'def pts: if .type == "Polygon" then .coordinates[0] elif .type == "MultiPolygon" then [.coordinates[][0][]] else [] end;
+                     select((.properties.name // "") != "" and (.properties.wikidata // "") != "")
+                     | ([.properties | keys[] | select(test("^name:[a-z]{2,3}(-[A-Za-z]{2,8})?$"))] | length) as $langs
+                     | (.geometry | pts) as $p | select(($p | length) > 0)
+                     | ($p | map(.[0])) as $xs | ($p | map(.[1])) as $ys
+                     | {id: (.id // ""), name: .properties.name, props: .properties, langs: $langs,
+                        lng: ($xs | add / length), lat: ($ys | add / length),
+                        area: ((($xs | max) - ($xs | min)) * 111320 * ((($ys | add / length) * 3.14159265 / 180) | cos)
+                               * (($ys | max) - ($ys | min)) * 111320)}' \
+            >> "$WORK/marks.ndjson" 2>/dev/null || true
+          [ -s "$WORK/marks.ndjson" ] && MARKS_NDJSON="$WORK/marks.ndjson"
+        fi
+      fi
+    fi
+    [ -n "$MARKS_NDJSON" ] && echo "osm: $(wc -l < "$MARKS_NDJSON") named landmarks (parks, schools, temples, museums...)"
+  fi
+fi
+
+# GONE (2026-10-06): places OpenStreetMap's mappers have marked closed. A shop that shuts is
+# retagged with a lifecycle prefix (disused:shop=, was:amenity=, abandoned:..., closed:...) and
+# keeps its name; Overture has no such memory, so the same shop stays "open" there for years.
+# Features that ALSO carry a live shop/amenity/tourism tag are a new tenant and are left out.
+GONE_NDJSON=""
+if [ -n "${OSM_SRC:-}" ] && [ -f "${OSM_SRC:-}" ]; then
+  osmium tags-filter --overwrite -o "$WORK/gone.osm.pbf" "$OSM_SRC" \
+    nw/disused:shop nw/disused:amenity nw/disused:tourism nw/disused:leisure \
+    nw/was:shop nw/was:amenity nw/was:tourism nw/was:leisure \
+    nw/abandoned:shop nw/abandoned:amenity nw/abandoned:tourism \
+    nw/closed:shop nw/closed:amenity nw/closed:tourism >/dev/null 2>&1 || true
+  if [ -s "$WORK/gone.osm.pbf" ]; then
+    osmium export -f geojsonseq --geometry-types=point,polygon --overwrite -o "$WORK/gone.geojsonseq" "$WORK/gone.osm.pbf" >/dev/null 2>&1 || true
+    if [ -s "$WORK/gone.geojsonseq" ]; then
+      tr -d '\036' < "$WORK/gone.geojsonseq" \
+        | jq -c '.properties as $p
+            | select(($p.shop // $p.amenity // $p.tourism // $p.leisure) == null)
+            | ($p.name // $p["old_name"] // $p["disused:name"] // $p["was:name"] // "") as $n
+            | select($n != "")
+            | (if .geometry.type == "Point" then .geometry.coordinates
+               else (.geometry.coordinates[0] | [(map(.[0]) | add / length), (map(.[1]) | add / length)]) end) as $c
+            | {name: $n, lng: $c[0], lat: $c[1]}' > "$WORK/gone.ndjson" 2>/dev/null || true
+      [ -s "$WORK/gone.ndjson" ] && GONE_NDJSON="$WORK/gone.ndjson"
+    fi
+  fi
+  [ -n "$GONE_NDJSON" ] && echo "osm: $(wc -l < "$GONE_NDJSON") named places marked closed by mappers" || echo "osm: no closed-place tags in this region"
+fi
+# WIKIDATA SAYS IT IS GONE (2026-10-06). An OpenStreetMap object can outlive what it stands for: a
+# hospital that shut in 2019 is still tagged as a hospital, a demolished stadium still has its
+# outline. Where the object links a Wikidata item and that item has a dissolved / abolished /
+# demolished date (P576) in the past, the object is no longer a source: no landmark row, no
+# Wikidata or size credit, and its name joins the closed list above so the other sources' rows
+# for it go too. P576 only. The date of official closure (P3999) was measured and left out: it
+# is set on theaters and stations that closed once and are open again. In the District of
+# Columbia 6 of 1,740 linked items qualify, all correct. Best effort; WD_CLOSED=off skips it.
+if [ "${WD_CLOSED:-on}" != "off" ] && { [ -n "$OSM_NDJSON" ] || [ -n "$MARKS_NDJSON" ]; }; then
+  cat $OSM_NDJSON $MARKS_NDJSON 2>/dev/null | jq -r '.props.wikidata // empty' 2>/dev/null \
+    | { grep -E '^Q[0-9]+$' || true; } | sort -u > "$WORK/qids.txt"
+  : > "$WORK/wdgone.txt"
+  if [ -s "$WORK/qids.txt" ]; then
+    rm -f "$WORK"/qidpart.*
+    split -l 300 "$WORK/qids.txt" "$WORK/qidpart."
+    for part in "$WORK"/qidpart.*; do
+      vals=$(sed 's/^/wd:/' "$part" | tr '\n' ' ')
+      curl -s -m 60 -A "VelaMaps-bake (https://github.com/PimpinPumpkin/Vela)" -H 'Accept: text/csv' \
+        --data-urlencode "query=SELECT DISTINCT ?q WHERE { VALUES ?q { $vals } ?q wdt:P576 ?d . FILTER(?d <= NOW()) }" \
+        https://query.wikidata.org/sparql 2>/dev/null | { grep -oE 'Q[0-9]+' || true; } >> "$WORK/wdgone.txt"
+      sleep 1
+    done
+    rm -f "$WORK"/qidpart.*
+  fi
+  if [ -s "$WORK/wdgone.txt" ]; then
+    sort -u "$WORK/wdgone.txt" | jq -R '{(.): 1}' | jq -s 'add' > "$WORK/wdgone.json"
+    for f in $OSM_NDJSON $MARKS_NDJSON; do
+      jq -c --slurpfile g "$WORK/wdgone.json" 'select($g[0][.props.wikidata // ""] == 1) | {name: .name, lng: .lng, lat: .lat}' "$f" >> "$WORK/gone.ndjson" 2>/dev/null || true
+      jq -c --slurpfile g "$WORK/wdgone.json" 'select($g[0][.props.wikidata // ""] != 1)' "$f" > "$f.keep" 2>/dev/null && mv "$f.keep" "$f"
+    done
+    [ -s "$WORK/gone.ndjson" ] && GONE_NDJSON="$WORK/gone.ndjson"
+    echo "wikidata: $(sort -u "$WORK/wdgone.txt" | wc -l | tr -d ' ') linked items are dissolved or demolished, of $(wc -l < "$WORK/qids.txt" | tr -d ' ')"
+  else
+    echo "wikidata: no dissolved items among $(wc -l < "$WORK/qids.txt" | tr -d ' ') (or the service did not answer)"
+  fi
+fi
+
+GONE_SQL=""
+if [ -n "$GONE_NDJSON" ]; then
+  LIVE_SQL="CREATE TABLE osmlive (sk VARCHAR, lng DOUBLE, lat DOUBLE);"
+  [ -n "$OSM_NDJSON" ] && LIVE_SQL="CREATE TABLE osmlive AS SELECT snapkey(name) AS sk, lng, lat FROM read_json('$OSM_NDJSON', columns = {name: 'VARCHAR', lng: 'DOUBLE', lat: 'DOUBLE'}) WHERE snapkey(name) IS NOT NULL;"
+read -r -d '' GONE_SQL <<GONESQL || true
+-- A row is left out when a mapper-closed place of the same whole name lies within about 80 m,
+-- unless a LIVE OpenStreetMap business of that name is there too (it moved next door, or
+-- reopened and the old node was kept). Rows that come from OpenStreetMap itself are never touched.
+CREATE TABLE osmgone AS SELECT snapkey(name) AS sk, lng, lat FROM read_json('$GONE_NDJSON', columns = {name: 'VARCHAR', lng: 'DOUBLE', lat: 'DOUBLE'}) WHERE snapkey(name) IS NOT NULL AND length(snapkey(name)) >= 4;
+$LIVE_SQL
+CREATE TABLE gonekeys AS SELECT id, lat, lng, snapkey(name) AS sk FROM raw WHERE id NOT LIKE 'osm:%';
+CREATE TABLE gonehits AS
+SELECT DISTINCT r.id FROM gonekeys r JOIN osmgone g ON g.sk = r.sk AND abs(r.lat - g.lat) < 0.00075 AND abs(r.lng - g.lng) < 0.001
+WHERE r.id NOT IN (
+  SELECT r2.id FROM gonekeys r2 JOIN osmlive l ON l.sk = r2.sk AND abs(r2.lat - l.lat) < 0.00075 AND abs(r2.lng - l.lng) < 0.001);
+DELETE FROM raw WHERE id IN (SELECT id FROM gonehits);
+SELECT (SELECT count(*) FROM osmgone) AS closed_by_mappers_in_box, (SELECT count(*) FROM gonehits) AS rows_dropped_as_closed_in_osm;
+GONESQL
+fi
+
+ATP_SQL=""
+if [ -n "$ATP_NDJSON" ]; then
+read -r -d '' ATP_SQL <<ATPSQL || true
+CREATE TABLE atp_raw AS SELECT props, lng, lat FROM read_json('$ATP_NDJSON', format = 'newline_delimited', columns = {props: 'JSON', lng: 'DOUBLE', lat: 'DOUBLE'});
+CREATE TABLE atp AS
+SELECT 'atp:' || (json_extract_string(props, '@spider')) || ':' || COALESCE(json_extract_string(props, 'ref'), md5(CAST(lng AS VARCHAR) || ',' || CAST(lat AS VARCHAR))) AS id,
+  -- Some locators name a branch after its town ("Davis", "Davis, CA"); the brand is the name then.
+  CASE WHEN json_extract_string(props, 'brand') IS NOT NULL
+        AND (lower(json_extract_string(props, 'name')) = lower(COALESCE(json_extract_string(props, 'addr:city'), ''))
+             OR json_extract_string(props, 'name') ILIKE '%, ' || COALESCE(json_extract_string(props, 'addr:state'), '~'))
+       THEN json_extract_string(props, 'brand') ELSE json_extract_string(props, 'name') END AS name,
+  osmcat(props) AS category,
+  0.85 AS confidence,
+  json_extract_string(props, 'brand') AS brand,
+  COALESCE(json_extract_string(props, 'addr:full'), json_extract_string(props, 'addr:street_address')) AS addr,
+  json_extract_string(props, 'website') AS website, json_extract_string(props, 'phone') AS phone, 'open' AS operating_status,
+  json_extract_string(props, 'opening_hours') AS hours, lng, lat,
+  -- A locator's addr:full already names the town; only a split address gets the town appended.
+  CASE WHEN json_extract_string(props, 'addr:full') IS NULL THEN fmtloc(json_extract_string(props, 'addr:city'),
+    json_extract_string(props, 'addr:state'), json_extract_string(props, 'addr:postcode'),
+    coalesce(json_extract_string(props, 'addr:country'), (SELECT cc FROM regioncc))) END AS loc
+FROM atp_raw
+WHERE json_extract_string(props, 'name') IS NOT NULL AND json_extract_string(props, 'name') <> ''
+  AND lng BETWEEN $W AND $E AND lat BETWEEN $S AND $N
+  AND isbiz(props);
+
+CREATE TABLE rawkeys AS SELECT id, lat, lng, nkey(name) AS nk, lower(brand) AS bk, snapkey(name) AS sk FROM raw;
+CREATE TABLE atpkeys AS SELECT id, lat, lng, nkey(name) AS nk, lower(brand) AS bk, snapkey(name) AS sk FROM atp;
+-- The Overture row a locator point matches keeps the locator's COORDINATE (atp_snap below):
+-- Overture puts a tenant on its parcel point, which in a strip mall is out in the parking lot,
+-- while a chain's own store locator gives the storefront (user 2026-09-17, a Subway pinned in the
+-- lot in front of the mall). Only when they disagree by more than ~30 m; below that the two
+-- sources agree to a median 7.4 m and moving the row would be noise.
+CREATE TABLE atpdupes AS
+SELECT DISTINCT a.id FROM atpkeys a JOIN rawkeys o ON o.nk = a.nk
+WHERE a.nk IS NOT NULL AND a.nk <> '' AND abs(o.lat - a.lat) < 0.0015 AND abs(o.lng - a.lng) < 0.002
+UNION
+SELECT DISTINCT a.id FROM atpkeys a JOIN rawkeys o ON o.bk = a.bk
+WHERE a.bk IS NOT NULL AND abs(o.lat - a.lat) < 0.0015 AND abs(o.lng - a.lng) < 0.002;
+-- A locator point that duplicates an Overture row is dropped, but what it knows is not: a chain's
+-- locator carries the store's hours, which Overture never has (the same rule as the OSM fill
+-- below). Name only, never brand, so one branch's hours cannot land on another.
+CREATE TABLE atpfill AS
+SELECT rid, hours, phone, website, loc FROM (
+  SELECT o.id AS rid, a.hours, a.phone, a.website, a.loc,
+    row_number() OVER (PARTITION BY o.id ORDER BY abs(o.lat - ak.lat) + abs(o.lng - ak.lng)) AS rn
+  FROM rawkeys o JOIN atpkeys ak ON ak.nk = o.nk JOIN atp a ON a.id = ak.id
+  WHERE ak.nk IS NOT NULL AND ak.nk <> '' AND abs(o.lat - ak.lat) < 0.0015 AND abs(o.lng - ak.lng) < 0.002
+    AND (a.hours IS NOT NULL OR a.phone IS NOT NULL OR a.website IS NOT NULL OR a.loc IS NOT NULL)
+) WHERE rn = 1;
+UPDATE raw SET hours = coalesce(raw.hours, f.hours), phone = coalesce(raw.phone, f.phone),
+  website = coalesce(raw.website, f.website)
+FROM atpfill f WHERE raw.id = f.rid;
+INSERT INTO locs SELECT rid, loc FROM atpfill WHERE loc IS NOT NULL;
+INSERT INTO raw
+SELECT a.id, a.name, a.category, a.confidence, a.brand, a.addr, a.website, a.phone, a.operating_status, a.lng, a.lat, a.hours
+FROM atp a WHERE a.id NOT IN (SELECT id FROM atpdupes);
+INSERT INTO locs SELECT id, loc FROM atp WHERE id NOT IN (SELECT id FROM atpdupes) AND loc IS NOT NULL;
+SELECT (SELECT count(*) FROM atpfill WHERE hours IS NOT NULL) AS atp_hours_carried;
+-- arg_min, not row_number() ... WHERE rn = 1: DuckDB 1.5.6 dies on that window over this join
+-- and filter with "INTERNAL Error: Failed to cast expression to type" (1.5.4 ran it), and CI
+-- installs the newest DuckDB, so every region with chain data stopped baking (2026-10-04).
+CREATE TABLE atp_snap AS
+SELECT o.id, arg_min(a.lat, abs(a.lat - o.lat) + abs(a.lng - o.lng)) AS alat,
+  arg_min(a.lng, abs(a.lat - o.lat) + abs(a.lng - o.lng)) AS alng
+  -- NAME key only, never brand alone: a brand match moved "Safeway Pharmacy" onto the Safeway
+  -- and the store onto the pharmacy's locator point (Sacramento test box, 2026-09-17). And a
+  -- storefront correction is tens of meters; anything past ~120 m is a different branch.
+FROM rawkeys o JOIN atpkeys a ON o.sk = a.sk
+WHERE abs(a.lat - o.lat) < 0.0015 AND abs(a.lng - o.lng) < 0.002
+  AND 111320 * sqrt(pow(a.lat - o.lat, 2) + pow((a.lng - o.lng) * cos(radians(o.lat)), 2)) BETWEEN 30 AND 120
+GROUP BY o.id;
+SELECT (SELECT count(*) FROM atp) AS atp_in_box, (SELECT count(*) FROM raw WHERE id LIKE 'atp:%') AS atp_added, (SELECT count(*) FROM atp_snap) AS storefront_snaps;
+ATPSQL
+fi
+if [ -n "$LOCAL" ]; then
+  SRC="read_parquet('$LOCAL')"
+  SEL="id, name, category, confidence, brand, addr, website, phone, operating_status, lng, lat, CAST(NULL AS VARCHAR) AS loc, CAST(NULL AS VARCHAR) AS cc"
+  # The dev extract has plain lng/lat columns and no bbox struct.
+  BBOXPRED=""
+else
+  SRC="read_parquet('s3://overturemaps-us-west-2/release/$RELEASE/theme=places/type=place/*', hive_partitioning=1)"
+  # Overture replaced 'categories' with 'taxonomy' in 2026-09-23.0, renaming about a third of the
+  # values; tools/overture-taxonomy-map.csv maps them back to the names every rule below uses.
+  if duckdb -c "INSTALL httpfs; LOAD httpfs; SET s3_region='us-west-2'; DESCRIBE SELECT * FROM $SRC LIMIT 0" 2>/dev/null | grep -q taxonomy; then
+    CATCOL="taxonomy.primary"
+  else
+    CATCOL="categories.primary"
+  fi
+  SEL="id, names.primary AS name, $CATCOL AS category, confidence, brand.names.primary AS brand, addresses[1].freeform AS addr, websites[1] AS website, phones[1] AS phone, operating_status, ST_X(geometry) AS lng, ST_Y(geometry) AS lat, fmtloc(addresses[1].locality, addresses[1].region, addresses[1].postcode, addresses[1].country) AS loc, addresses[1].country AS cc"
+  # PRUNE ON bbox, NOT ON THE GEOMETRY (2026-09-18). The region filter below is on ST_X/ST_Y, which
+  # DuckDB has to decode per row, so every place on earth was read for every region: 504 s of a
+  # 570 s Kentucky bake, once per region, 414 times. Overture's own `bbox` struct is a plain column
+  # with row-group statistics, so the same filter expressed against it skips the row groups outside
+  # the region: the identical 400,608 rows came back in 3.7 s. The addresses query below has always
+  # done this. The geometry test STAYS as the exact filter (this is only a pruning hint, and a point
+  # has xmin = xmax = lng), so the rows are the same set either way.
+  BBOXPRED="AND bbox.xmin BETWEEN $W AND $E AND bbox.ymin BETWEEN $S AND $N"
+fi
+
+# FOURSQUARE'S CLOSED FLAG, BY EXACT ID (2026-10-06). Overture imports about four million
+# Foursquare places and does not carry over Foursquare's date_closed: in the District of Columbia
+# 1,527 of them were closed in Foursquare and open or unknown in Overture. For a row whose Overture
+# source IS Foursquare the source's record id is Foursquare's own place id, so the join is exact
+# and no names are compared. The Foursquare copy read here is a public mirror of the 2025-02-06
+# release (the official releases need an account since late 2025), so a closure after that date
+# is not seen, and a place that reopened since would be dropped wrongly: a row that a LIVE second
+# source lists (an OpenStreetMap business of the same name within ~150 m, or the chain's own
+# locator) is therefore kept. Overture's update_time on these rows is its own import date (they
+# cluster on a handful of days), not a sign of life, so it is not used. A sample of 45 of the
+# District's matches read as known closures (restaurants gone since 2012 to 2024), which Overture
+# carries at confidence 0.92. Best effort: if the mirror is unreachable the bake goes on without
+# it. FSQ_CLOSED=off skips it. Apache 2.0, notice in tools/licenses/FSQ-OS-PLACES-NOTICE.txt.
+#
+# WITH A TOKEN (2026-10-06): FSQ_HF_TOKEN, a Hugging Face token whose account has accepted the
+# dataset's terms, reads the NEWEST release there instead (foursquare/fsq-os-places,
+# release/dt=<date>), so closures keep arriving. The token reaches DuckDB through the HF_TOKEN
+# environment variable, never the command line. Without one, or when that read fails, the
+# February 2025 mirror is used as before.
+FSQ_SQL=""
+FSQ_BASE="${FSQ_BASE:-https://data.source.coop/fused/fsq-os-places/2025-02-06/places}"
+fsq_closed() {  # $1 = SQL run first, $2 = the table expression to read Foursquare from
+  duckdb -c "INSTALL httpfs; LOAD httpfs; INSTALL spatial; LOAD spatial; SET s3_region='us-west-2'; $1
+      COPY (SELECT o.id FROM (
+              SELECT id, sources[1].record_id AS rec FROM $SRC
+              WHERE bbox.xmin BETWEEN $W AND $E AND bbox.ymin BETWEEN $S AND $N AND sources[1].dataset = 'Foursquare') o
+            JOIN (SELECT fsq_place_id FROM $2
+                  WHERE longitude BETWEEN $W AND $E AND latitude BETWEEN $S AND $N AND date_closed IS NOT NULL) f
+            ON f.fsq_place_id = o.rec) TO '$WORK/fsqclosed.csv' (HEADER false);" >/dev/null 2>"$WORK/fsq.err" && [ -s "$WORK/fsqclosed.csv" ]
+}
+if [ -z "$LOCAL" ] && [ "${FSQ_CLOSED:-on}" != "off" ]; then
+  FSQ_FROM=""
+  if [ -n "${FSQ_HF_TOKEN:-}" ]; then
+    FSQ_DT=$(curl -s -m 30 -H "Authorization: Bearer $FSQ_HF_TOKEN" "https://huggingface.co/api/datasets/foursquare/fsq-os-places/tree/main/release" 2>/dev/null \
+      | jq -r '.[].path' 2>/dev/null | { grep -E '^release/dt=[0-9-]+$' || true; } | sort | tail -1)
+    if [ -n "$FSQ_DT" ] && HF_TOKEN="$FSQ_HF_TOKEN" fsq_closed "CREATE SECRET fsqhf (TYPE HUGGINGFACE, PROVIDER credential_chain);" \
+        "read_parquet('hf://datasets/foursquare/fsq-os-places/$FSQ_DT/places/parquet/*.parquet')"; then
+      FSQ_FROM="Foursquare ${FSQ_DT#release/dt=}"
+    else
+      echo "foursquare: the current release could not be read ($(head -c 160 "$WORK/fsq.err" 2>/dev/null | tr '\n' ' ')), trying the 2025 mirror"
+    fi
+  fi
+  if [ -z "$FSQ_FROM" ] && fsq_closed "" "read_parquet(list_transform(range(0, 81), i -> '$FSQ_BASE/' || i || '.parquet'))"; then
+    FSQ_FROM="the 2025-02-06 mirror"
+  fi
+  if [ -n "$FSQ_FROM" ]; then
+    echo "foursquare: $(wc -l < "$WORK/fsqclosed.csv") Overture rows it marks closed ($FSQ_FROM)"
+    FSQ_LIVE="CREATE TABLE fsqlive (id VARCHAR);"
+    [ -n "$OSM_NDJSON" ] && FSQ_LIVE="$FSQ_LIVE
+INSERT INTO fsqlive SELECT DISTINCT r.id FROM (SELECT id, lat, lng, snapkey(name) AS sk FROM raw WHERE id IN (SELECT id FROM fsqclosed)) r
+  JOIN (SELECT snapkey(name) AS sk, lng, lat FROM read_json('$OSM_NDJSON', columns = {name: 'VARCHAR', lng: 'DOUBLE', lat: 'DOUBLE'})) l
+  ON l.sk = r.sk AND abs(r.lat - l.lat) < 0.0015 AND abs(r.lng - l.lng) < 0.002 WHERE r.sk IS NOT NULL;"
+    [ -n "$ATP_NDJSON" ] && FSQ_LIVE="$FSQ_LIVE
+INSERT INTO fsqlive SELECT rid FROM atpfill UNION SELECT id FROM atp_snap;"
+    FSQ_SQL="CREATE TABLE fsqclosed AS SELECT * FROM read_csv('$WORK/fsqclosed.csv', header = false, columns = {'id': 'VARCHAR'});
+$FSQ_LIVE
+DELETE FROM raw WHERE id IN (SELECT id FROM fsqclosed) AND id NOT IN (SELECT id FROM fsqlive);
+SELECT (SELECT count(*) FROM fsqclosed) AS closed_in_foursquare,
+  (SELECT count(*) FROM fsqclosed WHERE id IN (SELECT id FROM fsqlive)) AS kept_a_live_source_lists_them;"
+  else
+    echo "foursquare: closed list not available ($(head -c 200 "$WORK/fsq.err" 2>/dev/null | tr '\n' ' ')), baking without it"
+  fi
+fi
+
+# Overture ADDRESSES for the unit-level snap above. Skipped on the local-parquet dev path (the
+# extract has places only), which leaves the table empty and every stacked row on the ring.
+if [ -n "$LOCAL" ]; then
+  ADDR_SQL="CREATE TABLE addrpts (anum VARCHAR, aunit VARCHAR, alat DOUBLE, alng DOUBLE);"
+else
+  ADDR_SQL="CREATE TABLE addrpts AS
+SELECT number AS anum,
+       regexp_replace(upper(regexp_replace(coalesce(unit, ''), '(?i)^(ste|suite|unit|apt|apartment|rm|room|no|#)[ .]*', '')), '[^A-Za-z0-9]', '') AS aunit,
+       ST_Y(geometry) AS alat, ST_X(geometry) AS alng
+FROM read_parquet('s3://overturemaps-us-west-2/release/$RELEASE/theme=addresses/type=*/*', hive_partitioning=1)
+WHERE unit IS NOT NULL AND number IS NOT NULL
+  AND bbox.xmin BETWEEN $W AND $E AND bbox.ymin BETWEEN $S AND $N;"
+fi
+# OSM AS A SOURCE, not only a position (user 2026-09-18). Overture publishes monthly and neither
+# we nor anyone reading this can correct it; OpenStreetMap is the one source in the stack a person
+# can fix, and see fixed, so a business somebody adds or repairs there has to be able to reach the
+# map. The rows go in beside Overture's and AllThePlaces', through the same tag mapping, the same
+# name/brand dedupe and the same ranking. Only NODES qualify, same as the snap: a building way's
+# centroid is the same kind of guess as the parcel point we already have.
+OSM_BIZ_SQL=""
+if [ -n "$OSM_NDJSON" ]; then
+read -r -d '' OSM_BIZ_SQL <<OSMBIZSQL || true
+CREATE TABLE osm_src AS SELECT id, name, props, lng, lat FROM read_json('$OSM_NDJSON', format = 'newline_delimited',
+  columns = {id: 'VARCHAR', name: 'VARCHAR', props: 'JSON', lng: 'DOUBLE', lat: 'DOUBLE'})
+  WHERE lng BETWEEN $W AND $E AND lat BETWEEN $S AND $N;
+CREATE TABLE osmen AS
+SELECT id AS oid, en FROM (
+  SELECT id, name, coalesce(json_extract_string(props, 'name:en'), json_extract_string(props, 'name:ja-Latn'),
+    json_extract_string(props, 'name:ja_rm'), json_extract_string(props, 'name:zh-Latn-pinyin'),
+    json_extract_string(props, 'name:ko-Latn'), json_extract_string(props, 'name:latin'),
+    json_extract_string(props, 'brand:en')) AS en
+  FROM osm_src
+) WHERE en IS NOT NULL AND trim(en) <> '' AND nonlatin(name) AND NOT nonlatin(en);
+-- Notability: an OSM node linked to Wikidata (its own or its brand's) is a known place.
+CREATE TABLE osmwiki AS SELECT id AS oid FROM osm_src
+  WHERE json_extract_string(props, 'wikidata') IS NOT NULL OR json_extract_string(props, 'brand:wikidata') IS NOT NULL;
+CREATE TABLE osmbiz AS
+SELECT 'osm:' || id AS id, name, osmcat(props) AS category,
+  -- Under AllThePlaces' 0.85 and Overture's own scores: an OSM node is as good as its last editor,
+  -- and where the other two have the same place they should keep the row.
+  0.8 AS confidence,
+  json_extract_string(props, 'brand') AS brand,
+  nullif(trim(coalesce(json_extract_string(props, 'addr:housenumber'), '') || ' ' || coalesce(json_extract_string(props, 'addr:street'), '')), '') AS addr,
+  coalesce(json_extract_string(props, 'website'), json_extract_string(props, 'contact:website')) AS website,
+  coalesce(json_extract_string(props, 'phone'), json_extract_string(props, 'contact:phone')) AS phone,
+  'open' AS operating_status, json_extract_string(props, 'opening_hours') AS hours, lng, lat,
+  fmtloc(json_extract_string(props, 'addr:city'), json_extract_string(props, 'addr:state'),
+    json_extract_string(props, 'addr:postcode'), coalesce(json_extract_string(props, 'addr:country'), (SELECT cc FROM regioncc))) AS loc
+FROM osm_src WHERE name IS NOT NULL AND name <> '' AND id <> '' AND isbiz(props);
+-- Keys are recomputed here, AFTER the AllThePlaces insert, so OSM dedupes against everything
+-- already in the table rather than against Overture alone.
+CREATE TABLE rawkeys2 AS SELECT id, lat, lng, nkey(name) AS nk, lower(brand) AS bk FROM raw;
+CREATE TABLE osmbizkeys AS SELECT id, lat, lng, nkey(name) AS nk, lower(brand) AS bk FROM osmbiz;
+CREATE TABLE osmdupes AS
+SELECT DISTINCT o.id FROM osmbizkeys o JOIN rawkeys2 r ON r.nk = o.nk
+WHERE o.nk IS NOT NULL AND o.nk <> '' AND abs(r.lat - o.lat) < 0.0015 AND abs(r.lng - o.lng) < 0.002
+UNION
+SELECT DISTINCT o.id FROM osmbizkeys o JOIN rawkeys2 r ON r.bk = o.bk
+WHERE o.bk IS NOT NULL AND abs(r.lat - o.lat) < 0.0015 AND abs(r.lng - o.lng) < 0.002;
+-- A DUPLICATE STILL KNOWS THINGS (user 2026-09-22: a convenience store's OSM node carried its
+-- opening hours, Overture's row for the same shop did not, and the dedupe dropped the node with
+-- them, so the map showed no hours for a place OSM describes fully). The kept row takes the
+-- nearest same-name OSM node's hours, phone and website wherever it has none; a value it already
+-- has (Overture's, or a chain locator's) stays. Name only, never brand, so one branch's hours
+-- cannot land on another branch of the chain a block away.
+CREATE TABLE osmfill AS
+SELECT rid, hours, phone, website, loc FROM (
+  SELECT r.id AS rid, o.hours, o.phone, o.website, o.loc,
+    row_number() OVER (PARTITION BY r.id ORDER BY abs(r.lat - ok.lat) + abs(r.lng - ok.lng)) AS rn
+  FROM rawkeys2 r JOIN osmbizkeys ok ON ok.nk = r.nk JOIN osmbiz o ON o.id = ok.id
+  WHERE ok.nk IS NOT NULL AND ok.nk <> '' AND abs(r.lat - ok.lat) < 0.0015 AND abs(r.lng - ok.lng) < 0.002
+    AND (o.hours IS NOT NULL OR o.phone IS NOT NULL OR o.website IS NOT NULL OR o.loc IS NOT NULL)
+) WHERE rn = 1;
+UPDATE raw SET hours = coalesce(raw.hours, f.hours), phone = coalesce(raw.phone, f.phone),
+  website = coalesce(raw.website, f.website)
+FROM osmfill f WHERE raw.id = f.rid;
+INSERT INTO locs SELECT rid, loc FROM osmfill WHERE loc IS NOT NULL;
+SELECT (SELECT count(*) FROM osmfill WHERE hours IS NOT NULL) AS osm_hours_carried;
+INSERT INTO raw
+SELECT o.id, o.name, o.category, o.confidence, o.brand, o.addr, o.website, o.phone, o.operating_status, o.lng, o.lat, o.hours
+FROM osmbiz o WHERE o.id NOT IN (SELECT id FROM osmdupes) AND o.category IS NOT NULL;
+INSERT INTO locs SELECT id, loc FROM osmbiz WHERE id NOT IN (SELECT id FROM osmdupes) AND category IS NOT NULL AND loc IS NOT NULL;
+INSERT INTO names_en SELECT 'osm:' || oid, en FROM osmen WHERE 'osm:' || oid IN (SELECT id FROM raw);
+SELECT (SELECT count(*) FROM osmbiz) AS osm_biz_in_box, (SELECT count(*) FROM raw WHERE id LIKE 'osm:%') AS osm_biz_added;
+OSMBIZSQL
+fi
+MARKS_SQL=""
+if [ -n "$MARKS_NDJSON" ]; then
+read -r -d '' MARKS_SQL <<MARKSSQL || true
+CREATE MACRO markcat0(props) AS (CASE
+    -- A park that is also tagged an attraction is a park (Bryant Park carries both).
+    WHEN json_extract_string(props, 'leisure') IN ('park', 'garden', 'nature_reserve', 'water_park') THEN json_extract_string(props, 'leisure')
+    WHEN json_extract_string(props, 'tourism') = 'museum' THEN 'museum'
+    WHEN json_extract_string(props, 'tourism') = 'gallery' THEN 'art_gallery'
+    WHEN json_extract_string(props, 'tourism') = 'zoo' THEN 'zoo'
+    WHEN json_extract_string(props, 'tourism') = 'theme_park' THEN 'amusement_park'
+    WHEN json_extract_string(props, 'tourism') = 'aquarium' THEN 'aquarium'
+    WHEN json_extract_string(props, 'tourism') = 'viewpoint' THEN 'viewpoint'
+    WHEN json_extract_string(props, 'tourism') = 'attraction' THEN 'attraction'
+    WHEN json_extract_string(props, 'amenity') IN ('college', 'university') THEN 'college_university'
+    WHEN json_extract_string(props, 'amenity') = 'townhall' THEN 'city_hall'
+    WHEN json_extract_string(props, 'amenity') = 'community_centre' THEN 'community_center'
+    WHEN json_extract_string(props, 'amenity') = 'arts_centre' THEN 'cultural_center'
+    WHEN json_extract_string(props, 'amenity') = 'police' THEN 'police_station'
+    WHEN json_extract_string(props, 'amenity') = 'theatre' THEN 'theater'
+    WHEN json_extract_string(props, 'amenity') IN ('place_of_worship', 'school', 'library', 'hospital', 'courthouse', 'fire_station') THEN json_extract_string(props, 'amenity')
+    WHEN json_extract_string(props, 'leisure') = 'stadium' THEN 'stadium_arena'
+    WHEN json_extract_string(props, 'leisure') = 'sports_centre' THEN 'sports_club'
+    WHEN json_extract_string(props, 'historic') IS NOT NULL THEN 'landmark_and_historical_building'
+    ELSE NULL END);
+-- ...or a named building (the second osmium pass above): a Wikidata-linked building or tower.
+CREATE MACRO markcat(props) AS coalesce(markcat0(props), CASE WHEN json_extract_string(props, 'wikidata') IS NOT NULL
+      AND (json_extract_string(props, 'building') IS NOT NULL OR json_extract_string(props, 'man_made') = 'tower') THEN 'landmark_and_historical_building' END);
+CREATE TABLE marks_src AS SELECT DISTINCT ON (id) id, name, props, lng, lat, area, langs FROM read_json('$MARKS_NDJSON', format = 'newline_delimited',
+  columns = {id: 'VARCHAR', name: 'VARCHAR', props: 'JSON', lng: 'DOUBLE', lat: 'DOUBLE', area: 'DOUBLE', langs: 'INTEGER'})
+  WHERE lng BETWEEN $W AND $E AND lat BETWEEN $S AND $N
+  -- An attraction that is also a Wikidata building arrives from both passes (DISTINCT ON above;
+  -- not QUALIFY row_number(), which DuckDB 1.5.6 dies on).
+  ORDER BY id, langs DESC;
+-- osmium names an area "a<2 x way id>" or "a<2 x relation id + 1>"; turn it back into the OSM
+-- object a person can open and edit.
+CREATE TABLE marks_all AS
+SELECT 'osm:' || CASE WHEN id LIKE 'a%' THEN
+    CASE WHEN CAST(substr(id, 2) AS BIGINT) % 2 = 0 THEN 'w' || (CAST(substr(id, 2) AS BIGINT) // 2)
+         ELSE 'r' || ((CAST(substr(id, 2) AS BIGINT) - 1) // 2) END
+  ELSE id END AS id, name, markcat(props) AS category, 0.8 AS confidence,
+  json_extract_string(props, 'brand') AS brand,
+  nullif(trim(coalesce(json_extract_string(props, 'addr:housenumber'), '') || ' ' || coalesce(json_extract_string(props, 'addr:street'), '')), '') AS addr,
+  coalesce(json_extract_string(props, 'website'), json_extract_string(props, 'contact:website')) AS website,
+  coalesce(json_extract_string(props, 'phone'), json_extract_string(props, 'contact:phone')) AS phone,
+  'open' AS operating_status, json_extract_string(props, 'opening_hours') AS hours, lng, lat,
+  coalesce(json_extract_string(props, 'name:en'), json_extract_string(props, 'name:ja-Latn'), json_extract_string(props, 'name:latin')) AS en,
+  -- A building that is ONLY a building needs three name languages for the Wikidata credit.
+  (json_extract_string(props, 'wikidata') IS NOT NULL AND (markcat0(props) IS NOT NULL OR coalesce(langs, 0) >= 3)) AS wiki,
+  -- SIZE is the notability signal among landmarks: Midtown has ~80 Wikidata-linked landmarks per
+  -- 1.6 km, mostly statues and chapels, and a four-hectare park or a station concourse should
+  -- outrank them. Bounding-box area of the outline, 0 for a mapped point.
+  coalesce(area, 0) AS area,
+  coalesce(langs, 0) AS langs
+FROM marks_src WHERE id <> '' AND markcat(props) IS NOT NULL;
+-- One row per landmark: a campus mapped as a relation AND its main way, or a node inside its own
+-- outline, share a name; the first by id stands for all.
+DROP TABLE marks;
+CREATE TABLE marks AS SELECT * FROM marks_all WHERE id IN (
+  SELECT first(a.id ORDER BY a.id) FROM marks_all a JOIN marks_all b ON snapkey(a.name) = snapkey(b.name)
+    AND abs(a.lat - b.lat) < 0.003 AND abs(a.lng - b.lng) < 0.004
+  GROUP BY b.id
+) OR snapkey(name) IS NULL;
+-- A landmark Overture or an OSM shop node already has (a hospital, a museum, a library) keeps the
+-- existing row: the outline's centroid is a worse point than a mapped entrance.
+CREATE TABLE markdupes AS
+SELECT DISTINCT m.id, r.id AS rid, m.wiki FROM marks m JOIN raw r ON snapkey(r.name) = snapkey(m.name)
+WHERE snapkey(m.name) IS NOT NULL AND abs(r.lat - m.lat) < 0.003 AND abs(r.lng - m.lng) < 0.004
+  -- ...but never against an Overture row the scoring below throws out (its parks and schools):
+  -- that dropped Bryant Park itself, whose OSM outline matched an Overture "park" row that the
+  -- category filter then removed, leaving neither.
+  AND (r.category IS NULL OR r.category NOT IN ('park','campus_building','apartments','housing_development','real_estate','transportation','bus_station','train_station','public_transportation','school','elementary_school','middle_school','high_school'));
+-- ONE existing row STANDS FOR the landmark and takes its credit (2026-10-04): the name match
+-- above also catches the offices named after the building ("Empire State Building Company Llc.",
+-- an architect's listing), and every one of them was being credited as the landmark. The row of
+-- the landmark's own kind first, then the most confident, then the nearest.
+CREATE TABLE markbest AS
+SELECT d.id, first(d.rid ORDER BY
+    (CASE WHEN r.category = m.category THEN 0
+          WHEN r.category IN ('attraction','landmark_and_historical_building','museum','park','garden','nature_reserve','city_hall','place_of_worship','church_cathedral',
+            'temple','mosque','synagogue','shrine','theater','viewpoint','library','hospital','university','college_university','stadium_arena','zoo','aquarium',
+            'amusement_park','art_gallery','cultural_center','courthouse','government_office') THEN 1 ELSE 2 END),
+    r.confidence DESC, abs(r.lat - m.lat) + abs(r.lng - m.lng), d.rid) AS rid, bool_or(d.wiki) AS wiki
+FROM markdupes d JOIN raw r ON r.id = d.rid JOIN marks m ON m.id = d.id
+GROUP BY d.id;
+INSERT INTO raw
+SELECT id, name, category, confidence, brand, addr, website, phone, operating_status, lng, lat, hours
+FROM marks WHERE id NOT IN (SELECT id FROM markdupes) AND id NOT IN (SELECT id FROM raw);
+INSERT INTO names_en SELECT id, en FROM marks WHERE en IS NOT NULL AND nonlatin(name) AND NOT nonlatin(en)
+  AND id IN (SELECT id FROM raw);
+-- A landmark merged into the row that already had it gives that row its English name
+-- ("花園神社" -> "Hanazono Jinja Shrine" onto Overture's row for the same shrine).
+INSERT INTO names_en SELECT DISTINCT d.rid, m.en FROM markdupes d JOIN marks m ON m.id = d.id JOIN raw r ON r.id = d.rid
+  WHERE m.en IS NOT NULL AND nonlatin(r.name) AND NOT nonlatin(m.en);
+-- Size bonus: log10 of the outline's area in square meters, less 2, capped at 3 (1 ha = +2).
+CREATE TABLE marksize AS SELECT id, least(3.0, greatest(0.0, log10(greatest(area, 1)) - 2)) AS b FROM marks WHERE id NOT IN (SELECT id FROM markdupes)
+  UNION ALL SELECT d.rid, least(3.0, greatest(0.0, log10(greatest(m.area, 1)) - 2)) FROM markbest d JOIN marks m ON m.id = d.id;
+-- The Wikidata credit goes to whichever row stands for the landmark: its own, or the Overture row
+-- it merged into (the Empire State Building's OSM outline carries the link, Overture's row not).
+CREATE TABLE markwiki AS SELECT id FROM marks WHERE wiki AND id NOT IN (SELECT id FROM markdupes)
+  UNION SELECT rid FROM markbest WHERE wiki;
+-- FAME: how many languages OSM names it in (name:<lang> tags). A world-famous place carries dozens
+-- and a pocket park none, which outline size cannot see: the Berliner Fernsehturm (a small
+-- footprint) scored 2.5 on size + Wikidata and lost its cell's z15 slots to large parks. 0.6 x
+-- log2(1 + languages), capped at 3: 1 language = +0.6, 5 = +1.6, 30+ = +3.
+CREATE TABLE markfame AS SELECT id, least(3.0, 0.6 * log2(1 + langs)) AS f FROM marks WHERE langs > 0 AND id NOT IN (SELECT id FROM markdupes)
+  UNION ALL SELECT d.rid, least(3.0, 0.6 * log2(1 + m.langs)) FROM markbest d JOIN marks m ON m.id = d.id WHERE m.langs > 0;
+SELECT (SELECT count(*) FROM marks) AS landmarks_in_box, (SELECT count(*) FROM raw WHERE id IN (SELECT id FROM marks)) AS landmarks_added;
+MARKSSQL
+fi
+OSM_SQL=""
+if [ -n "$OSM_NDJSON" ]; then
+read -r -d '' OSM_SQL <<OSMSQL || true
+CREATE TABLE osm_raw AS SELECT id AS oid, name, lng, lat FROM osm_src
+  WHERE lng BETWEEN $W AND $E AND lat BETWEEN $S AND $N;
+-- OSM'S PIN WINS WHEREVER THE TWO ARE THE SAME PLACE (user 2026-09-22: OSM pins are placed more
+-- carefully, and they are the ones a person can fix). It used to win only between 30 and 120 m:
+-- a node closer than 30 m was ignored, and one 120 to ~150 m away was dropped as a duplicate by the
+-- insert above without donating its position, so a fix in that band never reached the map. Now
+-- any distance inside the same box the duplicate test uses counts, on two name tiers:
+--   0 = the whole normalized name agrees (snapkey), 1 = the names agree once generic words are
+--   removed (the core key: "Joe's Pizza" and "Joe's Pizza & Pasta").
+-- Each OSM node and each row take part in at most ONE pair, and only when they are each other's
+-- best (lower tier first, then nearer): two branches of a chain a block apart, or a store and the
+-- pharmacy inside it, can never both land on one node, and a row whose best node belongs to a
+-- nearer row keeps its own point. A CHAIN (a brand, or a name the region has more than once) keeps
+-- the old 120 m ceiling: past that, the OSM node is more likely the next branch than a fix.
+-- Other fields still converge from every source (osmfill,
+-- atpfill); this decides only the coordinate.
+CREATE TABLE osmkeys AS SELECT oid, snapkey(name) AS sk, lat, lng FROM osm_raw WHERE snapkey(name) IS NOT NULL;
+CREATE TABLE rowkeys AS SELECT id, lat, lng, snapkey(name) AS sk,
+  (brand IS NOT NULL OR count(*) OVER (PARTITION BY snapkey(name)) > 1) AS chain
+FROM scored WHERE snapkey(name) IS NOT NULL;
+CREATE MACRO strongcore(k) AS NOT regexp_matches(k, '^[0-9]+(st|nd|rd|th)?$') AND (length(k) >= 5 OR k LIKE '% %');
+CREATE TABLE osmcore AS
+WITH toks AS (
+  SELECT o.oid, t.tok, t.i FROM (SELECT oid, string_split(sk, ' ') AS tl FROM osmkeys) o,
+    unnest(o.tl) WITH ORDINALITY AS t(tok, i)
+  WHERE t.tok <> '' AND t.tok NOT IN (SELECT w FROM generic)
+) SELECT oid, string_agg(tok, ' ' ORDER BY i) AS ck FROM toks GROUP BY oid HAVING strongcore(string_agg(tok, ' ' ORDER BY i));
+CREATE TABLE rowcore AS
+WITH toks AS (
+  SELECT r.id, t.tok, t.i FROM (SELECT id, string_split(sk, ' ') AS tl FROM rowkeys) r,
+    unnest(r.tl) WITH ORDINALITY AS t(tok, i)
+  WHERE t.tok <> '' AND t.tok NOT IN (SELECT w FROM generic)
+) SELECT id, string_agg(tok, ' ' ORDER BY i) AS ck FROM toks GROUP BY id HAVING strongcore(string_agg(tok, ' ' ORDER BY i));
+CREATE TABLE osmpairs AS
+SELECT id, oid, olat, olng, tier, chain, 111320 * sqrt(pow(olat - rlat, 2) + pow((olng - rlng) * cos(radians(rlat)), 2)) AS d FROM (
+  SELECT r.id, k.oid, k.lat AS olat, k.lng AS olng, r.lat AS rlat, r.lng AS rlng, 0 AS tier, r.chain
+  FROM rowkeys r JOIN osmkeys k ON k.sk = r.sk
+  WHERE abs(k.lat - r.lat) < 0.0015 AND abs(k.lng - r.lng) < 0.002
+  UNION ALL
+  SELECT r.id, k.oid, k.lat, k.lng, r.lat, r.lng, 1 AS tier, r.chain
+  FROM rowkeys r JOIN rowcore rc ON rc.id = r.id JOIN osmcore oc ON oc.ck = rc.ck JOIN osmkeys k ON k.oid = oc.oid
+  WHERE k.sk <> r.sk AND abs(k.lat - r.lat) < 0.0015 AND abs(k.lng - r.lng) < 0.002
+);
+CREATE TABLE osm_snap AS
+SELECT id, olat, olng FROM (
+  SELECT *, row_number() OVER (PARTITION BY id ORDER BY tier, d, oid) AS rr,
+            row_number() OVER (PARTITION BY oid ORDER BY tier, d, id) AS rn
+  FROM osmpairs WHERE d <= 120 OR NOT chain
+) WHERE rr = 1 AND rn = 1;
+SELECT (SELECT count(*) FROM osm_snap o JOIN osmpairs p USING (id) WHERE p.olat = o.olat AND p.olng = o.olng AND p.tier = 1) AS osm_snaps_core_name,
+       (SELECT count(*) FROM osm_snap o JOIN osmpairs p USING (id) WHERE p.olat = o.olat AND p.olng = o.olng AND p.d < 30) AS osm_snaps_under_30m,
+       (SELECT count(*) FROM osm_snap o JOIN osmpairs p USING (id) WHERE p.olat = o.olat AND p.olng = o.olng AND p.d > 120) AS osm_snaps_over_120m;
+-- English names travel with the NAME pairing, nearest pair per row (no mutual-best needed: a name
+-- is not a position, and two branches of one chain share their English name anyway).
+INSERT INTO names_en
+SELECT id, en FROM (
+  SELECT p.id, e.en, row_number() OVER (PARTITION BY p.id ORDER BY p.tier, p.d) AS rn
+  FROM osmpairs p JOIN osmen e ON e.oid = p.oid
+) WHERE rn = 1 AND id NOT IN (SELECT id FROM names_en);
+-- CHAINS SHARE THEIR NAME: one OSM node tagging "ドトールコーヒーショップ" as "Doutor Coffee Shop"
+-- names every branch in the region. The dictionary keeps a name only when OSM agrees on its
+-- English form (the most common spelling holds at least two thirds of its nodes). A row takes it
+-- on its whole snap key, or on a dictionary key that STARTS its name ("ファミリーマート新宿三丁目店"),
+-- when that key is at least 4 characters and is itself a chain name (2+ OSM nodes), so a short
+-- generic word like "カフェ" can never name everything that begins with it.
+CREATE TABLE endict AS
+SELECT sk, en, n FROM (
+  SELECT k.sk, e.en, count(*) AS c, sum(count(*)) OVER (PARTITION BY k.sk) AS n,
+    row_number() OVER (PARTITION BY k.sk ORDER BY count(*) DESC, e.en) AS rn
+  FROM osmen e JOIN osmkeys k ON k.oid = e.oid GROUP BY k.sk, e.en
+) WHERE rn = 1 AND c * 3 >= n * 2;
+INSERT INTO names_en
+SELECT id, en FROM (
+  SELECT r.id, d.en, row_number() OVER (PARTITION BY r.id ORDER BY (d.sk = r.sk) DESC, length(d.sk) DESC) AS rn
+  FROM rowkeys r JOIN scored s ON s.id = r.id JOIN endict d
+    ON d.sk = r.sk OR (length(d.sk) >= 4 AND d.n >= 2 AND starts_with(r.sk, d.sk))
+  WHERE nonlatin(s.name)
+) WHERE rn = 1 AND id NOT IN (SELECT id FROM names_en);
+SELECT (SELECT count(*) FROM osm_raw) AS osm_nodes, (SELECT count(*) FROM osm_snap) AS osm_snaps,
+  (SELECT count(DISTINCT id) FROM names_en) AS names_en, (SELECT count(*) FROM endict) AS en_dictionary;
+OSMSQL
+fi
+
+TAXMAP="$(cd "$(dirname "$0")" && pwd)/overture-taxonomy-map.csv"
+# -bail: a failed statement used to leave every later table missing and still exit 0, which the
+# workflow read as "no places" (every nightly bake from 2026-09-24 to 2026-09-27).
+duckdb -bail <<SQL
+.timer on
+INSTALL httpfs; LOAD httpfs; INSTALL spatial; LOAD spatial; SET s3_region='us-west-2';
+-- SPILL RATHER THAN DIE. A continent-sized box materializes millions of rows, and a runner that
+-- runs out of memory reports it as "the runner has received a shutdown signal" with no output at
+-- all, which reads like flaky infrastructure (Australia and its states, twice, 2026-09-18). A
+-- limit under the runner's 16 GB with somewhere to spill turns that into a slower bake.
+SET memory_limit = '11GB'; SET temp_directory = '$WORK/duckdb-spill';
+-- THE REST OF THE ADDRESS (user 2026-09-22: "a lot of the places don't have the full address, no
+-- zip, city or state"). 'addr' is the street line only, and it stays that way because several
+-- steps below use it as a JOIN KEY (tenant matching, the unit snap, the fuel-lot house number).
+-- The city / region / postcode travel in a side table 'locs' and are exported as the tile's 'loc',
+-- which the app appends. Formatted the way the country writes an address: "Davis, CA 95616" in
+-- the US, Canada and Australia (ZIP+4 cut to the ZIP), "London SW1A 1AA" in Britain and Ireland,
+-- "10115 Berlin" everywhere else. OSM and AllThePlaces rows rarely say their country, so they
+-- take the region's own most common Overture country.
+CREATE MACRO fmtloc(city, region, postcode, country) AS nullif(trim(CASE
+  WHEN upper(coalesce(country, 'US')) IN ('US', 'CA', 'AU') THEN concat_ws(', ', nullif(trim(city), ''),
+    nullif(trim(concat_ws(' ', nullif(trim(region), ''), nullif(split_part(trim(coalesce(postcode, '')), '-', 1), ''))), ''))
+  WHEN upper(country) IN ('GB', 'IE') THEN concat_ws(' ', nullif(trim(city), ''), nullif(trim(postcode), ''))
+  ELSE concat_ws(' ', nullif(trim(postcode), ''), nullif(trim(city), '')) END), '');
+CREATE TABLE raw AS SELECT $SEL, CAST(NULL AS VARCHAR) AS hours FROM $SRC
+  WHERE lng BETWEEN $W AND $E AND lat BETWEEN $S AND $N $BBOXPRED;
+CREATE TABLE taxmap AS SELECT * FROM read_csv('$TAXMAP', header = true, columns = {'new': 'VARCHAR', 'old': 'VARCHAR'});
+UPDATE raw SET category = taxmap.old FROM taxmap WHERE raw.category = taxmap.new;
+CREATE TABLE regioncc AS SELECT coalesce(mode(cc), 'US') AS cc FROM raw;
+CREATE TABLE locs AS SELECT id, loc FROM raw WHERE loc IS NOT NULL;
+-- ENGLISH NAMES (2026-09-22, user: a map of Japan read in Japanese with the app set to English).
+-- Overture carries no English name for a Japanese place (0 of 14,718 rows in central Tokyo); OSM
+-- has name:en or a romanized name on over half of them. A row whose own name is NOT Latin gets
+-- one here: an OSM row from its own tags, any other row from the OSM node it pairs with by name
+-- (the osm_snap pairs). Exported as the tile property 'name_en', which the app shows for a
+-- Latin-script UI. Nothing is stored for a name that is already Latin.
+CREATE TABLE names_en (id VARCHAR, en VARCHAR);
+CREATE MACRO nonlatin(n) AS regexp_matches(coalesce(n, ''), '[^\\x{0000}-\\x{024F}\\x{1E00}-\\x{1EFF}\\x{2000}-\\x{206F}\\x{20A0}-\\x{20CF}\\x{2100}-\\x{214F}]');
+ALTER TABLE raw DROP COLUMN loc;
+ALTER TABLE raw DROP COLUMN cc;
+-- The snap key is the WHOLE name, normalized, with a trailing store number dropped ("Safeway
+-- #1561" -> "safeway"): the two-word dedupe key is deliberately loose, and moving a point needs a
+-- tighter test than dropping a duplicate does (it dragged a campus onto its own outreach office,
+-- 2026-09-17).
+-- Since 2026-09-21 the key mirrors the app's core/util/PlaceNames.normalized: accents folded,
+-- parentheticals out, "&" read as "and", legal suffixes dropped, a possessive "'s" kept on its
+-- word, then punctuation, spaces and the trailing store number. "SpeeDee Oil Change & Auto
+-- Service", "Caffé Italia", "James W. Childress, DDS Inc." and "Nugget #12" key the way the tap
+-- resolve reads them, so a row the bake keeps is one the app can match.
+-- LETTERS OF EVERY SCRIPT (2026-09-22): the separator class was [^a-z0-9], so a Japanese, Chinese,
+-- Korean, Cyrillic, Greek, Hebrew, Arabic or Thai name keyed to NOTHING, and in every such region
+-- the OSM and chain-locator snaps, the same-business folds and the OSM duplicate test silently did
+-- nothing: OSM's copy of a shop Overture already had went in as a second pin (Shinjuku's tiles
+-- carried 6-10x Davis's features). The app's PlaceNames.PUNCT is [^\p{L}\p{N} ]; this matches it.
+CREATE MACRO snapkey(n) AS nullif(trim(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(
+  strip_accents(lower(coalesce(n, ''))),
+  '\\([^)]*\\)', ' ', 'g'), '''s\\b', 's', 'g'), '&', ' and ', 'g'), '[^\\p{L}\\p{N}]+', ' ', 'g'),
+  '\\b(llc|inc|corp|co|ltd|company|incorporated|corporation|pc|apc|llp|pllc)\\b', ' ', 'g'),
+  '[ ]+(no|num|store|unit|#)?[ ]*[0-9]{2,6}$', '')), '');
+-- SHARED TAG MAPPING. AllThePlaces and OpenStreetMap both describe a place with OSM tags, so the
+-- tag-to-category mapping and the "is this a business" test live here as macros and both sources
+-- use them; they used to be forty lines inside the AllThePlaces block.
+CREATE MACRO osmcat(props) AS (
+  CASE
+    WHEN json_extract_string(props, 'amenity') = 'fast_food' THEN 'fast_food_restaurant'
+    WHEN json_extract_string(props, 'amenity') = 'cafe' THEN 'coffee_shop'
+    WHEN json_extract_string(props, 'amenity') = 'fuel' THEN 'gas_station'
+    WHEN json_extract_string(props, 'amenity') = 'cinema' THEN 'movie_theater'
+    WHEN json_extract_string(props, 'amenity') = 'ice_cream' THEN 'ice_cream_shop'
+    WHEN json_extract_string(props, 'amenity') IN ('doctors', 'clinic') THEN 'doctor'
+    WHEN json_extract_string(props, 'amenity') = 'veterinary' THEN 'veterinarian'
+    WHEN json_extract_string(props, 'amenity') = 'charging_station' THEN 'ev_charging_station'
+    WHEN json_extract_string(props, 'amenity') = 'car_repair' THEN 'automotive_repair'
+    WHEN json_extract_string(props, 'amenity') = 'theatre' THEN 'theater'
+    WHEN json_extract_string(props, 'amenity') IS NOT NULL THEN json_extract_string(props, 'amenity')
+    WHEN json_extract_string(props, 'shop') IS NOT NULL THEN CASE json_extract_string(props, 'shop')
+      WHEN 'supermarket' THEN 'supermarket' WHEN 'convenience' THEN 'convenience_store' WHEN 'department_store' THEN 'department_store'
+      WHEN 'hardware' THEN 'hardware_store' WHEN 'doityourself' THEN 'home_improvement_store' WHEN 'electronics' THEN 'electronics'
+      WHEN 'furniture' THEN 'furniture_store' WHEN 'florist' THEN 'florist' WHEN 'laundry' THEN 'laundromat' WHEN 'dry_cleaning' THEN 'dry_cleaner'
+      WHEN 'hairdresser' THEN 'hair_salon' WHEN 'beauty' THEN 'beauty_salon' WHEN 'jewelry' THEN 'jewelry_store' WHEN 'books' THEN 'bookstore'
+      WHEN 'pet' THEN 'pet_store' WHEN 'clothes' THEN 'clothing_store' WHEN 'shoes' THEN 'shoe_store' WHEN 'toys' THEN 'toy_store'
+      WHEN 'bicycle' THEN 'bicycle_shop' WHEN 'alcohol' THEN 'liquor_store' WHEN 'tobacco' THEN 'tobacco_shop' WHEN 'sports' THEN 'sporting_goods'
+      WHEN 'mall' THEN 'shopping_center' WHEN 'wholesale' THEN 'wholesale_store' WHEN 'variety_store' THEN 'discount_store' WHEN 'car' THEN 'car_dealer'
+      WHEN 'car_repair' THEN 'automotive_repair' WHEN 'car_parts' THEN 'auto_parts_store' WHEN 'chemist' THEN 'drugstore' WHEN 'optician' THEN 'optometrist'
+      ELSE (json_extract_string(props, 'shop')) || '_store' END
+    WHEN json_extract_string(props, 'tourism') IN ('hotel', 'motel', 'hostel') THEN json_extract_string(props, 'tourism')
+    WHEN json_extract_string(props, 'tourism') = 'guest_house' THEN 'bed_and_breakfast'
+    WHEN json_extract_string(props, 'tourism') = 'museum' THEN 'museum'
+    WHEN json_extract_string(props, 'leisure') = 'fitness_centre' THEN 'gym'
+    WHEN json_extract_string(props, 'healthcare') IS NOT NULL THEN 'medical_center'
+    WHEN json_extract_string(props, 'office') IS NOT NULL THEN (json_extract_string(props, 'office')) || '_office'
+    ELSE NULL END);
+CREATE MACRO isbiz(props) AS ((json_extract_string(props, 'shop') IS NOT NULL
+    OR json_extract_string(props, 'tourism') IN ('hotel', 'motel', 'hostel', 'guest_house', 'museum')
+    OR json_extract_string(props, 'leisure') = 'fitness_centre'
+    OR json_extract_string(props, 'healthcare') IS NOT NULL
+    OR json_extract_string(props, 'office') IN ('insurance', 'financial_advisor', 'estate_agent', 'tax_advisor', 'lawyer', 'accountant', 'travel_agent')
+    OR json_extract_string(props, 'amenity') IN ('restaurant', 'fast_food', 'cafe', 'bar', 'pub', 'ice_cream', 'fuel', 'pharmacy', 'bank', 'dentist', 'doctors', 'clinic',
+      'veterinary', 'cinema', 'car_wash', 'car_rental', 'car_repair', 'post_office', 'charging_station', 'gym', 'hospital', 'childcare', 'kindergarten',
+      'coworking_space', 'theatre', 'nightclub', 'food_court', 'bureau_de_change', 'money_transfer', 'driving_school', 'language_school',
+      'music_school', 'dancing_school', 'library', 'marketplace', 'bicycle_rental')));
+-- The first two significant words of a name, the app's own namesAgree rule in SQL form.
+-- A name with no two-letter Latin word (Japanese, Cyrillic, ...) keys on its whole snap key: the
+-- two-word rule below only ever saw [a-z0-9], so those names used to key to '' and never deduped.
+CREATE MACRO nkey(n) AS CASE WHEN NOT regexp_matches(lower(coalesce(n, '')), '[a-z0-9]{2,}') THEN coalesce(snapkey(n), '') ELSE trim(regexp_extract(regexp_replace(lower(n), '[^a-z0-9 ]', ' ', 'g'), '\\b([a-z0-9]{2,})\\b', 1) || ' ' ||
+  regexp_extract(regexp_replace(lower(n), '[^a-z0-9 ]', ' ', 'g'), '\\b[a-z0-9]{2,}\\b(?: [a-z0-9] )* +\\b([a-z0-9]{2,})\\b', 1)) END;
+$ATP_SQL
+$OSM_BIZ_SQL
+CREATE TABLE marks (id VARCHAR);
+$MARKS_SQL
+CREATE TABLE IF NOT EXISTS markwiki (id VARCHAR);
+CREATE TABLE IF NOT EXISTS marksize (id VARCHAR, b DOUBLE);
+CREATE TABLE IF NOT EXISTS markfame (id VARCHAR, f DOUBLE);
+CREATE TABLE IF NOT EXISTS markdupes (id VARCHAR, rid VARCHAR, wiki BOOLEAN);
+CREATE TABLE IF NOT EXISTS markbest (id VARCHAR, rid VARCHAR, wiki BOOLEAN);
+-- ONE ROW PER BUSINESS (user 2026-09-21, "two POIs that really should be one"). Overture itself
+-- carries the same business twice (a gas station under "Chevron" and "Chevron Station Davis", a
+-- shop under "SpeeDee" and "SpeeDee-Midas", a store and the counter inside it named after the
+-- store), and the source dedupes above only ever compared a NEW source against what was there.
+-- Rows with the same snap key within ~60 m collapse onto one leader: not a kiosk category, then
+-- the higher confidence, then the row that knows more (address, phone, website, hours). A hash
+-- join on the key with the box as the residual, never a correlated lookup (state-scale rule).
+-- The row standing for an OSM landmark (markbest) leads whatever it folds with, in both steps.
+CREATE TABLE dupk AS SELECT id, lat, lng, sk, confidence, kiosk, fields, (id IN (SELECT rid FROM markbest))::INT AS mark FROM (
+  SELECT id, lat, lng, snapkey(name) AS sk, confidence,
+    (CASE WHEN category IN ('rental_kiosks','bank_equipment_service','money_transfer_services','atms','key_and_locksmith','vending_machine','photo_booth') THEN 1 ELSE 0 END) AS kiosk,
+    ((addr IS NOT NULL)::INT + (phone IS NOT NULL)::INT + (website IS NOT NULL)::INT + (hours IS NOT NULL)::INT) AS fields
+  -- OSM landmarks are already deduplicated against everything (markdupes): the name key strips
+  -- "Corporation", so Bryant Park folded into "Bryant Park Corporation", a charity office, and lost.
+  FROM raw WHERE id NOT IN (SELECT id FROM marks)
+  UNION ALL
+  -- A FORECOURT IS ONE PER LOT: two fuel rows with one house number within the box are one station
+  -- named after different things (the brand and the shop inside it). The NUMBER, not the street
+  -- line: the two rows spell the same road three ways ("State Route 113 #1", "SR-113", "STATE RTE 113").
+  SELECT id, lat, lng, 'fuel@' || regexp_extract(addr, '^([0-9]+)', 1) AS sk, confidence, 0 AS kiosk,
+    ((addr IS NOT NULL)::INT + (phone IS NOT NULL)::INT + (website IS NOT NULL)::INT + (hours IS NOT NULL)::INT) AS fields
+  FROM raw WHERE category = 'gas_station' AND addr IS NOT NULL AND regexp_matches(addr, '^[0-9]')
+) WHERE sk IS NOT NULL AND sk <> '';
+CREATE TABLE dupleader AS
+SELECT a.id, first(b.id ORDER BY b.mark DESC, b.kiosk, b.confidence DESC, b.fields DESC, b.id) AS leader
+FROM dupk a JOIN dupk b ON b.sk = a.sk AND abs(b.lat - a.lat) < 0.00055 AND abs(b.lng - a.lng) < 0.0007
+GROUP BY a.id;
+DELETE FROM raw WHERE id IN (SELECT id FROM dupleader WHERE id <> leader);
+SELECT (SELECT count(*) FROM dupleader WHERE id <> leader) AS same_business_rows_dropped;
+-- THE VARIANT FAMILY (2026-09-22): "Chevron Gas Station" beside "Chevron", "Walgreens Pharmacy"
+-- beside "Walgreens", "Starbucks Coffee Company" beside "Starbucks" are one business whose names
+-- differ only by GENERIC words. The core key is the snap key minus the app's generic word list
+-- (tools/place-generic-words.txt, pinned to core/util/PlaceNames.GENERIC by a unit test); rows
+-- with the same non-empty core key within ~60 m fold onto the leader the same way. A key that is
+-- only a street number ("38th") or a single short word is not a name and is left out, which is
+-- the app's strong-core rule in SQL.
+-- ONE NAME MUST CONTAIN THE OTHER (2026-10-04): the two rows fold only when every word of one
+-- name is in the other, i.e. they differ by ADDED words. Sharing a core was not enough: "state"
+-- and "building" are generic, so the Empire State Building's core was "empire", it folded into
+-- "Empire Beauty School" a few doors down, and New York had no Empire State Building at all.
+CREATE TABLE generic AS SELECT w FROM read_csv('$ROOT/tools/place-generic-words.txt', header = false, columns = {'w': 'VARCHAR'});
+-- (No lambda here: DuckDB refuses a subquery inside one, so the tokens are unnested and the
+-- generic ones anti-joined away, then re-joined in order.)
+CREATE TABLE corek AS
+WITH toks AS (
+  SELECT r.id, r.lat, r.lng, r.confidence, r.category, r.addr, r.phone, r.website, r.hours, r.tl, r.mark, t.tok, t.i
+  FROM (SELECT *, string_split(snapkey(name), ' ') AS tl, (id IN (SELECT rid FROM markbest))::INT AS mark FROM raw WHERE snapkey(name) IS NOT NULL AND id NOT IN (SELECT id FROM marks)) r,
+       unnest(r.tl) WITH ORDINALITY AS t(tok, i)
+  WHERE t.tok <> '' AND t.tok NOT IN (SELECT w FROM generic)
+)
+SELECT id, any_value(lat) AS lat, any_value(lng) AS lng, string_agg(tok, ' ' ORDER BY i) AS ck, any_value(confidence) AS confidence,
+  any_value(CASE WHEN category IN ('rental_kiosks','bank_equipment_service','money_transfer_services','atms','key_and_locksmith','vending_machine','photo_booth') THEN 1 ELSE 0 END) AS kiosk,
+  any_value((addr IS NOT NULL)::INT + (phone IS NOT NULL)::INT + (website IS NOT NULL)::INT + (hours IS NOT NULL)::INT) AS fields,
+  any_value(list_filter(tl, x -> x <> '')) AS tl, any_value(mark) AS mark
+FROM toks GROUP BY id
+HAVING NOT regexp_matches(string_agg(tok, ' ' ORDER BY i), '^[0-9]+(st|nd|rd|th)?$')
+   AND (length(string_agg(tok, ' ' ORDER BY i)) >= 5 OR string_agg(tok, ' ' ORDER BY i) LIKE '% %');
+CREATE TABLE coreleader AS
+SELECT a.id, first(b.id ORDER BY b.mark DESC, b.kiosk, b.confidence DESC, b.fields DESC, b.id) AS leader
+FROM corek a JOIN corek b ON b.ck = a.ck AND abs(b.lat - a.lat) < 0.00055 AND abs(b.lng - a.lng) < 0.0007
+  AND (list_has_all(a.tl, b.tl) OR list_has_all(b.tl, a.tl))
+GROUP BY a.id;
+DELETE FROM raw WHERE id IN (SELECT id FROM coreleader WHERE id <> leader);
+SELECT (SELECT count(*) FROM coreleader WHERE id <> leader) AS same_business_variant_rows_dropped;
+$FSQ_SQL
+$GONE_SQL
+CREATE TABLE scored AS
+SELECT *,
+  CASE
+    -- An airport is a landmark; a seaplane base, a heliport or an airstrip in the same category is not
+    -- (#648: a seaplane base drew beside the city's real airports from a regional view).
+    WHEN category IN ('hospital','university','college_university','stadium_arena','museum','zoo','amusement_park','shopping_center','supermarket','department_store','grocery_store','convention_center','casino','aquarium') OR (category = 'airport' AND NOT regexp_matches(lower(coalesce(name, '')), 'seaplane|heliport|helipad|airstrip|airfield')) THEN 4.5
+    WHEN category IN ('hotel','accommodation','pharmacy','bank','movie_theater','gym','library','church_cathedral','bowling_alley','hardware_store','car_dealer','furniture_store','electronics','sporting_goods','home_improvement_store','wholesale_store','discount_store') THEN 3.2
+    WHEN category IS NULL THEN 1.6
+    -- OSM landmarks (the one-set bake): an attraction or a town hall is a place people navigate
+    -- by; a park, a school, a place of worship sits with the everyday services.
+    WHEN category IN ('attraction','viewpoint','landmark_and_historical_building','city_hall','courthouse','theater','art_gallery','cultural_center') THEN 3.2
+    WHEN category IN ('park','garden','nature_reserve','water_park','place_of_worship','school','police_station','fire_station','community_center','sports_club') THEN 2.2
+    -- FOOD above the other everyday services, OFFICES at the bottom (user 2026-09-22): on a
+    -- crowded block the budget goes to places people walk into, not the tenant list upstairs.
+    WHEN category LIKE '%restaurant%' OR category IN ('coffee_shop','cafe','bar','pub','fast_food_restaurant','bakery','ice_cream_shop','brewery','food_court','deli','sandwich_shop','dessert_shop','juice_bar','tea_room') THEN 2.6
+    WHEN category LIKE '%office%' OR category LIKE '%agency%' OR category LIKE '%consult%' OR category IN ('lawyer','attorney','accountant','professional_services','insurance_agency','real_estate_agent','real_estate','financial_service','financial_advising','corporate_office','business','it_service_and_computer_repair','employment_agencies','marketing_agency','advertising_agency','notary_public','tax_services','business_management_services') THEN 0.5
+    WHEN category IN ('winery','gas_station','ev_charging_station','automotive_repair','car_wash','pet_store','bookstore','clothing_store','shoe_store','jewelry_store','florist','liquor_store','tobacco_shop','toy_store','bicycle_shop','dentist','veterinarian','optometrist','urgent_care_clinic','post_office','atms','laundromat','dry_cleaner','barber','hair_salon','beauty_salon','nail_salon','spa','tattoo') THEN 2.2
+    ELSE 1.0
+  END
+  + CASE WHEN brand IS NOT NULL AND brand <> '' THEN 1.6 ELSE 0 END
+  + CASE WHEN website IS NOT NULL THEN 0.5 ELSE 0 END
+  + CASE WHEN phone IS NOT NULL THEN 0.4 ELSE 0 END
+  + CASE WHEN addr IS NOT NULL THEN 0.2 ELSE 0 END
+  + (COALESCE(confidence, 0.5) - 0.5) * 1.6 AS prominence,
+  CASE
+    WHEN category LIKE '%gas_station%' OR category LIKE '%charging%' THEN 'fuel'
+    WHEN category LIKE '%restaurant%' OR category IN ('coffee_shop','cafe','bar','pub','bakery','ice_cream_shop','brewery','winery','food_court','deli','juice_bar','tea_room','sandwich_shop','donut_shop','bagel_shop','dessert_shop','frozen_yogurt_shop','cupcake_shop','smoothie_shop','bubble_tea','taqueria','diner','steakhouse','cafeteria','buffet') OR category LIKE '%food%' THEN 'food'
+    WHEN category IN ('hotel','accommodation','motel','bed_and_breakfast','hostel','resort') THEN 'lodging'
+    WHEN category IN ('hospital','pharmacy','dentist','veterinarian','optometrist','urgent_care_clinic','doctor','health_and_medical','diagnostic_services','physical_therapy','chiropractor','medical_center') OR category LIKE '%clinic%' OR category LIKE '%medical%' THEN 'health'
+    WHEN category LIKE '%parking%' THEN 'parking'
+    WHEN category IN ('park','garden','nature_reserve','water_park') THEN 'park'
+    WHEN category IN ('university','college_university','library','school','preschool','tutoring_center') OR category LIKE '%school%' THEN 'edu'
+    WHEN category IN ('museum','movie_theater','art_gallery','performing_arts','theater','zoo','aquarium','landmark_and_historical_building','cultural_center','attraction','viewpoint','amusement_park') THEN 'culture'
+    WHEN category IN ('gym','stadium_arena','bowling_alley','yoga_studio','sports_club','golf_course','climbing_gym','ice_skating_rink','martial_arts_club','swimming_pool') OR category LIKE '%fitness%' OR category LIKE '%sport%' THEN 'sport'
+    WHEN category IN ('bank','atms','post_office','police_station','fire_station','city_hall','courthouse','church_cathedral','mosque','synagogue','temple','place_of_worship','community_center','cemetery','government_office') OR category LIKE '%religious%' THEN 'civic'
+    WHEN category LIKE '%store%' OR category LIKE '%shop%' OR category IN ('supermarket','grocery_store','shopping_center','florist','laundromat','dry_cleaner','barber','hair_salon','beauty_salon','nail_salon','spa','car_dealer','automotive_repair','car_wash','hardware_store','electronics','furniture_store','tattoo','jewelry','retail','boutique','market') OR category LIKE '%salon%' THEN 'shop'
+    ELSE 'default'
+  END AS grp
+FROM raw
+WHERE name IS NOT NULL AND name <> ''
+  AND COALESCE(operating_status, 'open') <> 'permanently_closed'
+  AND COALESCE(confidence, 0.5) >= 0.4
+  AND (category IS NULL OR id LIKE 'osm:%' OR category NOT IN ('park','campus_building','apartments','housing_development','real_estate','transportation','bus_station','train_station','public_transportation','school','elementary_school','middle_school','high_school'))
+  AND NOT (category IS NULL AND website IS NULL);
+-- Rank by prominence inside a fine (~400 m) and a coarse (~1.6 km) cell. Longitude cells are
+-- widened by 1/cos(lat) so the cells stay roughly square away from the equator.
+-- A third, ~6.5 km cell (xrank) picks the landmarks Google still draws zoomed out to z11/z12:
+-- airports, hospitals, universities, stadiums, malls, zoos. Only the landmark categories qualify
+-- there, so a branded gas station never becomes a town's z11 marker.
+-- TENANTS (2026-09-15): a supermarket's pharmacy, its money-transfer counter, the optician inside
+-- the department store all carry the anchor's address and often the anchor's brand, and their
+-- own category prior + brand bonus let them outrank the store in a 400 m cell (a Safeway pharmacy
+-- drawn where the Safeway should be). A row at an anchor category's address, within ~200 m of
+-- it and not an anchor itself, loses 2 points, so the store wins the cell and the tenant fills in
+-- as you zoom.
+-- Address as a JOIN KEY: lowercased, with the unit part dropped ("2121 Cowell Blvd Ste B" and
+-- "2121 Cowell Blvd, Suite B" both become "2121 cowell blvd"). Exact string equality missed a
+-- department whose row carried the suite and the store's did not, which is how a Safeway Pharmacy
+-- kept outranking its own Safeway (user 2026-09-16).
+CREATE MACRO anorm(a) AS nullif(trim(regexp_replace(regexp_replace(lower(coalesce(a, '')), '[,#].*$', ''), '[ ]+(ste|suite|unit|apt|bldg|rm|room|no|fl|floor)[ .]*[a-z0-9-]*$', '')), '');
+-- The first word of a name, for the department test below.
+-- The anchor's first WORD, store number dropped: "Safeway", "SAFEWAY #1561" and "Safeway Store
+-- 1561" all key to "safeway", so a "Safeway Pharmacy" next door reads as its department however
+-- either row happens to be named (user 2026-09-16).
+CREATE MACRO nhead(n) AS nullif(lower(regexp_extract(coalesce(n, ''), '^[A-Za-z][A-Za-z.-]{2,}')), '');
+CREATE TABLE anchors AS
+SELECT id, name, brand, addr, lat, lng FROM scored
+WHERE category IN ('supermarket','grocery_store','department_store','shopping_center','hospital','university','college_university','hardware_store','home_improvement_store','wholesale_store','warehouse_club','sporting_goods','electronics','furniture_store');
+-- Which non-anchor rows are DEPARTMENTS of a nearby anchor. Three HASH JOINS, one per way a
+-- department shows itself (same normalized address, same brand, or a name that is the anchor's
+-- first word plus more), each with the ~200 m box as a residual, then DISTINCT ids. The first cut
+-- was one correlated EXISTS with the three tests OR-ed together, which cannot be hashed: it ran
+-- every row against every anchor, fine for Davis and effectively quadratic over a state (a world
+-- bake did 19 regions in 2.5 hours, 2026-09-16). DISTINCT, never a plain join onto the rows: a
+-- tenant can sit at more than one anchor, and a join duplicated the row once per match.
+CREATE TABLE tenants AS
+SELECT DISTINCT id FROM (
+  SELECT s.id FROM scored s JOIN anchors a ON anorm(s.addr) = anorm(a.addr)
+  WHERE s.id <> a.id AND abs(s.lat - a.lat) < 0.002 AND abs(s.lng - a.lng) < 0.003
+    AND (s.category IS NULL OR s.category NOT IN ('supermarket','grocery_store','department_store','shopping_center','hospital','university','college_university','hardware_store','home_improvement_store','wholesale_store','warehouse_club','sporting_goods','electronics','furniture_store'))
+  UNION ALL
+  SELECT s.id FROM scored s JOIN anchors a ON lower(s.brand) = lower(a.brand)
+  WHERE s.id <> a.id AND abs(s.lat - a.lat) < 0.002 AND abs(s.lng - a.lng) < 0.003
+    AND (s.category IS NULL OR s.category NOT IN ('supermarket','grocery_store','department_store','shopping_center','hospital','university','college_university','hardware_store','home_improvement_store','wholesale_store','warehouse_club','sporting_goods','electronics','furniture_store'))
+  UNION ALL
+  -- The store's OWN fuel station and its little shop, which carry the store's brand out in the
+  -- lot: they must not take the brand's icon off the store itself (user 2026-09-17, a Safeway
+  -- fuel kiosk drew as "Safeway" while the store showed only its counters). They keep their fuel
+  -- group, so the pumps still draw as fuel when you are close.
+  SELECT s.id FROM scored s JOIN anchors a ON lower(s.brand) = lower(a.brand)
+  WHERE s.id <> a.id AND abs(s.lat - a.lat) < 0.0025 AND abs(s.lng - a.lng) < 0.0035
+    AND s.category IN ('gas_station','convenience_store','ev_charging_station')
+  UNION ALL
+  SELECT s.id FROM scored s JOIN anchors a ON nhead(s.name) = nhead(a.name)
+  WHERE s.id <> a.id AND abs(s.lat - a.lat) < 0.0025 AND abs(s.lng - a.lng) < 0.0035
+    AND length(nhead(a.name)) >= 4 AND s.category IN ('gas_station','convenience_store','ev_charging_station')
+  UNION ALL
+  SELECT s.id FROM scored s JOIN anchors a ON nhead(s.name) = nhead(a.name)
+  WHERE s.id <> a.id AND abs(s.lat - a.lat) < 0.002 AND abs(s.lng - a.lng) < 0.003
+    AND length(nhead(a.name)) >= 4 AND lower(s.name) LIKE nhead(a.name) || ' %'
+    AND (s.category IS NULL OR s.category NOT IN ('supermarket','grocery_store','department_store','shopping_center','hospital','university','college_university','hardware_store','home_improvement_store','wholesale_store','warehouse_club','sporting_goods','electronics','furniture_store'))
+);
+-- KIOSKS AND COUNTERS (2026-09-17): a Redbox, a Coinstar, an ecoATM, a Western Union window or a
+-- key-cutting machine is a fixture INSIDE a shop, never a destination you navigate to, and at a
+-- Sacramento Safeway nine of them sat within 42 m of the store. They stay in the data (searchable,
+-- tappable) but never earn a browse-zoom icon.
+CREATE MACRO iskiosk(c, n) AS (
+  c IN ('rental_kiosks','bank_equipment_service','money_transfer_services','atms','key_and_locksmith','vending_machine','photo_booth')
+  OR lower(coalesce(n, '')) IN ('redbox','coinstar','ecoatm','western union','keyme locksmiths','keyme')
+);
+-- TWO ICONS, ONE NAME (user 2026-09-18). A brand's forecourt is often published under the BARE
+-- brand name, so the lot ends up with two icons labeled identically a few tens of meters apart:
+-- the store and the pumps. Demoting the forecourt does not help, because fuel is exempt from the
+-- tenant minzoom (you want pumps while driving), so both draw and a tap on "the store" is a coin
+-- toss. The forecourt keeps its own row and its own group; it just says which one it is. Only an
+-- EXACT name match is touched - a row already called "<brand> Fuel Station" is left alone.
+CREATE TABLE brandsame AS
+SELECT DISTINCT s.id, s.category FROM scored s JOIN anchors a ON lower(s.name) = lower(a.name)
+WHERE s.id <> a.id AND abs(s.lat - a.lat) < 0.0025 AND abs(s.lng - a.lng) < 0.0035
+  AND s.category IN ('gas_station', 'convenience_store', 'ev_charging_station');
+CREATE TABLE anchored AS
+SELECT s.* REPLACE (
+    CASE WHEN t.id IS NOT NULL AND s.id NOT IN (SELECT id FROM marks) AND s.id NOT IN (SELECT id FROM markwiki) THEN s.prominence - 2.0 ELSE s.prominence END AS prominence,
+    CASE
+      WHEN b.id IS NULL THEN s.name
+      WHEN b.category = 'gas_station' THEN s.name || ' Fuel'
+      WHEN b.category = 'ev_charging_station' THEN s.name || ' Charging'
+      ELSE s.name || ' Market'
+    END AS name),
+  -- A landmark is never a tenant: Grand Central and the Empire State Building shared addresses
+  -- with the anchors inside them and were held back to z17 as their "departments".
+  CASE WHEN (t.id IS NOT NULL OR iskiosk(s.category, s.name)) AND s.id NOT IN (SELECT id FROM marks) AND s.id NOT IN (SELECT id FROM markwiki) THEN 1 ELSE 0 END AS tenant
+FROM scored s LEFT JOIN tenants t ON t.id = s.id LEFT JOIN brandsame b ON b.id = s.id;
+-- STACKED POINTS (2026-09-15): Overture puts every tenant of a building on the same parcel point
+-- (17% of Davis rows share their point with another: medical suites, strip-mall tenants), and
+-- coincident icons collide at every zoom, so all but the top one never drew. Spread the stack on
+-- a small ring (about 8 to 20 m, golden-angle steps, best row stays put) so they separate at the
+-- zooms where a person is looking for one shop in a row of them.
+-- UNIT-LEVEL SNAP (2026-09-16). A stacked row has no coordinate of its own: Overture puts every
+-- tenant of a building on one parcel point, which usually sits at the lot's address out front.
+-- Overture's ADDRESSES theme does carry a point per unit ("APT 112", "STE B"), so a tenant whose
+-- own address names a unit can be put on its own door instead of an invented ring slot. Match on
+-- house NUMBER + UNIT within ~200 m and ignore the street name: a number plus a unit is
+-- effectively unique that close, and street abbreviations ("Blvd" vs "Boulevard") differ between
+-- the two themes. Rows that do not match keep the parcel point and fall through to the ring.
+-- Only STACKED rows are snapped; an unstacked place already has a real coordinate (measured
+-- 2026-09-16: Overture and AllThePlaces agree to a median 7.4 m on Davis chains).
+CREATE MACRO unitkey(a) AS nullif(upper(regexp_replace(regexp_extract(coalesce(a, ''), '(?i)(ste|suite|unit|apt|apartment|rm|room|no|#)[ .]*([a-z0-9-]+)[ ]*$', 2), '[^A-Za-z0-9]', '')), '');
+CREATE MACRO numkey(a) AS nullif(regexp_extract(coalesce(a, ''), '^[0-9]+'), '');
+$ADDR_SQL
+-- The chain-locator coordinate wins over Overture's parcel point (atp_snap), before the stack
+-- test: moving a row off the shared parcel point is exactly what takes it out of the stack.
+CREATE TABLE IF NOT EXISTS atp_snap (id VARCHAR, alat DOUBLE, alng DOUBLE);
+$OSM_SQL
+CREATE TABLE IF NOT EXISTS osm_snap (id VARCHAR, olat DOUBLE, olng DOUBLE);
+-- RANKING WITHOUT REVIEWS (user 2026-09-22). The density cap below needs a consistent order among
+-- the places competing for one cell, not a universal score, so agreement is the signal: a place
+-- that a second source ALSO lists (OSM's node pairs with it by name, or a chain's own locator
+-- matched it) is more likely real, current and worth the icon; one that OSM links to Wikidata is
+-- known. Added to prominence before the cells are ranked.
+CREATE TABLE IF NOT EXISTS osmpairs (id VARCHAR, oid VARCHAR, olat DOUBLE, olng DOUBLE, tier INTEGER, chain BOOLEAN, d DOUBLE);
+CREATE TABLE IF NOT EXISTS osmwiki (oid VARCHAR);
+CREATE TABLE IF NOT EXISTS atpfill (rid VARCHAR);
+CREATE TABLE IF NOT EXISTS markwiki (id VARCHAR);
+CREATE TABLE IF NOT EXISTS marksize (id VARCHAR, b DOUBLE);
+CREATE TABLE IF NOT EXISTS markfame (id VARCHAR, f DOUBLE);
+CREATE TABLE srcbonus AS
+SELECT id, 0.6 * max(osm) + 0.6 * max(atp) + 0.8 * max(wiki) AS b FROM (
+  SELECT id, 1 AS osm, 0 AS atp, 0 AS wiki FROM osmpairs WHERE d <= 120 OR NOT chain
+  UNION ALL SELECT p.id, 0, 0, 1 FROM osmpairs p JOIN osmwiki w ON w.oid = p.oid
+  UNION ALL SELECT s.id, 0, 0, 1 FROM scored s JOIN osmwiki w ON s.id = 'osm:' || w.oid
+  -- A landmark OSM links to Wikidata (Bryant Park, Grand Central, a city hall) is exactly what a
+  -- crowded view should keep: without this Midtown's shops took every slot and those arrived at z17.
+  UNION ALL SELECT id, 0, 0, 2.5 FROM markwiki
+  UNION ALL SELECT rid, 0, 1, 0 FROM atpfill
+  UNION ALL SELECT id, 0, 1, 0 FROM atp_snap
+) GROUP BY id;
+-- OSM first, then the chain locator, then Overture's own point.
+CREATE TABLE located AS
+SELECT a.* REPLACE (
+  CASE WHEN a.tenant = 1 THEN a.lat ELSE COALESCE(o.olat, p.alat, a.lat) END AS lat,
+  CASE WHEN a.tenant = 1 THEN a.lng ELSE COALESCE(o.olng, p.alng, a.lng) END AS lng
+) FROM anchored a LEFT JOIN atp_snap p ON p.id = a.id LEFT JOIN osm_snap o ON o.id = a.id;
+CREATE TABLE stacked AS
+SELECT *, count(*) OVER (PARTITION BY round(lat, 5), round(lng, 5)) > 1 AS in_stack FROM located;
+-- A HASH JOIN on (number, unit) with the distance as a residual and the nearest candidate per
+-- place by row_number - not a correlated LATERAL lookup per row, which is quadratic at state scale.
+CREATE TABLE snapkeys AS
+SELECT id, lat, lng, numkey(addr) AS knum, unitkey(addr) AS kunit FROM stacked
+WHERE in_stack AND numkey(addr) IS NOT NULL AND unitkey(addr) IS NOT NULL;
+CREATE TABLE snapcand AS
+SELECT k.id, a.alat, a.alng,
+  row_number() OVER (PARTITION BY k.id ORDER BY abs(a.alat - k.lat) + abs(a.alng - k.lng)) AS rn
+FROM snapkeys k JOIN addrpts a ON a.anum = k.knum AND a.aunit = k.kunit
+WHERE abs(a.alat - k.lat) < 0.002 AND abs(a.alng - k.lng) < 0.003;
+CREATE TABLE snapped AS
+SELECT s.* REPLACE (COALESCE(c.alat, s.lat) AS lat, COALESCE(c.alng, s.lng) AS lng)
+FROM stacked s LEFT JOIN (SELECT id, alat, alng FROM snapcand WHERE rn = 1) c ON c.id = s.id;
+SELECT count(*) FILTER (WHERE in_stack) AS stacked_rows,
+       count(*) FILTER (WHERE in_stack AND unitkey(addr) IS NOT NULL) AS stacked_with_unit,
+       (SELECT count(*) FROM snapped s JOIN stacked t USING (id) WHERE s.lat <> t.lat OR s.lng <> t.lng) AS snapped_to_unit
+FROM stacked;
+-- Whatever still shares a point after the snap gets the ring, as before.
+CREATE TABLE spread AS
+SELECT * EXCLUDE (in_stack) REPLACE (
+  lat + CASE WHEN dup = 0 THEN 0 ELSE (8 + least(dup, 6) * 2) / 111320.0 * sin(dup * 2.399963) END AS lat,
+  lng + CASE WHEN dup = 0 THEN 0 ELSE (8 + least(dup, 6) * 2) / (111320.0 * cos(radians(lat))) * cos(dup * 2.399963) END AS lng
+) FROM (
+  SELECT *, row_number() OVER (PARTITION BY round(lat, 5), round(lng, 5) ORDER BY prominence DESC, id) - 1 AS dup FROM snapped
+);
+UPDATE spread SET prominence = spread.prominence + sb.b FROM srcbonus sb WHERE spread.id = sb.id;
+UPDATE spread SET prominence = spread.prominence + ms.b FROM (SELECT id, max(b) AS b FROM marksize GROUP BY id) ms WHERE spread.id = ms.id;
+-- UNCONFIRMED (2026-10-06, a forum report from the District of Columbia). Overture publishes its own doubt as
+-- confidence, and a row under 0.75 that NO second source lists (no OpenStreetMap pair, no chain
+-- locator, no Wikidata link, no mapped outline) is where the stale and the invented live: an
+-- aquarium that closed in 2013 inside a federal building, a scavenger hunt filed as an amusement
+-- park, a testing center as a university. The category prior alone gave those landmark rank
+-- (7 and up) and a label from a city view. Such a row keeps its place on the map but is ranked
+-- as an ordinary one and is never a landmark. OSM and chain rows carry 0.8 and 0.85, so only
+-- Overture's own rows can qualify.
+CREATE TABLE unconfirmed AS
+SELECT id FROM spread
+WHERE COALESCE(confidence, 0.5) < 0.75
+  AND id NOT IN (SELECT id FROM srcbonus WHERE b > 0)
+  AND id NOT IN (SELECT id FROM marksize);
+-- NOT a rule here: "a chain row with no point of its brand in the chain's own locator nearby is a
+-- closed branch". Measured on the District of Columbia box 2026-10-06 and rejected: the locator
+-- data is not complete per brand (it had 7 points for a brand with 11 open stores in the box, 44
+-- for a pharmacy chain with 55), so the rule ranked open stores down with the closed ones.
+UPDATE spread SET prominence = least(prominence, 3.0) WHERE id IN (SELECT id FROM unconfirmed);
+SELECT (SELECT count(*) FROM unconfirmed) AS unconfirmed_rows_capped, (SELECT count(*) FROM spread) AS of_rows;
+CREATE TABLE ranked AS
+SELECT * EXCLUDE (dup),
+  -- ~100 m cell: the high-zoom icon budget. rank's 400 m cell is the whole screen at z17.5, so a
+  -- cap on it never opens up as you zoom in; a finer cell lets more icons in the closer you get.
+  row_number() OVER (PARTITION BY floor(lat / 0.0009), floor(lng * cos(radians(lat)) / 0.0009) ORDER BY prominence DESC, id) AS frank,
+  row_number() OVER (PARTITION BY floor(lat / 0.0036), floor(lng * cos(radians(lat)) / 0.0036) ORDER BY prominence DESC, id) AS rank,
+  row_number() OVER (PARTITION BY floor(lat / 0.0144), floor(lng * cos(radians(lat)) / 0.0144) ORDER BY prominence DESC, id) AS crank,
+  -- The ~6.5 km cell's anchors (z11/z12) go to the most FAMOUS landmarks, not the highest category
+  -- prior: the prior made a university campus and a library Berlin Mitte's widest-zoom points.
+  row_number() OVER (PARTITION BY floor(lat / 0.058), floor(lng * cos(radians(lat)) / 0.058) ORDER BY landmark DESC, coalesce(notab, 1.0) + coalesce(fame, 0) DESC, prominence DESC, id) AS xrank,
+  -- Landmarks get their OWN budget per ~1.6 km cell: in Midtown every slot of the shared one went to
+  -- shops, and Bryant Park, Grand Central and the Empire State Building arrived at z17.
+  -- ...ordered by NOTABILITY (outline size, Wikidata, languages named in), not the category prior: downtown Davis has
+  -- ~30 landmarks per cell, and the campus buildings' "university" prior put the town's central park
+  -- 29th.
+  row_number() OVER (PARTITION BY landmark, floor(lat / 0.0144), floor(lng * cos(radians(lat)) / 0.0144) ORDER BY coalesce(notab, 1.0) + coalesce(fame, 0) DESC, prominence DESC, id) AS lrank
+FROM (
+  SELECT *, CASE WHEN id IN (SELECT id FROM unconfirmed) THEN 0
+    WHEN category IN ('hospital','university','college_university','stadium_arena','shopping_center','zoo','amusement_park','convention_center','casino','aquarium','museum') OR (category = 'airport' AND NOT regexp_matches(lower(coalesce(name, '')), 'seaplane|heliport|helipad|airstrip|airfield')) THEN 1
+    -- Linked to Wikidata, or an outline of a hectare or more (a town's central park has no
+    -- Wikidata link and still anchors the map).
+    WHEN (id IN (SELECT id FROM markwiki) OR id IN (SELECT id FROM marksize WHERE b >= 2.0) OR id IN (SELECT id FROM markfame WHERE f >= 1.5))
+      AND category IN ('park','garden','nature_reserve','attraction','landmark_and_historical_building','city_hall','place_of_worship','theater','viewpoint',
+        'church_cathedral','temple','mosque','synagogue','shrine','government_office','museum','art_gallery','library','stadium_arena') THEN 1
+    ELSE 0 END AS landmark
+  FROM spread LEFT JOIN (
+    SELECT id, max(n) AS notab FROM (
+      SELECT id, b AS n FROM marksize UNION ALL SELECT id, 1.5 AS n FROM markwiki
+      UNION ALL SELECT s.id, coalesce(z.b, 0) + 1.5 FROM markwiki s LEFT JOIN marksize z USING (id)
+    ) GROUP BY id
+  ) nb USING (id)
+  LEFT JOIN (SELECT id, max(f) AS fame FROM markfame GROUP BY id) fm USING (id)
+);
+-- The minzoom rule, computed once so the tiles and the landmark report below read the same value.
+CREATE TABLE zooms AS SELECT id, CASE
+      -- A counter or a department inside a shop belongs to that shop until you are right on top
+      -- of it; it never competes with its own store for the block's icon.
+      -- ...except a fuel station, which is a destination of its own while driving.
+      WHEN tenant = 1 AND grp <> 'fuel' THEN 17
+      WHEN landmark = 1 AND xrank = 1 THEN 11
+      WHEN landmark = 1 AND xrank <= 3 THEN 12
+      WHEN landmark = 1 AND lrank <= 4 THEN 14
+      WHEN landmark = 1 AND lrank <= 10 THEN 15
+      WHEN crank = 1 AND prominence >= 6 THEN 13
+      -- THE CELL BUDGET IS A CAP (2026-09-22). "Important" used to skip the budget outright, and in
+      -- a dense city nearly every shop scores important: a Shinjuku z16 tile carried 963 places
+      -- (Davis: 86) and a pan over it ran 10-14 fps on a 4a. Importance now buys a few places
+      -- MORE per cell, never an unlimited number; everything still arrives by z17 (dots).
+      WHEN crank <= 2 OR (prominence >= 5 AND crank <= 6) THEN 14
+      WHEN rank <= 3 OR (prominence >= 4.5 AND rank <= 8) THEN 15
+      WHEN rank <= 12 OR (prominence >= 3.5 AND rank <= 24) THEN 16
+      ELSE 17 END AS mz FROM ranked;
+-- LANDMARK REPORT (2026-09-22): nobody can look at every city, so each bake says how its landmarks
+-- fared. A landmark with a Wikidata link (or an outline of a hectare or more) that only reaches
+-- the map at z16 or later is a sign the budget or the notability order misfired somewhere.
+.mode list
+SELECT 'LANDMARKS', count(*) AS landmarks,
+  count(*) FILTER (WHERE z.mz <= 15) AS by_z15,
+  round(100.0 * count(*) FILTER (WHERE z.mz <= 15) / greatest(count(*), 1), 1) AS pct_by_z15
+FROM ranked r JOIN zooms z USING (id) WHERE r.landmark = 1;
+SELECT 'LATE', z.mz, r.name, r.category, round(coalesce(r.notab, 0) + coalesce(r.fame, 0), 1) FROM ranked r JOIN zooms z USING (id)
+WHERE r.landmark = 1 AND z.mz > 15 ORDER BY coalesce(r.notab, 0) + coalesce(r.fame, 0) DESC, r.prominence DESC LIMIT 10;
+.mode duckbox
+-- NEIGHBOR LOCALITY (2026-09-23, user: offline, OSM places showed "123 Main St" and no city,
+-- state or ZIP). OSM tags many places with only the number and street, and the rows that come
+-- from it (and a few locator rows) reach here with no loc. Such a row borrows the loc of the
+-- nearest row that has one within ~300 m, a postcode-bearing one first, so a street line reads
+-- as a full address. A grid join (0.004 degree cells and their neighbors), never a correlated
+-- lookup: see "Bake joins must be HASH joins". Rows with nothing nearby stay as they were.
+CREATE TABLE lxall AS SELECT id, any_value(loc) AS loc FROM locs GROUP BY id;
+CREATE TABLE haveloc AS SELECT r.id, r.lat, r.lng, x.loc,
+    CAST(floor(r.lat / 0.004) AS BIGINT) AS cy, CAST(floor(r.lng / 0.004) AS BIGINT) AS cx,
+    regexp_matches(x.loc, '[0-9]') AS zip
+  FROM ranked r JOIN lxall x USING (id);
+CREATE TABLE needloc AS SELECT r.id, r.lat, r.lng,
+    CAST(floor(r.lat / 0.004) AS BIGINT) AS cy, CAST(floor(r.lng / 0.004) AS BIGINT) AS cx
+  FROM ranked r LEFT JOIN lxall x USING (id) WHERE x.id IS NULL;
+CREATE TABLE cellofs AS SELECT * FROM (VALUES (-1), (0), (1)) t(d);
+CREATE TABLE needkeys AS SELECT n.id, n.lat, n.lng, n.cy + a.d AS ky, n.cx + b.d AS kx
+  FROM needloc n CROSS JOIN cellofs a CROSS JOIN cellofs b;
+CREATE TABLE locfill AS SELECT id, loc FROM (
+  SELECT k.id, h.loc, row_number() OVER (PARTITION BY k.id ORDER BY h.zip DESC,
+      pow(k.lat - h.lat, 2) + pow((k.lng - h.lng) * cos(radians(k.lat)), 2)) AS rn
+  FROM needkeys k JOIN haveloc h ON h.cy = k.ky AND h.cx = k.kx
+  WHERE pow(k.lat - h.lat, 2) + pow((k.lng - h.lng) * cos(radians(k.lat)), 2) < pow(0.0027, 2)
+) WHERE rn = 1;
+INSERT INTO locs SELECT id, loc FROM locfill;
+.mode list
+SELECT 'LOCFILL', (SELECT count(*) FROM needloc) AS without_loc, (SELECT count(*) FROM locfill) AS filled;
+.mode duckbox
+COPY (
+  SELECT json_object(
+    'type', 'Feature',
+    'tippecanoe', json_object('minzoom', mz),
+    'geometry', json_object('type', 'Point', 'coordinates', [lng, lat]),
+    'properties', json_object(
+      'id', id, 'name', name, 'name_en', name_en,
+      'class', COALESCE(upper(substr(replace(category, '_', ' '), 1, 1)) || substr(replace(category, '_', ' '), 2), 'Place'),
+      'group', grp, 'icon', 'vela-poi-' || grp, 'prominence', round(prominence, 2), 'confidence', round(COALESCE(confidence, 0.5), 2),
+      'rank', rank, 'crank', crank, 'xrank', xrank, 'frank', frank, 'landmark', landmark, 'tenant', tenant,
+      -- 1 = this row is an OSM landmark or building, or the existing row standing for one. Always
+      -- written, so the app can tell an archive that knows from one baked before the property.
+      'mark', (CASE WHEN id IN (SELECT id FROM marks) OR id IN (SELECT rid FROM markbest) THEN 1 ELSE 0 END),
+      'brand', brand, 'addr', addr, 'loc', loc, 'website', website, 'phone', phone, 'hours', hours,
+      'src', 'overture', 'origin', CASE WHEN id LIKE 'atp:%' THEN 'atp' WHEN id LIKE 'osm:%' THEN 'osm' ELSE 'overture' END
+    )
+  ) FROM ranked JOIN zooms USING (id) LEFT JOIN (SELECT id, any_value(loc) AS loc FROM locs GROUP BY id) lx USING (id)
+    LEFT JOIN (SELECT id, any_value(en) AS name_en FROM names_en GROUP BY id) nx USING (id)
+) TO '$WORK/places.ndjson' (FORMAT CSV, HEADER false, QUOTE '', ESCAPE '', DELIMITER '\t');
+SELECT count(*) AS features, sum(tenant) AS tenants, round(avg(prominence),2) AS prom_avg, sum(CASE WHEN landmark = 1 AND xrank <= 3 THEN 1 ELSE 0 END) AS z12, sum(CASE WHEN crank <= 2 OR (prominence >= 5 AND crank <= 6) THEN 1 ELSE 0 END) AS z14, sum(CASE WHEN rank <= 3 OR (prominence >= 4.5 AND rank <= 8) THEN 1 ELSE 0 END) AS z15, sum(CASE WHEN rank <= 12 OR (prominence >= 3.5 AND rank <= 24) THEN 1 ELSE 0 END) AS z16 FROM ranked;
+SQL
+# Uninhabited rows (Ashmore and Cartier, coral-sea specks) have no businesses at all; tippecanoe
+# refuses an empty input, so leave no archive and let the workflow skip the upload.
+if [ ! -s "$WORK/places.ndjson" ]; then
+  echo "no places in region $ID bbox [$S,$W,$N,$E]; nothing to bake"
+  rm -rf "$WORK"
+  exit 0
+fi
+tippecanoe -o "$OUT" -l places -f -P -Z11 -z17 -B12 --no-feature-limit --no-tile-size-limit --extend-zooms-if-still-dropping "$WORK/places.ndjson" >/dev/null 2>&1
+rm -rf "$WORK"
+echo "wrote $OUT ($(du -h "$OUT" | cut -f1)) region $ID bbox [$S,$W,$N,$E]"

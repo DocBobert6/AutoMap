@@ -1,0 +1,712 @@
+package app.vela.ui.place
+
+import app.vela.ui.icons.Sym
+import app.vela.ui.icons.SymOutlined
+
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.calculateTargetValue
+import androidx.compose.animation.core.exponentialDecay
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import app.vela.R
+import app.vela.core.model.Route
+import app.vela.core.model.TravelMode
+import app.vela.ui.SheetPalette
+import app.vela.ui.dpadHighlight
+import app.vela.ui.formatDistance
+import app.vela.ui.formatDuration
+import app.vela.ui.nav.StepRow
+import app.vela.ui.nav.StopDividerRow
+import app.vela.ui.theme.isAppInDarkTheme
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
+
+/**
+ * The route chooser laid out like Google Maps' own (the 2026 layout, read off the app on the 4a),
+ * an EXPERIMENT behind Settings > Diagnostics so it can be compared with [DirectionsPanel] on the
+ * same build. What differs from the shipped chooser, all on purpose:
+ *
+ * - A header with the MODE as the title ("Drive") and three round actions: options, share, close.
+ * - Underlined mode TABS (glyph + time) instead of pill chips, with a divider under them.
+ * - ONE route summary - the selected route's time in its traffic color, the distance, and a line
+ *   saying why it is the pick - instead of a list of route cards. The other routes are chosen
+ *   from their time bubbles on the map ([app.vela.ui.map.RouteBubble]), or by tapping their line.
+ * - Expanding the sheet shows the time and avoid chips, "add a stop along the way", and the TURN
+ *   LIST inline (Google's expanded sheet), with the stop bands from the steps sheet.
+ * - A sticky bottom bar: Start, Add stops, Share.
+ *
+ * Transit keeps [DirectionsPanel]: Google's transit chooser is a different list entirely.
+ */
+@Composable
+fun GoogleStyleDirectionsPanel(
+    currentMode: TravelMode,
+    routes: List<Route>,
+    activeRoute: Route?,
+    flockOnRoute: List<Int> = emptyList(),
+    modeEtas: Map<TravelMode, String> = emptyMap(),
+    onModeSelected: (TravelMode) -> Unit,
+    avoidTolls: Boolean = false,
+    avoidHighways: Boolean = false,
+    avoidFerries: Boolean = false,
+    onAvoidTolls: (Boolean) -> Unit = {},
+    onAvoidHighways: (Boolean) -> Unit = {},
+    onAvoidFerries: (Boolean) -> Unit = {},
+    onStartNav: () -> Unit,
+    onSearchAlongRoute: (String) -> Unit,
+    onTimeSelected: (Int, Long?) -> Unit = { _, _ -> },
+    onEditStops: () -> Unit,
+    altsOpen: Boolean = false,
+    onAltsOpenChange: (Boolean) -> Unit = {},
+    onSelectRoute: (Int) -> Unit = {},
+    onShare: () -> Unit,
+    onClose: () -> Unit,
+    onStep: (Int) -> Unit = {},
+    destName: String? = null,
+    destAddress: String? = null,
+    legStarts: List<Pair<Int, String>> = emptyList(),
+    minimizeTick: Int = 0,
+    onCollapsedChange: (Boolean) -> Unit = {},
+    bodyMaxDp: Float? = null,
+    /** Landscape: the column is short, so the card tightens up and its middle scrolls. */
+    compact: Boolean = false,
+    modifier: Modifier = Modifier,
+    onShowTraffic: (() -> Unit)? = null,
+) {
+    val dark = isAppInDarkTheme()
+    val ink = SheetPalette.ink(dark)
+    val dim = SheetPalette.dim(dark)
+    val collapsed = remember { mutableStateOf(true) } // Google opens at the summary, not the list
+    val firstFocus = app.vela.ui.rememberDpadAutoFocus() // D-pad: the panel opens on the Drive tab
+    // A third, smaller state below the summary (issue #616): the time and Start on one line, so a
+    // small screen can see the route. Handle tap: summary <-> minimized (list -> summary); swipe
+    // down from the summary minimizes, swipe up restores; a map pan minimizes.
+    val minimized = remember { mutableStateOf(false) }
+    // Back on the minimized picker brings the picker back; only the next Back leaves the route.
+    RoutePanelBack(minimized.value) { minimized.value = false }
+    var downPull by remember { mutableStateOf(0f) }
+    val bodyMax = (LocalConfiguration.current.screenHeightDp * 0.58f).let { cap -> bodyMaxDp?.let { minOf(cap, it) } ?: cap }
+    val bodyH = remember { Animatable(0f) }
+    val settleSpec = remember { spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 350f) }
+    val decay = remember { exponentialDecay<Float>(frictionMultiplier = 1.6f) }
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val bodyScroll = rememberScrollState()
+    LaunchedEffect(collapsed.value) {
+        onCollapsedChange(collapsed.value)
+        val target = if (collapsed.value) 0f else bodyMax
+        if (bodyH.targetValue != target) bodyH.animateTo(target, settleSpec)
+    }
+    fun dragBy(dyPx: Float) {
+        val dyDp = with(density) { dyPx.toDp().value }
+        if (minimized.value) { downPull += dyDp; return }
+        if (bodyH.value <= 0f && dyDp > 0f) downPull += dyDp else if (dyDp < 0f) downPull = 0f
+        scope.launch { bodyH.snapTo((bodyH.value - dyDp).coerceIn(0f, bodyMax)) }
+    }
+    fun settle(velocityPxPerSec: Float) {
+        val vDp = with(density) { velocityPxPerSec.toDp().value }
+        val pulled = downPull; downPull = 0f
+        if (minimized.value) {
+            if (vDp < -FLING_COMMIT_DPS || pulled < -40f) minimized.value = false
+            return
+        }
+        if (bodyH.value <= 0f && (vDp > FLING_COMMIT_DPS || pulled > 40f)) { minimized.value = true; return }
+        val naturalEnd = decay.calculateTargetValue(bodyH.value, -vDp)
+        val target = when {
+            vDp < -FLING_COMMIT_DPS -> bodyMax
+            vDp > FLING_COMMIT_DPS -> 0f
+            else -> if (kotlin.math.abs(naturalEnd) < kotlin.math.abs(bodyMax - naturalEnd)) 0f else bodyMax
+        }
+        scope.launch {
+            bodyH.animateTo(target, settleSpec, initialVelocity = -vDp)
+            collapsed.value = target == 0f
+        }
+    }
+    val conn = remember {
+        object : NestedScrollConnection {
+            private var dragging = false
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (available.y > 0f && bodyScroll.value == 0 && bodyH.value > 0f) { dragging = true; dragBy(available.y); return available }
+                if (available.y < 0f && bodyH.value < bodyMax) { dragging = true; dragBy(available.y); return available }
+                return Offset.Zero
+            }
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                if (dragging) { dragging = false; settle(available.y); return available }
+                return Velocity.Zero
+            }
+        }
+    }
+    var seenTick by remember { mutableStateOf(minimizeTick) }
+    LaunchedEffect(minimizeTick) {
+        if (minimizeTick == seenTick) return@LaunchedEffect
+        seenTick = minimizeTick
+        if (collapsed.value) { minimized.value = true; return@LaunchedEffect }
+        bodyH.animateTo(0f, settleSpec)
+        collapsed.value = true
+    }
+
+    Card(
+        modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = SheetPalette.bg(dark), contentColor = ink),
+    ) {
+        Column(
+            Modifier
+                .navigationBarsPadding()
+                .pointerInput(Unit) { sheetDragGestures(dragBy = { dragBy(it) }, settle = { settle(it) }) }
+                .padding(top = if (compact) 2.dp else 6.dp, bottom = if (compact) 6.dp else 12.dp),
+        ) {
+            Box(
+                Modifier.fillMaxWidth().dpadHighlight(RoundedCornerShape(8.dp)).clickable {
+                    if (!collapsed.value) collapsed.value = true else minimized.value = !minimized.value
+                }
+                    .padding(vertical = if (compact) 2.dp else 6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(Modifier.width(36.dp).height(4.dp).clip(CircleShape).background(dim.copy(alpha = 0.4f)))
+            }
+            if (minimized.value) {
+                val r = activeRoute ?: routes.firstOrNull()
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp, top = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (r == null) {
+                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.weight(1f))
+                    } else {
+                        val eta = r.durationInTrafficSeconds ?: r.durationSeconds
+                        Text(
+                            buildAnnotatedString {
+                                withStyle(SpanStyle(color = trafficEtaColor(r) ?: ink, fontWeight = FontWeight.Medium, fontSize = 20.sp)) { append(formatDuration(eta)) }
+                                withStyle(SpanStyle(color = dim, fontSize = 16.sp)) { append(" (${formatDistance(r.distanceMeters)})") }
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                        Button(onClick = onStartNav) {
+                            Icon(Sym.Navigation, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.place_start))
+                        }
+                    }
+                }
+                return@Column
+            }
+            // Header: the mode is the title, the actions are round buttons (Google's grammar). In
+            // landscape the title gives way to the tabs, which name the mode anyway.
+            Row(
+                Modifier.padding(start = if (compact) 8.dp else 20.dp, end = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (compact) {
+                    ModeTabs(currentMode, modeEtas, ink, onModeSelected, Modifier.weight(1f), firstFocus = firstFocus)
+                } else {
+                    Text(
+                        modeTitle(currentMode),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Medium,
+                        color = ink,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                // Landscape: smaller circles, or they stand taller than the tab row and cross the divider.
+                RoundAction(Sym.Tune, stringResource(R.string.exp_chooser_options), dark, small = compact) {
+                    collapsed.value = false
+                    scope.launch { bodyScroll.animateScrollTo(0) }
+                }
+                Spacer(Modifier.width(8.dp))
+                RoundAction(Sym.Share, stringResource(R.string.place_share), dark, small = compact, onClick = onShare)
+                Spacer(Modifier.width(8.dp))
+                RoundAction(Sym.Close, stringResource(R.string.place_close_directions), dark, small = compact, onClick = onClose)
+            }
+            if (!compact) {
+                Spacer(Modifier.height(10.dp))
+                ModeTabs(currentMode, modeEtas, ink, onModeSelected, firstFocus = firstFocus)
+            }
+            HorizontalDivider(color = dim.copy(alpha = 0.25f))
+            // The selected route, summarized. Always visible (the collapsed sheet is this).
+            val route = activeRoute ?: routes.firstOrNull()
+            // LANDSCAPE (compact): everything between the tabs and the action bar scrolls, so a
+            // short column can never push the Start button off the card or grow over the endpoints
+            // card above it (user 2026-09-17).
+            Column(
+                if (compact) Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()) else Modifier,
+            ) {
+                Column(Modifier.padding(start = 20.dp, end = 16.dp, top = if (compact) 6.dp else 12.dp)) {
+                    if (route == null) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Text(stringResource(R.string.place_finding_route), style = MaterialTheme.typography.bodyMedium, color = dim)
+                        }
+                    } else {
+                        val eta = route.durationInTrafficSeconds ?: route.durationSeconds
+                        val fastest = routes.minOfOrNull { it.durationInTrafficSeconds ?: it.durationSeconds } ?: eta
+                        val deltaMin = ((eta - fastest) / 60.0).roundToInt()
+                        route.savedName?.let { SavedRouteChip(it, Modifier.padding(bottom = 6.dp)) }
+                        Text(
+                            buildAnnotatedString {
+                                withStyle(SpanStyle(color = trafficEtaColor(route) ?: ink, fontWeight = FontWeight.Medium, fontSize = 22.sp)) {
+                                    append(formatDuration(eta))
+                                }
+                                withStyle(SpanStyle(color = dim, fontSize = 18.sp)) { append(" (${formatDistance(route.distanceMeters)})") }
+                            },
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        // "Fastest" belongs to the fastest route only: a near-tie a few seconds slower
+                        // rounds to the same minute and used to claim it too.
+                        val isFastest = routes.indexOfFirst { (it.durationInTrafficSeconds ?: it.durationSeconds) == fastest } == routes.indexOf(route)
+                        val via = route.summary?.takeIf { it.isNotBlank() }?.let { stringResource(R.string.exp_chooser_via, it) }
+                        Text(
+                            when {
+                                isFastest && routes.size > 1 -> listOfNotNull(stringResource(R.string.exp_chooser_fastest), via).joinToString(" · ")
+                                deltaMin >= 1 -> listOfNotNull(stringResource(R.string.exp_chooser_slower, formatDuration(eta - fastest)), via).joinToString(" · ")
+                                else -> via ?: ""
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = dim,
+                        )
+                        val idx = routes.indexOf(route).coerceAtLeast(0)
+                        val cams = flockOnRoute.getOrElse(idx) { 0 }
+                        if (cams > 0) {
+                            Text(androidx.compose.ui.res.pluralStringResource(R.plurals.dir_cameras_on_route, cams, cams), style = MaterialTheme.typography.bodyMedium, color = SheetPalette.TrafficAmber)
+                        }
+                        // Why a slower route leads (discussion #676): with "Avoid surveillance cameras"
+                        // on, the picker puts a route with fewer cameras first, and said nothing about it.
+                        val fastestCams = flockOnRoute.getOrElse(routes.indexOfFirst { (it.durationInTrafficSeconds ?: it.durationSeconds) == fastest }) { 0 }
+                        if (!isFastest && flockOnRoute.size == routes.size && fastestCams > cams) {
+                            val n = fastestCams - cams
+                            Text(androidx.compose.ui.res.pluralStringResource(R.plurals.dir_cameras_avoided, n, n), style = MaterialTheme.typography.bodyMedium, color = SheetPalette.TrafficGreen)
+                        }
+                        // The alternates affordance sits with the ETA, not down in the button row: it is
+                        // about THIS number ("29 min ... and what else?"). Always there, so its absence
+                        // never has to be interpreted; with one route it says so and does nothing.
+                        Spacer(Modifier.height(6.dp))
+                        if (routes.size > 1) {
+                            Row(
+                                Modifier
+                                    .clip(CircleShape)
+                                    .dpadHighlight(CircleShape)
+                                    .clickable { onAltsOpenChange(!altsOpen) }
+                                    .padding(vertical = 6.dp, horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(Sym.AltRoute, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    androidx.compose.ui.res.pluralStringResource(R.plurals.exp_chooser_alts, routes.size - 1, routes.size - 1),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        } else {
+                            Spacer(Modifier.height(6.dp))
+                            Text(stringResource(R.string.exp_chooser_alts_none), style = MaterialTheme.typography.bodyMedium, color = dim)
+                        }
+                        if (onShowTraffic != null && routes.isNotEmpty()) {
+                            TrafficOnTapRow(onShowTraffic, ink, Modifier.padding(top = 2.dp))
+                        }
+                    }
+                }
+                // The alternates pane, over the body: every route with its time, how much longer it is,
+                // its distance, the roads it uses and its camera count. Back returns to the Google view.
+                if (altsOpen && routes.size > 1) {
+                    val fastestEta = routes.minOf { it.durationInTrafficSeconds ?: it.durationSeconds }
+                    Column(Modifier.padding(top = 6.dp, bottom = 4.dp)) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(start = 8.dp, end = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            IconButton(onClick = { onAltsOpenChange(false) }, modifier = Modifier.dpadHighlight(CircleShape)) {
+                                Icon(Sym.ArrowBack, contentDescription = stringResource(R.string.exp_chooser_alts_back), tint = ink)
+                            }
+                            Text(
+                                stringResource(R.string.exp_chooser_alts_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = ink,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        val fastestIdx = routes.indexOfFirst { (it.durationInTrafficSeconds ?: it.durationSeconds) == fastestEta }
+                        // With "Avoid surveillance cameras" on, the counts are computed and the app may
+                        // already have picked a route that is not the fastest. Say which one has the
+                        // fewest, so the choice it made explains itself (user 2026-09-17).
+                        val fewestCamIdx = flockOnRoute.takeIf { it.size == routes.size && it.distinct().size > 1 }
+                            ?.let { counts -> counts.indices.minByOrNull { counts[it] } }
+                        routes.forEachIndexed { i, r ->
+                            val eta = r.durationInTrafficSeconds ?: r.durationSeconds
+                            val delta = (eta - fastestEta).toInt()
+                            val chosen = r === activeRoute
+                            val cams = flockOnRoute.getOrElse(i) { 0 }
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 3.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(if (chosen) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else androidx.compose.ui.graphics.Color.Transparent)
+                                    .dpadHighlight(RoundedCornerShape(14.dp))
+                                    .clickable { onSelectRoute(i); onAltsOpenChange(false) }
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    r.savedName?.let { SavedRouteChip(it, Modifier.padding(bottom = 4.dp)) }
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            formatDuration(eta),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = trafficEtaColor(r) ?: ink,
+                                            fontWeight = FontWeight.Medium,
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            when {
+                                                i == fastestIdx -> stringResource(R.string.exp_chooser_fastest)
+                                                delta < 60 -> stringResource(R.string.exp_chooser_alts_same)
+                                                else -> stringResource(R.string.exp_chooser_slower, formatDuration(delta.toDouble()))
+                                            },
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = dim,
+                                        )
+                                    }
+                                    Text(
+                                        listOfNotNull(
+                                            formatDistance(r.distanceMeters),
+                                            r.summary?.takeIf { it.isNotBlank() }?.let { stringResource(R.string.exp_chooser_via, it) },
+                                            if (cams > 0) androidx.compose.ui.res.pluralStringResource(R.plurals.dir_cameras_on_route, cams, cams) else null,
+                                            if (i == fewestCamIdx) stringResource(R.string.exp_chooser_fewest_cams) else null,
+                                        ).joinToString(" · "),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = if (cams > 0) SheetPalette.TrafficAmber else dim,
+                                    )
+                                }
+                                if (chosen) Icon(Sym.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
+                }
+                // Expandable body: options, add-along-the-way, and the inline turn list.
+                val bodyComposed by remember { derivedStateOf { !collapsed.value || bodyH.value > 1f } }
+                if (bodyComposed && route != null) {
+                    Column(
+                        Modifier
+                            .graphicsLayer {
+                                alpha = (bodyH.value / 120f).coerceIn(0f, 1f)
+                                clip = true
+                                compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
+                            }
+                            .layout { measurable, constraints ->
+                                val cap = bodyH.value.dp.roundToPx().coerceAtLeast(0)
+                                val pl = measurable.measure(constraints.copy(maxHeight = minOf(constraints.maxHeight, cap)))
+                                layout(pl.width, pl.height) { pl.place(0, 0) }
+                            },
+                    ) {
+                        Column(Modifier.nestedScroll(conn).verticalScroll(bodyScroll).padding(top = 12.dp)) {
+                            Box(Modifier.padding(horizontal = 16.dp)) {
+                                DepartTimeChooser(route, dim, isTransit = false, onTimeSelected = onTimeSelected)
+                            }
+                            if (currentMode == TravelMode.DRIVE) {
+                                Row(
+                                    Modifier.horizontalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    // One "Avoid" label and four short chips: with "Avoid" on every
+                                    // chip the fourth sat off the edge of a phone, unseen.
+                                    Text(stringResource(R.string.place_avoid_label), style = MaterialTheme.typography.labelLarge, color = dim)
+                                    FilterChip(
+                                        selected = avoidTolls, onClick = { onAvoidTolls(!avoidTolls) },
+                                        label = { Text(stringResource(R.string.place_avoid_short_tolls)) },
+                                        shape = CircleShape,
+                                        modifier = Modifier.dpadHighlight(CircleShape),
+                                    )
+                                    FilterChip(
+                                        selected = avoidHighways, onClick = { onAvoidHighways(!avoidHighways) },
+                                        label = { Text(stringResource(R.string.place_avoid_short_highways)) },
+                                        shape = CircleShape,
+                                        modifier = Modifier.dpadHighlight(CircleShape),
+                                    )
+                                    FilterChip(
+                                        selected = avoidFerries, onClick = { onAvoidFerries(!avoidFerries) },
+                                        label = { Text(stringResource(R.string.place_avoid_short_ferries)) },
+                                        shape = CircleShape,
+                                        modifier = Modifier.dpadHighlight(CircleShape),
+                                    )
+                                    AvoidCamerasChip()
+                                }
+                                if ((avoidTolls || avoidHighways || avoidFerries) && routes.isNotEmpty() && routes.all { it.avoidNotHonored }) {
+                                    Row(Modifier.padding(start = 20.dp, end = 16.dp, top = 8.dp), verticalAlignment = Alignment.Top) {
+                                        Icon(SymOutlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(stringResource(R.string.place_avoid_not_honored), style = MaterialTheme.typography.bodyMedium, color = ink)
+                                    }
+                                }
+                            }
+                            Text(
+                                stringResource(R.string.exp_chooser_along),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = ink,
+                                modifier = Modifier.padding(start = 20.dp, top = 18.dp, bottom = 8.dp),
+                            )
+                            Row(
+                                Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                app.vela.ui.QuickCategories.all().map { Triple(it.label, it.query, it.icon) }.forEach { (labelRes, query, icon) ->
+                                    FilterChip(
+                                        selected = false,
+                                        onClick = { onSearchAlongRoute(query) },
+                                        label = { Text(stringResource(labelRes)) },
+                                        leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = dim) },
+                                        shape = CircleShape,
+                                    )
+                                }
+                            }
+                            if (route.maneuvers.isNotEmpty()) {
+                                Text(
+                                    stringResource(R.string.place_steps),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = ink,
+                                    modifier = Modifier.padding(start = 20.dp, top = 18.dp, bottom = 4.dp),
+                                )
+                                Column(Modifier.padding(start = 20.dp, end = 8.dp)) {
+                                    route.maneuvers.forEachIndexed { i, m ->
+                                        legStarts.firstOrNull { it.first == i }?.let { (_, name) -> StopDividerRow(name) }
+                                        StepRow(
+                                            m = m, active = false, highlighted = false, romanize = { it },
+                                            destName = destName, destAddress = destAddress,
+                                            // The list drops to the summary, or it covers the map
+                                            // the step is shown on. Keys go back to the Drive tab.
+                                            onClick = {
+                                                onStep(i)
+                                                collapsed.value = true
+                                                runCatching { firstFocus.requestFocus() }
+                                            },
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // Sticky action bar.
+            if (route != null) {
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = if (compact) 6.dp else 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Button(onClick = onStartNav) {
+                        Icon(Sym.Navigation, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.place_start))
+                    }
+                    FilledTonalButton(onClick = onEditStops) {
+                        Icon(Sym.AddLocationAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.exp_chooser_add_stops))
+                    }
+                    // Share is the header's round button alone (issue #814): a second one here did
+                    // the same thing.
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun modeTitle(mode: TravelMode): String = stringResource(
+    when (mode) {
+        TravelMode.DRIVE -> R.string.place_mode_drive
+        TravelMode.TRANSIT -> R.string.place_mode_transit
+        TravelMode.WALK -> R.string.place_mode_walk
+        TravelMode.BICYCLE -> R.string.place_mode_bike
+    },
+)
+
+/** Whether the route picker on screen is minimized. MapScreen reads it to leave Back to the
+ *  picker (it cannot take another argument: the method size limit). */
+internal object RoutePanelState {
+    val minimized = mutableStateOf(false)
+}
+
+/** A minimized route picker takes Back to restore itself (user 2026-10-06: a back swipe while
+ *  looking at the route on the map closed the route and brought the place card back). */
+@Composable
+internal fun RoutePanelBack(minimized: Boolean, restore: () -> Unit) {
+    androidx.compose.runtime.DisposableEffect(minimized) {
+        RoutePanelState.minimized.value = minimized
+        onDispose { RoutePanelState.minimized.value = false }
+    }
+    androidx.activity.compose.BackHandler(enabled = minimized && app.vela.ui.LocalSheetActive.current, onBack = restore)
+}
+
+/** Google's round header action: a tonal circle with a glyph. */
+@Composable
+internal fun RoundAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, dark: Boolean, small: Boolean = false, onClick: () -> Unit) {
+    if (small) {
+        // A plain box: IconButton keeps a 48 dp minimum, which is what stood over the divider.
+        Box(
+            Modifier.size(32.dp).clip(CircleShape).background(SheetPalette.row(dark)).dpadHighlight(CircleShape).clickable(onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) { Icon(icon, contentDescription = label, tint = SheetPalette.ink(dark), modifier = Modifier.size(18.dp)) }
+        return
+    }
+    val tint = SheetPalette.dim(dark)
+    HeaderCircleButton(icon, label, tint, tint, onClick = onClick)
+}
+
+
+/** Mode tabs: glyph + time, the selected one in the accent with an underline. In landscape they
+ *  share the header row with the round actions, which is the only way the card fits the column. */
+@Composable
+internal fun ModeTabs(
+    currentMode: TravelMode,
+    modeEtas: Map<TravelMode, String>,
+    ink: androidx.compose.ui.graphics.Color,
+    onModeSelected: (TravelMode) -> Unit,
+    modifier: Modifier = Modifier,
+    /** D-pad: where focus lands when the panel opens (the Drive tab). */
+    firstFocus: androidx.compose.ui.focus.FocusRequester? = null,
+) {
+    Row(modifier.horizontalScroll(rememberScrollState()).padding(start = 8.dp)) {
+        listOf(
+            Triple(TravelMode.DRIVE, R.string.place_mode_drive, Sym.DirectionsCar),
+            Triple(TravelMode.TRANSIT, R.string.place_mode_transit, Sym.DirectionsBus),
+            Triple(TravelMode.WALK, R.string.place_mode_walk, Sym.DirectionsWalk),
+            Triple(TravelMode.BICYCLE, R.string.place_mode_bike, Sym.DirectionsBike),
+        ).forEach { (mode, label, icon) ->
+            val sel = mode == currentMode
+            val tint = if (sel) MaterialTheme.colorScheme.primary else ink
+            Column(
+                (if (mode == TravelMode.DRIVE && firstFocus != null) Modifier.focusRequester(firstFocus) else Modifier)
+                    .clip(RoundedCornerShape(8.dp))
+                    .dpadHighlight(RoundedCornerShape(8.dp))
+                    .clickable { onModeSelected(mode) }
+                    .padding(horizontal = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(icon, contentDescription = stringResource(label), tint = tint, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        modeEtas[mode] ?: stringResource(label),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal,
+                        color = tint,
+                    )
+                }
+                Box(
+                    Modifier
+                        .width(44.dp)
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
+                        .background(if (sel) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent),
+                )
+            }
+        }
+    }
+}
+/** A saved route's mark in the route lists (issue #622): its name in a filled pill, so it reads
+ *  as YOURS at a glance instead of as one more "via". */
+@Composable
+internal fun SavedRouteChip(name: String, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.tertiaryContainer)
+            .padding(horizontal = 10.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Sym.Bookmark, contentDescription = null,
+            tint = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.size(14.dp),
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(
+            stringResource(R.string.route_saved_label, name),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onTertiaryContainer,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** The per-trip door to Settings > Navigation > "Avoid surveillance cameras" (discussion #676: it
+ *  was switched on once in Settings and forgotten, and a route that was not the fastest led the
+ *  list with no way to say "not this time" where the other avoid options are). Same switch, same
+ *  stickiness as the tolls, highways and ferries chips beside it. */
+@Composable
+internal fun AvoidCamerasChip() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val on = app.vela.ui.FlockRouteAlert.on.value
+    FilterChip(
+        selected = on,
+        onClick = {
+            app.vela.ui.FlockRouteAlert.set(context, !on)
+            app.vela.ui.RouteActions.camerasChanged?.invoke()
+        },
+        label = { Text(stringResource(R.string.place_avoid_short_cameras)) },
+        shape = CircleShape,
+        modifier = Modifier.dpadHighlight(CircleShape),
+    )
+}

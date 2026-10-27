@@ -1,0 +1,52 @@
+name: Feature request
+description: Something Vela should do
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Requests are read, not voted on. The maintainer decides what gets built; a request that does not fit is closed as not planned, without a debate, and stays closed. One request per issue, with the situation where you missed it. Requests that skip the checklist or the required fields are closed without further explanation.
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before you ask
+      options:
+        - label: I searched open and closed issues, including the ones closed as not planned, and this has not been asked.
+          required: true
+        - label: This issue contains one feature request.
+          required: true
+        - label: I have read CONTRIBUTING.md, including the ground rules (no backend, no API keys) and how requests are handled.
+          required: true
+        - label: I have filled in every required field. I understand the request is closed otherwise.
+          required: true
+        - label: If an AI assistant helped write this, it read CONTRIBUTING.md and CLAUDE.md first, I checked every claim it makes about Vela, and I name it below.
+          required: true
+  - type: input
+    id: ai_model
+    attributes:
+      label: AI assistant, if any
+      description: The model and version that helped write this, so the reviewer knows what to check.
+      placeholder: Claude Opus 5.5, ChatGPT 5, none
+  - type: textarea
+    id: what
+    attributes:
+      label: What you want
+      description: Describe the feature. If Google Maps or Organic Maps has it, name it. That is the fastest way to communicate the target.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it matters
+      description: The situation where you missed it, concretely. A request without one is closed.
+    validations:
+      required: true
+  - type: textarea
+    id: keyless
+    attributes:
+      label: Keyless reality check
+      description: |
+        Where would the data come from? Vela has no server, no API keys and no Google sign-in. It can use what Google shows a logged-out browser, and open data such as OpenStreetMap, Overture or Transitous. Anything that needs a Google account, a paid API or a server of our own cannot be built. Name the source you have in mind, or say you do not know and what you checked. See "Feature requests need a keyless reality check" in CONTRIBUTING.md.
+      placeholder: "Google shows this on the public place page without signing in."
+    validations:
+      required: true

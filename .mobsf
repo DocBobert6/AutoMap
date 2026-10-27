@@ -1,0 +1,26 @@
+---
+# Rules that do not apply to a maps app with no account and no secrets on screen. Everything
+# else is reported.
+- ignore-rules:
+  - android_root_detection        # Vela runs on rooted and custom ROMs on purpose
+  - android_safetynet             # no Google Play services
+  - android_prevent_screenshot    # a map is meant to be screenshotted
+  - android_ssl_pinning           # Google rotates certificates; a pin would break the app
+  - android_certificate_transparency
+  - android_tapjacking
+  - android_manifest_domain_config_cleartext   # localhost only, for local testing
+  # StrandHogg 2.0. The rule's own text says a target SDK of 29 or higher fixes it at platform
+  # level, and it fired because it read the MINIMUM SDK (26) as the target: the target (35) is
+  # set in Gradle, where the scanner does not look. Its other remedy, singleInstance with an
+  # empty task affinity, would change how every link from another app opens the map.
+  - android_task_hijacking2
+  # Fires on every `const val KEY = "..."`: 132 findings, all of them names of settings in the
+  # preferences file, none a secret. GitHub's own secret scanning covers real credentials.
+  - android_kotlin_hardcoded
+  # The offline place and address search. Every query was read on 2026-10-07: typed text goes in
+  # as bound arguments, and what is joined into the SQL text is column lists, table names from a
+  # fixed table and numeric ids.
+  - android_kotlin_sql_raw_query
+  # Fires on any log call. The rule the project keeps is narrower and checked by hand: no
+  # coordinates, typed text or place names in a log line.
+  - android_kotlin_logging

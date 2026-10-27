@@ -1,0 +1,2286 @@
+package app.vela.core.data.google
+
+import app.vela.core.VelaConfig
+import app.vela.core.config.CalibrationStore
+import app.vela.core.config.JsTransforms
+import app.vela.core.diag.DiagLog
+import app.vela.core.data.CalibrationNeededException
+import app.vela.core.data.CategoryFilter
+import app.vela.core.data.LowDataMode
+import app.vela.core.data.LowRamMode
+import app.vela.core.data.MapDataSource
+import app.vela.core.data.SuggestResult
+import app.vela.core.data.RerouteFallback
+import app.vela.core.data.RouteBudget
+import app.vela.core.data.RouteEngine
+import app.vela.core.data.RouteGeometry
+import app.vela.core.data.RoutingPrefs
+import app.vela.core.data.ValhallaRouter
+import app.vela.core.data.abandonableAsync
+import app.vela.core.data.google.BrowserHeaders.browserHeaders
+import app.vela.core.data.google.BrowserHeaders.browserXhrHeaders
+import app.vela.core.data.google.parse.DirectionsParser
+import app.vela.core.data.google.parse.EntityListParser
+import app.vela.core.data.google.parse.PhotosParser
+import app.vela.core.data.google.parse.ReviewsParser
+import app.vela.core.data.google.parse.SearchParser
+import app.vela.core.model.LatLng
+import app.vela.core.model.Place
+import app.vela.core.model.Review
+import app.vela.core.model.Route
+import app.vela.core.model.RouteSource
+import app.vela.core.model.SearchResult
+import app.vela.core.model.TravelMode
+import app.vela.core.model.destinationPoint
+import app.vela.core.model.distanceTo
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.net.URLEncoder
+import kotlin.math.ln
+import kotlin.math.log2
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * The real extractor, calibrated against maps.google.com (2026-06-15).
+ *
+ * Search is `/search?tbm=map&q=…` plus a pb built by [SearchPb] from the calibrated
+ * template, which carries the viewport (center + span) and the page offset.
+ * Directions needs a pb (built by [DirectionsPb]) but no session token. Both are the same endpoints google.com/maps calls from a browser, so
+ * they work without Play Services — good for GrapheneOS.
+ */
+@Singleton
+/**
+ * How prominent a place is on the map ≈ how many people know it. Review count dominates (a Safeway has
+ * thousands, the sushi counter inside it dozens), log-compressed so a mega-chain doesn't utterly bury
+ * everything, and nudged by rating so among similarly-popular places the better-rated wins.
+ */
+fun ambientProminence(p: Place): Double =
+    ln((p.reviewCount ?: 0) + 1.0) * (0.6 + (p.rating ?: 3.5) / 10.0) +
+        (categoryPrior(p.category) - NEUTRAL_PRIOR) * PRIOR_WEIGHT
+
+/**
+ * What KIND of place it is, on the same 1.0-4.5 scale the open-places bake uses, so the two places
+ * sources rank alike (user 2026-09-18: "hospitals, supermarkets, shit like that should be the big
+ * POIs in a plaza"). Google returns no ranking of its own - the ambient pool is the merge of ~13
+ * per-category searches, each ordered by its own relevance - so review count was the whole story,
+ * and a busy taco window could take the label off the hospital behind it.
+ *
+ * It is applied as a DIFFERENCE from [NEUTRAL_PRIOR] (the everyday-business tier), not as an
+ * addition, so an ordinary restaurant's prominence is unchanged and the zoom x prominence label
+ * tiers keep meaning what they meant: anchors rise, unknown-category junk sinks, the middle stays.
+ *
+ * Google's category text arrives in the app's language, and these keywords are English, so a
+ * non-English session simply gets the neutral prior - the ranking it had before this existed.
+ * Sharing the multilingual keyword tables CategoryFilter already carries is the upgrade path.
+ */
+internal fun categoryPrior(category: String?): Double {
+    val c = category?.lowercase()?.trim() ?: return 1.6 // no category at all: the fan-out's junk tier
+    fun any(vararg k: String) = k.any { it in c }
+    return when {
+        any("hospital", "medical center", "medical centre", "university", "college", "airport",
+            "stadium", "arena", "museum", "zoo", "aquarium", "amusement park", "theme park",
+            "shopping mall", "shopping center", "shopping centre", "supermarket", "grocery",
+            "department store", "convention cent", "casino", "warehouse club") -> 4.5
+        any("hotel", "motel", "resort", "pharmacy", "drugstore", "bank", "credit union",
+            "movie theater", "cinema", "gym", "fitness", "library", "church", "mosque",
+            "synagogue", "temple", "bowling", "hardware", "car dealer", "furniture",
+            "electronics", "sporting goods", "home improvement", "discount store") -> 3.2
+        any("restaurant", "cafe", "café", "coffee", "bar", "pub", "bakery", "fast food",
+            "ice cream", "brewery", "winery", "gas station", "charging station", "auto repair",
+            "car wash", "pet store", "book store", "bookstore", "clothing", "shoe store",
+            "jewelry", "florist", "liquor", "tobacco", "toy store", "bicycle", "dentist",
+            "veterinar", "optometr", "urgent care", "post office", "atm", "laundr",
+            "dry clean", "barber", "salon", "spa", "tattoo") -> 2.2
+        else -> 1.0
+    }
+}
+
+/** The tier an ordinary shop or restaurant sits in: the prior shifts prominence around THIS. */
+private const val NEUTRAL_PRIOR = 2.2
+
+/** How hard the kind of place pulls, in prominence points per tier step. 0.9 puts an anchor about
+ *  two points over a same-sized neighbor, which is roughly a supermarket's review-count edge over
+ *  the sushi counter inside it - enough to settle the label, not enough to beat a real landmark. */
+private const val PRIOR_WEIGHT = 0.9
+
+/**
+ * Order ambient Google POIs for the browse map. Callers treat "first = wins the label slot" (the ambient
+ * layer places a lower symbol-sort-key first and drops overlapping dots), so this decides which POI shows
+ * when several collide AND which survive the take-N cap. **Prominence-first**, exact distance only as a
+ * tiebreak. This is what a map wants — the recognizable landmarks (a Safeway with 1,273 reviews, an
+ * Applebee's with 1,192) lead, and the low-signal junk the category fan-out drags in (a 0-review mobile
+ * mechanic, an adult-family-home, a road intersection) sinks to the bottom and is dropped/loses its
+ * collision. Distance-bucketing was tried and REVERTED: it floated that near-center junk above the
+ * landmarks (device-measured). The anchor-beats-tenant case still holds (Safeway's reviews ≫ its in-store
+ * sushi counter's, so it wins their shared point).
+ */
+/** Referer the keyless data endpoints expect — a real in-page RPC comes from the Maps document. */
+internal const val MAPS_REFERER = "https://www.google.com/maps/"
+
+internal fun rankAmbientPlaces(places: List<Place>): List<Place> =
+    places.sortedWith(
+        compareByDescending<Place> { ambientProminence(it) }
+            .thenBy { it.distanceMeters ?: Double.MAX_VALUE },
+    )
+
+class GoogleMapsDataSource @Inject constructor(
+    private val http: OkHttpClient,
+    private val session: GoogleSession,
+    private val calibration: CalibrationStore,
+    private val jsTransforms: JsTransforms,
+    private val diag: DiagLog,
+    private val routeEngine: RouteEngine,
+) : MapDataSource {
+
+    /** ISO 3166 alpha-2 of the region the phone is in (cell-network country, falling back to the
+     *  locale's) — set by the app layer at startup; drives the `gl=` rewrite in [regionalized]. */
+    @Volatile var glRegion: String? = null
+
+    /** Caps how many ambient category requests parse AT ONCE. Each response is loaded whole and
+     *  built into a JsonElement tree (~tens of MB for a dense area); the ~13-term fan-out fired them
+     *  all in parallel, so a fresh launch / fast far pan allocated ~400 MB of transient parse trees
+     *  in a burst, filled the 512 MB heap, and stalled every allocation on a blocking GC (measured
+     *  on a Pixel 9: 401 MB live, 80-86 ms WaitForGcToComplete storms, 400 ms frames). Bounding the
+     *  fan-out to a few at a time caps the peak transient heap (~4x30 MB instead of 13x30 MB) with the
+     *  same final pool - the streaming onPartial paint keeps first dots fast. Shared across calls so
+     *  a pan mid-load can't double the burst. */
+    // Permits fleet-tunable through calibration.json ("ambientFanoutPermits") - CLAUDE.md's own
+    // escape hatch ("if a dense area still spikes, lower the permit") without an app release.
+    // Read at construction, so a pushed change applies on the next process start.
+    /** The nearby pass's window height: a walkable radius, the Google app's own bias. */
+    private val NEARBY_SPAN_M = 2500.0
+
+    /** Branches still without an address after the "near me" list, looked up one by one. */
+    private val BRANCH_FILL_MAX = 3
+    private val BRANCH_SPAN_M = 30_000.0
+
+    private val ambientFanout = kotlinx.coroutines.sync.Semaphore(
+        calibration.current().tune("ambientFanoutPermits", 4.0).toInt().coerceIn(1, 13),
+    )
+
+    /** One result page: [offset] rows in, over a [viewport]-centered window [spanMeters] tall. A
+     *  parse drift on page 0 is thrown (and recorded) so the caller can surface it; on any later
+     *  page it yields an empty list, because a later page drifting must never kill page 0. */
+    private suspend fun searchPage(query: String, viewport: LatLng, spanMeters: Double?, rankFrom: LatLng?, offset: Int, cal: app.vela.core.config.Calibration, lang: String? = null, onMeta: ((SearchResult) -> Unit)? = null): List<Place> {
+        val url = "${cal.searchEndpoint}&q=${query.enc()}&pb=${SearchPb.build(query, viewport, cal.searchPb, spanMeters, offset).enc()}".localized(lang)
+        val raw = get(url)
+        // A remote transforms.js can fully re-parse a reshaped response (searchOverride);
+        // otherwise the compiled parser runs. Either way, an optional transformPlaces
+        // hook gets the last word. No hook / any error → pure compiled path.
+        return try {
+            jsTransforms.searchOverride(raw)
+                ?: SearchParser.parse(query, GoogleResponse.parse(raw), rankFrom ?: viewport, cal.paths)
+                    .also { onMeta?.invoke(it) }.places
+        } catch (e: CalibrationNeededException) {
+            if (offset == 0) {
+                // Capture the exact request that drifted so an opted-in user can hand it
+                // to a dev (no-op unless diagnostics are on).
+                diag.record("drift", "search parse drift: ${e.message}", url)
+                throw e
+            }
+            emptyList()
+        }
+    }
+
+    private fun placeKey(p: Place) =
+        p.featureId ?: "${p.name.lowercase()}|${(p.location.lat * 2000).toInt()}|${(p.location.lng * 2000).toInt()}"
+
+    override suspend fun search(query: String, near: LatLng?, spanMeters: Double?, rankFrom: LatLng?, lang: String?): SearchResult = io {
+        // Without Google (NoGoogle): the OpenStreetMap geocoder answers, biased around the user.
+        // It knows names and addresses, not categories; the downloaded place packs cover those
+        // where a region is installed (the view model runs them only when offline, or when this
+        // search throws or comes back empty).
+        if (app.vela.core.data.NoGoogle.enabled) {
+            val bias = rankFrom ?: near
+            val lang = java.util.Locale.getDefault().language
+            // Photon's own ranking (importance, softly biased to the user) leads, so a city or a
+            // landmark across the state is found; the suggest path's hard metro box is appended
+            // for the partial-address case. Checked on a device the other way round: the box
+            // led with fuzzy address rows two states away and the city itself never showed.
+            // The two run side by side (one after the other was most of the wait, issue #647).
+            val (ranked, nearby) = coroutineScope {
+                // Ranked in English when Photon does not speak the UI language (issue #652): with no
+                // language it matched only local names, and "eiffel tower" found a peak in Alberta
+                // before the Tour Eiffel, whose English name is the one people type.
+                val rankLang = if (lang in app.vela.core.data.PhotonGeocoder.LANGS) lang else "en"
+                val r = async(Dispatchers.IO) { app.vela.core.data.PhotonGeocoder.suggest(http, query, bias, rankLang, limit = 20, hardBox = false) }
+                val n = async(Dispatchers.IO) { app.vela.core.data.PhotonGeocoder.suggest(http, query, bias, lang, limit = 10) }
+                r.await() to n.await()
+            }
+            val places = (ranked + nearby).distinctBy { it.id }
+            return@io SearchResult(query, places)
+        }
+        session.ensure()
+        // Results are viewport-driven, so a location is required; callers
+        // normally pass the user's location, with a fallback for the rare null.
+        val viewport = near ?: DEFAULT_VIEWPORT
+        val cal = calibration.current()
+        val firstUrl = "${cal.searchEndpoint}&q=${query.enc()}&pb=${SearchPb.build(query, viewport, cal.searchPb, spanMeters).enc()}".localized(lang)
+        suspend fun page(offset: Int): List<Place> = searchPage(query, viewport, spanMeters, rankFrom, offset, cal, lang)
+        // NEARBY PASS (2026-09-13): Google's keyless ranking is prominence-heavy over the WHOLE
+        // window, so at town zoom the outlet next to the user loses its slot to better-known
+        // places across the visible area and misses all three pages; the ambient merge below
+        // only catches it when the category fan-out happened to hold it. A second request over
+        // a tight window around the user (the Google app weights distance the same way) leads
+        // the list. Only when the user is INSIDE the search window and that window is wider
+        // than the nearby one, so a search over another neighborhood or another city keeps
+        // Google's order for where the user is looking.
+        var focused = false
+        var focusPlace: Place? = null
+        var stripped = false
+        val nearbyWanted = rankFrom != null &&
+            (spanMeters == null || (rankFrom.distanceTo(viewport) <= spanMeters / 2 && spanMeters > NEARBY_SPAN_M * 1.5))
+        val (nearby, first) = kotlinx.coroutines.coroutineScope {
+            val n = async {
+                if (nearbyWanted) runCatching { searchPage(query, rankFrom!!, NEARBY_SPAN_M, rankFrom, 0, cal, lang) }.getOrDefault(emptyList())
+                else emptyList()
+            }
+            val f = async { searchPage(query, viewport, spanMeters, rankFrom, 0, cal, lang) { focused = it.focusedSingle; focusPlace = it.focus; stripped = it.strippedFocus } }
+            n.await() to f.await()
+        }.let { (n, f) ->
+            // OTHER BRANCHES (discussion #656). Automatic only with the setting on; otherwise the
+            // result carries [SearchResult.focus] and the app offers them on a tap.
+            val focus = focusPlace
+            if (!focused || focus == null || f.isEmpty()) { focusPlace = null; return@let n to f }
+            if (!app.vela.core.data.OtherLocations.auto) return@let n to f
+            focusPlace = null
+            n to branchesOf(query, focus, f, viewport, spanMeters, rankFrom, cal, lang, stripped)
+        }
+        // PAGINATE like the Google app: a page is !7iN results (20 today) and a FULL first page
+        // means the viewport holds more. Google's keyless web ranking is prominence-heavy over
+        // the whole box, so a modest place sitting right next to the user ranks 21-60 for a
+        // category query - one page was exactly why "the restaurant right next to me" never made
+        // the list (user 2026-07-18). Pages 2+3 fetch CONCURRENTLY (one extra round trip, not
+        // two); either failing quietly leaves page 1 intact. Specific-name queries return
+        // partial pages and never paginate, so they cost nothing extra. Page size + offsets are
+        // DERIVED from the calibrated template (searchPb is remote-updatable); a recaptured
+        // template without a !7i token skips pagination rather than guessing.
+        val pageSize = SearchPb.pageSize(cal.searchPb)
+        val more = if (pageSize != null && first.size >= pageSize - 2) {
+            kotlinx.coroutines.coroutineScope {
+                val p2 = async { runCatching { page(pageSize) }.getOrDefault(emptyList()) }
+                val p3 = async { runCatching { page(pageSize * 2) }.getOrDefault(emptyList()) }
+                p2.await() + p3.await()
+            }
+        } else emptyList()
+        val places = (nearby + first + more).distinctBy(::placeKey)
+        // detail = the exact request URL so an opted-in user's export is replayable.
+        diag.record("search", "\"$query\" near ${near?.lat ?: "?"},${near?.lng ?: "?"} → ${places.size} results (page1 ${first.size}, nearby ${if (nearbyWanted) nearby.size.toString() else "off"})", firstUrl)
+        // open/closed diagnosis: what status + hours did we actually parse for each result? (compare
+        // the status string to the hours to see whether Google's string is wrong or we mis-parse.)
+        places.take(6).forEach { p ->
+            diag.record(
+                "placestatus",
+                "${p.name}: openNow=${p.openNow} status=\"${p.statusText}\" permClosed=${p.permanentlyClosed} " +
+                    "| hours(${p.hours.size}): ${p.hours.joinToString(" · ").take(180)}",
+                "",
+            )
+        }
+        SearchResult(query, CategoryFilter.applyIfEnabled(jsTransforms.refineSearch(places)), focus = focusPlace, strippedFocus = stripped)
+    }
+
+    /** Google answers a business NAME with one focused branch wherever the map is, and lists only
+     *  some of the others, without addresses, in its related block. The same name plus "near me"
+     *  comes back as a LIST with full cards (checked in a real browser from Montreal, New York and
+     *  a wide view; a one-location business answers with itself). A branch still without an
+     *  address is asked for by name at its own spot. */
+    private suspend fun branchesOf(query: String, focus: Place, have: List<Place>, viewport: LatLng, spanMeters: Double?, rankFrom: LatLng?, cal: app.vela.core.config.Calibration, lang: String?, stripped: Boolean): List<Place> {
+        // Asked over a fixed window around the FOCUSED place, not the view: the list is capped
+        // (4 for a 5-branch chain) and which ones it holds changes with the window, and a city-wide
+        // one around the business holds its neighbors whatever the map is showing.
+        val listed = runCatching { searchPage("$query near me", focus.location, BRANCH_SPAN_M, rankFrom, 0, cal, lang) }.getOrDefault(emptyList())
+            .filter { SearchParser.isBranch(query, focus, it) }
+        // A new session's first seconds answer with the focused place and none of its related
+        // block (seen on the 4a: the same request carries it seconds later). Only then is the
+        // plain search asked again, and after the "near me" one so the session is that much older.
+        val again = if (!stripped) emptyList()
+        else runCatching { searchPage(query, viewport, spanMeters, rankFrom, 0, cal, lang) }.getOrDefault(emptyList())
+            .filter { SearchParser.isBranch(query, focus, it) }
+        var merged = SearchParser.mergeBranches(have + listed + again)
+        val bare = merged.filter { it.address.isNullOrBlank() && SearchParser.isBranch(query, focus, it) }.take(BRANCH_FILL_MAX)
+        if (bare.isNotEmpty()) {
+            val filled = coroutineScope {
+                bare.map { b ->
+                    async {
+                        b to runCatching { searchOnce(b.name, b.location, lang) }.getOrDefault(emptyList())
+                            .filter { it.location.distanceTo(b.location) < 60.0 && SearchParser.isBranch(query, focus, it) }
+                            .minByOrNull { it.location.distanceTo(b.location) }
+                    }
+                }.awaitAll()
+            }.toMap()
+            merged = merged.map { p -> filled[p] ?: p }
+        }
+        diag.record("search", "branches of \"$query\": had ${have.size}, near me ${listed.size}, now ${merged.size}, with address ${merged.count { !it.address.isNullOrBlank() }}")
+        return merged
+    }
+
+    override suspend fun searchBranches(query: String, focus: Place, current: List<Place>, near: LatLng?, spanMeters: Double?, rankFrom: LatLng?, lang: String?, stripped: Boolean): List<Place> = io {
+        if (app.vela.core.data.NoGoogle.enabled) return@io current
+        session.ensure()
+        CategoryFilter.applyIfEnabled(branchesOf(query, focus, current, near ?: DEFAULT_VIEWPORT, spanMeters, rankFrom, calibration.current(), lang, stripped))
+    }
+
+    /** The tap resolve's search: page one only. A chain's name fills the page, and [search] then
+     *  fetched pages two and three too, a second round trip that could only add branches farther
+     *  from the tap than the ones already on page one (measured 2026-09-22 on the 4a: 4.3 s of a
+     *  4.7 s tap). Without Google, the OSM geocoder answers as [search] does. */
+    override suspend fun searchOnce(query: String, near: LatLng, lang: String?): List<Place> = io {
+        if (app.vela.core.data.NoGoogle.enabled) return@io search(query, near, null, null, lang).places
+        session.ensure()
+        val cal = calibration.current()
+        val places = searchPage(query, near, null, null, 0, cal, lang)
+        CategoryFilter.applyIfEnabled(jsTransforms.refineSearch(places))
+    }
+
+    /**
+     * Google's own autocomplete (see [SuggestParser]) for the typed suggestions. Not the
+     * calibrated search endpoint: that one ranks a partial address by prominence over the
+     * window and answered a bare five-digit house number with a same-looking ZIP code in
+     * another state while houses with that number sat a mile away. The bias is the viewport center and span, the same window the
+     * search uses; hl/gl follow the app language and the phone's region like every other
+     * request. Without Google the OSM geocoder answers as before (the view model's path).
+     */
+    override suspend fun suggest(query: String, near: LatLng?, spanMeters: Double?, lang: String?): SuggestResult = io {
+        if (app.vela.core.data.NoGoogle.enabled) return@io SuggestResult(emptyList(), emptyList())
+        session.ensure()
+        val at = near ?: DEFAULT_VIEWPORT
+        val span = RequestShape.span((spanMeters ?: SUGGEST_SPAN_M).coerceIn(2_000.0, 500_000.0))
+        val cal = calibration.current()
+        val pb = cal.suggestPb.replace("{SPAN}", span.toString()).replace("{LNG}", at.lng.toString()).replace("{LAT}", at.lat.toString())
+            .replace("{W}", BrowserViewport.width.toString()).replace("{H}", BrowserViewport.height.toString())
+        val url = "${cal.suggestEndpoint}&pb=${pb.enc()}&q=${query.enc()}&tch=1&ech=${RequestShape.nextEch()}".localized(lang)
+        val raw = try { get(url) } catch (e: Exception) {
+            android.util.Log.w("VelaSuggest", "${query.length} chars: ${e.javaClass.simpleName} ${e.message}")
+            throw e
+        }
+        val parsed = SuggestParser.parse(raw, cal.suggestPaths)
+        // One line per keystroke pause, like VelaUpdate/VelaWeb: what the autocomplete answered,
+        // and the head of the body when it answered nothing (a consent page, a block, a reshape).
+        // The typed text itself stays out of the system log.
+        android.util.Log.i("VelaSuggest", "${query.length} chars, span $span → ${parsed.places.size} places, ${parsed.queries.size} queries" +
+            if (parsed.places.isEmpty() && parsed.queries.isEmpty()) " body[${raw.length}]=${raw.take(120).replace('\n', ' ')}" else "")
+        diag.record("suggest", "\"$query\" near ${at.lat},${at.lng} span $span → ${parsed.places.size} places, ${parsed.queries.size} queries", url)
+        SuggestResult(parsed.places, parsed.queries)
+    }
+
+    /** Pages [fromPage] onward of the same query, for the results list's "More results" row
+     *  (2026-09-13). Same window, same ranking point; the pages fetch concurrently and a
+     *  failing one is just missing. Dedupe against what is already shown is the caller's. */
+    override suspend fun searchMore(query: String, near: LatLng?, spanMeters: Double?, rankFrom: LatLng?, fromPage: Int, pages: Int): List<Place> = io {
+        if (app.vela.core.data.NoGoogle.enabled) return@io emptyList()
+        session.ensure()
+        val viewport = near ?: DEFAULT_VIEWPORT
+        val cal = calibration.current()
+        val pageSize = SearchPb.pageSize(cal.searchPb) ?: return@io emptyList()
+        val got = kotlinx.coroutines.coroutineScope {
+            (fromPage until fromPage + pages).map { pg ->
+                async { runCatching { searchPage(query, viewport, spanMeters, rankFrom, pg * pageSize, cal) }.getOrDefault(emptyList()) }
+            }.map { it.await() }
+        }.flatten().distinctBy(::placeKey)
+        diag.record("search", "\"$query\" pages $fromPage..${fromPage + pages - 1} → ${got.size} more results")
+        got
+    }
+
+    override suspend fun nearbyPlaces(center: LatLng, spanMeters: Double, onPartial: ((List<Place>) -> Unit)?): List<Place> = io {
+        if (app.vela.core.data.NoGoogle.enabled) return@io emptyList()
+        session.ensure()
+        val cal = calibration.current()
+        // The wide default search (!1d≈25229, !4f13.1) returns the ~20 most prominent places over a
+        // big area, so a strip mall shows almost none. Tighten the viewport (and match the !4f zoom)
+        // + ask for more (!7i40). Calibrated live: span 25229↔zoom 13.1; span ~3.5–4 km returns
+        // ~25 places within 700 m vs 1 at the default.
+        val zoom = (13.1 + log2(25229.0 / spanMeters)).coerceIn(13.0, 17.5)
+        // FAN OUT across category terms + merge: one "places" query is biased to prominent food/
+        // shops, so it misses whole tiers (a strip mall's plumber, nail salon, IT shop). A handful
+        // of category queries roughly DOUBLES local coverage (live: 22→52 unique within 600 m).
+        val allTerms = listOf(
+            "places", "restaurants", "coffee", "stores", "shopping", "services", "beauty salon", "fast food",
+            // High-traffic everyday categories the food/shop-biased set above under-returns, so the map
+            // shows a Google-like MIX (a gas station, a gym, a grocer) rather than mostly restaurants.
+            // Low-signal extras are fine — the prominence sort keeps them from displacing real businesses.
+            "grocery store", "gas station", "gym", "bar", "pharmacy",
+            // Civic/green POIs (schools, parks) — these render as edu/park icons (PoiIcons.groupForCategory
+            // maps "…school"→edu, "…park"→park) but were never in the fan-out, so at z14+ browse (ambient
+            // active → the OSM poi layers are hidden) they showed from NEITHER source. Their few reviews keep
+            // their prominence low, so they surface in quiet/residential views without crowding businesses.
+            "school", "park",
+        )
+        // LOW-RAM: the fan-out is the app's single largest allocation burst. Each term buffers a
+        // full response String, a stripped copy, and a JsonElement DOM (GoogleResponse.parse), and
+        // 15 of those run 4-at-a-time per pan - the documented ~180 MB/12 s churn. Constrained
+        // devices fetch an 8-term subset instead (ported from vela-dpad, 2026-07-23).
+        //
+        // The subset is NOT just the first N. "school" and "park" are retained DELIBERATELY: while
+        // the ambient layer is active at z14+ the basemap's OSM poi layers are filter-hidden, so
+        // those categories have NO second source - dropping them makes parks and schools vanish
+        // from the map entirely (the fork lost every park/school pin on a first 6-term attempt,
+        // caught by A/B screenshot). What goes instead are terms whose places still surface via
+        // "places"/"stores" or degrade gracefully: shopping, services, beauty salon, fast food,
+        // gym, bar, pharmacy. Fewer ambient POIs is a visible trade, and the right one on a phone
+        // that otherwise OOMs. Roomier devices are unaffected.
+        // Lean fan-out on a constrained heap OR a constrained LINK (issue #235): fewer terms,
+        // smaller page - the satellite case wants bytes back, not just heap.
+        val terms = if (LowRamMode.enabled || LowDataMode.enabled) {
+            listOf("places", "restaurants", "coffee", "stores", "grocery store", "gas station", "school", "park")
+        } else {
+            allTerms
+        }
+        suspend fun fetchTerm(term: String): List<Place> = ambientFanout.withPermit {
+            runCatching {
+                val pb = SearchPb.build(term, center, cal.searchPb)
+                    .replaceFirst(Regex("!1d[0-9.]+"), "!1d${spanMeters.toInt()}")
+                    .replaceFirst(Regex("!4f[0-9.]+"), "!4f${String.format(java.util.Locale.US, "%.1f", zoom)}")
+                    .replaceFirst(
+                        Regex("!7i\\d+"),
+                        // Deep pool per term, so zooming in can go down the rank. Halved on low-RAM:
+                        // the pool size drives the RESPONSE BODY size, and the body is what gets
+                        // buffered and DOM-parsed per term.
+                        if (LowRamMode.enabled || LowDataMode.enabled) "!7i30" else "!7i60",
+                    )
+                val url = "${cal.searchEndpoint}&q=${term.enc()}&pb=${pb.enc()}".localized()
+                SearchParser.parse(term, GoogleResponse.parse(get(url, kind = "nearby places")), center, cal.paths).places
+            }.getOrDefault(emptyList())
+        }
+        // Dedup by feature id (same place returned under several terms); fall back to name+coords,
+        // then rank for the map (locality + prominence — see rankAmbientPlaces).
+        fun finish(pool: List<Place>): List<Place> = rankAmbientPlaces(
+            CategoryFilter.applyIfEnabled(
+                pool.distinctBy {
+                    it.featureId ?: "${it.name}@${(it.location.lat * 1e4).toInt()},${(it.location.lng * 1e4).toInt()}"
+                },
+            ),
+        )
+        var all = coroutineScope {
+            if (onPartial == null) {
+                terms.map { term -> async { fetchTerm(term) } }.awaitAll().flatten()
+            } else {
+                // STREAM the fan-out: paint the accumulated pool as terms land (growth- and
+                // time-throttled so the map isn't re-tessellating on every landing) instead of
+                // gating the first dots on the SLOWEST of ~13 requests - the tail was most of
+                // the perceived wait. The final return below still carries the complete pool.
+                val pool = mutableListOf<Place>()
+                val mutex = Mutex()
+                var landed = 0
+                var paintedCount = 0
+                var lastPaintNs = 0L
+                terms.map { term ->
+                    launch {
+                        val places = fetchTerm(term)
+                        mutex.withLock {
+                            pool += places
+                            landed++
+                            val now = System.nanoTime()
+                            // Escalating batch size: the FIRST dots should land fast (10 places is
+                            // enough to make the map feel alive), but each partial re-runs symbol
+                            // placement for the WHOLE layer, and in a dense downtown 6-8 repaints in
+                            // the first seconds were most of the cold-load frame drops (user
+                            // 2026-07-14). Once the map is already populated, wait for bigger
+                            // batches - the user can't tell 60 dots from 85 mid-stream, but they can
+                            // feel the placement passes.
+                            // Bigger batches = FEWER whole-layer symbol-collision passes during the
+                            // cold load, which is where a weak GPU (4a) stutters (each onPartial
+                            // re-places the entire ambient layer). First paint at 25 keeps the map
+                            // feeling alive fast; after that wait for +50 so a dense area re-collides
+                            // ~2-3 times instead of ~8 (user 2026-07-17). The final return still carries
+                            // the complete pool.
+                            // Third rung (user 2026-07-17): once 100+ places are painted the map
+                            // already reads "full" - later mid-stream repaints are invisible to the
+                            // eye but each one re-places every symbol, so demand a bigger batch and
+                            // a longer quiet gap before paying for another pass. Dense downtowns go
+                            // from ~3-4 passes to ~2-3; sparse areas never reach this rung.
+                            val minGrowth = when {
+                                paintedCount == 0 -> 25
+                                paintedCount >= 100 -> 80
+                                else -> 50
+                            }
+                            val grown = pool.size - paintedCount >= minGrowth
+                            val due = now - lastPaintNs > (if (paintedCount >= 100) 800_000_000L else 500_000_000L)
+                            if (landed < terms.size && pool.isNotEmpty() && grown && (paintedCount == 0 || due)) {
+                                paintedCount = pool.size
+                                lastPaintNs = now
+                                onPartial(finish(pool.toList()))
+                            }
+                        }
+                    }
+                }.joinAll()
+                pool
+            }
+        }
+        // SLIM-FLAVOR HEAL (live-bisected 2026-07-14): for the first ~3 s of a fresh session Google
+        // serves a stripped per-place block - rating present, review count ABSENT (same query + pb
+        // returns the full block seconds later). A cold-start fan-out lands entirely inside that
+        // window, so the whole ambient pool parsed with reviewCount=null, which zeroed
+        // ambientProminence and silently broke everything keyed on it: prominence ranking, dot
+        // sizing, label tiers - all flat. Detect the flavor (rated places but not one count) and
+        // refetch ONCE; by then the session is warm and the rich pool overwrites the slim one
+        // (and the disk cache stores real counts). Doubles the request burst only on a cold start.
+        // Majority (not all-slim): the session can warm MID-burst, leaving a mixed pool.
+        val rated = all.count { it.rating != null }
+        if (rated >= 3 && all.count { it.rating != null && it.reviewCount == null } > rated / 2) {
+            delay(app.vela.core.util.Jitter.around(1200))
+            val healed = coroutineScope { terms.map { term -> async { fetchTerm(term) } }.awaitAll().flatten() }
+            if (healed.any { it.reviewCount != null }) {
+                diag.record("ambient", "slim cold-start pool healed: ${all.size} -> ${healed.size} places with counts")
+                // Healed first so distinctBy keeps the rich copy when a term partially failed.
+                all = healed + all
+            }
+        }
+        finish(all)
+    }
+
+    override suspend fun placeDetails(id: String): Place = io {
+        // CALIBRATE: the dedicated place-detail RPC (reviews, hours, popular
+        // times) under /maps/preview/place is not yet mapped. Search already
+        // returns name/rating/reviews/address/category, so the UI uses the
+        // Place from the search result directly until this is calibrated.
+        throw CalibrationNeededException("placeDetails RPC not yet mapped")
+    }
+
+    override suspend fun reverseGeocode(location: LatLng): Place? = io {
+        // OpenStreetMap's Nominatim — keyless, on-ethos (open data), and a stable
+        // documented API, so unlike the Google endpoints it needs no recalibration.
+        // Best-effort: any failure (network, rate-limit, no match) → null.
+        runCatching {
+            val url = "https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&zoom=18" +
+                "&lat=${location.lat}&lon=${location.lng}"
+            val root = Json.parseToJsonElement(getNominatim(url)).jsonObject
+            val addr = root["address"]?.jsonObject ?: return@runCatching null
+            fun str(k: String): String? = (addr[k] as? JsonPrimitive)?.takeUnless { it is JsonNull }?.content
+            val street = listOfNotNull(str("house_number"), str("road")).joinToString(" ").ifBlank { null }
+            val city = str("city") ?: str("town") ?: str("village") ?: str("hamlet") ?: str("suburb")
+            val regionPost = listOfNotNull(str("state"), str("postcode")).joinToString(" ").ifBlank { null }
+            val addressLine = listOfNotNull(street, city, regionPost).joinToString(", ")
+                .ifBlank { (root["display_name"] as? JsonPrimitive)?.content }
+            Place(
+                id = "pin:${location.lat},${location.lng}",
+                name = street ?: city ?: "Dropped pin",
+                location = location,
+                address = addressLine,
+            )
+        }.getOrNull()
+    }
+
+    override suspend fun reviews(featureId: String): List<Review> = io {
+        if (app.vela.core.data.NoGoogle.enabled) return@io emptyList()
+        // /maps/preview/review/listentitiesreviews — a keyless GET. The feature id
+        // "0xHIGH:0xLOW" splits into two unsigned-64 decimals (1y/2y); 2i/3i page,
+        // 3e1 sorts by most-relevant. The 1s session token can be any string.
+        // (Calibrated live 2026-06-16.)
+        val parts = featureId.split(":")
+        if (parts.size != 2) return@io emptyList()
+        val high = runCatching { java.math.BigInteger(parts[0].removePrefix("0x"), 16) }.getOrNull() ?: return@io emptyList()
+        val low = runCatching { java.math.BigInteger(parts[1].removePrefix("0x"), 16) }.getOrNull() ?: return@io emptyList()
+        val cal = calibration.current()
+        val pb = cal.reviewsPb.replace("{HIGH}", high.toString()).replace("{LOW}", low.toString())
+        val url = "${cal.reviewsEndpoint}&pb=${pb.enc()}"
+        runCatching { ReviewsParser.parse(GoogleResponse.parse(get(url))) }.getOrDefault(emptyList())
+    }
+
+    override suspend fun reviewFeed(featureId: String, hl: String?, pageToken: String): app.vela.core.data.google.parse.ReviewFeed? = io {
+        if (app.vela.core.data.NoGoogle.enabled) return@io null
+        if (!featureId.contains(":")) return@io null
+        session.ensure()
+        val cal = calibration.current()
+        // The token rides inside a JSON string inside the proto: keep it to the base64url alphabet.
+        val token = pageToken.filter { it.isLetterOrDigit() || it == '-' || it == '_' || it == '=' }
+        val inner = cal.reviewFeedProto.replace("{FID}", featureId).replace("{TOKEN}", token)
+        val freq = "[[[\"qv9Egd\",${JsonPrimitive(inner)},null,\"generic\"]]]"
+        val url = "https://www.google.com/maps/_/MapsWizUi/data/batchexecute?rpcids=qv9Egd&source-path=%2Fmaps&hl=en&gl=us" +
+            "&_reqid=${RequestShape.nextReqId()}&rt=c"
+        runCatching {
+            val raw = post(url.localized(hl), "f.req=${freq.enc()}&", aged = true)
+            ReviewFeedDebug.sink?.let { sink -> runCatching { sink(raw) } }
+            app.vela.core.data.google.parse.ReviewFeedParser.parse(raw)
+        }
+            .onFailure { diag.record("reviews", "feed failed: ${it.javaClass.simpleName} ${it.message}") }
+            .getOrNull()
+            ?.also { diag.record("reviews", "feed${if (token.isNotEmpty()) " page" else ""}: ${it.reviews.size} review(s)${if (it.end) ", end of list" else ""}${if (it.nextToken != null) ", more to come" else ""}") }
+    }
+
+    override suspend fun placeDetails(place: app.vela.core.model.Place): app.vela.core.model.PlaceDetails? = io {
+        if (app.vela.core.data.NoGoogle.enabled || place.name.isBlank()) return@io null
+        session.ensure()
+        val cal = calibration.current()
+        // Same query the WebView details fetch builds (WebPopularTimesFetcher.specificQuery): name +
+        // comma-less address, so the reply is the single focused result that carries [84].
+        val addr = place.address?.replace(',', ' ')?.replace(Regex("\\s+"), " ")?.trim()
+        val query = if (addr.isNullOrBlank()) place.name else "${place.name} $addr"
+        val url = "${cal.searchEndpoint}&q=${query.enc()}&pb=${SearchPb.build(query, place.location, cal.searchPb).enc()}".localized()
+        runCatching { app.vela.core.data.google.parse.PopularTimesParser.parse(get(url, aged = true, kind = "place details"), place.featureId, cal.paths) }.getOrNull()
+    }
+
+    override suspend fun placePhotoPage(featureId: String, pageToken: String): app.vela.core.data.google.parse.PhotoPage? = io {
+        if (app.vela.core.data.NoGoogle.enabled || !featureId.contains(":")) return@io null
+        session.ensure()
+        val cal = calibration.current()
+        var inner = cal.photosProto.replace("{FID}", featureId).replace("{COUNT}", PHOTO_COUNT.toString())
+            .replace("[1200,1000]", "[${BrowserViewport.width},${BrowserViewport.height}]")
+        if (pageToken.isNotEmpty()) {
+            // The cursor goes at [4][2][2], beside the page size (found by trying each slot against a
+            // live reply, 2026-09-23). A template of another shape gets no paging rather than a
+            // malformed request.
+            inner = runCatching {
+                val root = kotlinx.serialization.json.Json.parseToJsonElement(inner).jsonArray
+                val paging = root[4].jsonArray[2].jsonArray
+                val newPaging = kotlinx.serialization.json.JsonArray(paging.toMutableList().also { it[2] = JsonPrimitive(pageToken) })
+                val new4 = kotlinx.serialization.json.JsonArray(root[4].jsonArray.toMutableList().also { it[2] = newPaging })
+                kotlinx.serialization.json.JsonArray(root.toMutableList().also { it[4] = new4 }).toString()
+            }.getOrNull() ?: return@io null
+        }
+        val freq = "[[[\"hspqX\",${JsonPrimitive(inner)},null,\"generic\"]]]"
+        runCatching { app.vela.core.data.google.parse.PhotosParser.parsePage(post(RequestShape.batchUrl(cal.photosEndpoint).localized(), "f.req=${freq.enc()}&", aged = true)) }
+            .onFailure { diag.record("photos", "gallery page failed: ${it.javaClass.simpleName}") }
+            .getOrNull()
+    }
+
+    override suspend fun placePhotos(featureId: String): List<app.vela.core.model.Photo> = io {
+        if (app.vela.core.data.NoGoogle.enabled) return@io emptyList()
+        // batchexecute `hspqX` (/MapsPhotoService.ListEntityPhotos) — a keyless POST
+        // (no `at` token, just the warmed session cookies). The feature id goes in
+        // the proto verbatim ([2][0]); the response carries the full gallery, URL at
+        // each entry's [6][0]. (Calibrated live 2026-06-17.) Best-effort: any failure
+        // returns empty so the caller keeps the search-preview photos.
+        if (!featureId.contains(":")) return@io emptyList()
+        session.ensure()
+        val cal = calibration.current()
+        val inner = cal.photosProto.replace("{FID}", featureId).replace("{COUNT}", PHOTO_COUNT.toString())
+            .replace("[1200,1000]", "[${BrowserViewport.width},${BrowserViewport.height}]") // this install's window, not one shared size
+        // JsonPrimitive(...).toString() = the proto as a properly-escaped JSON string literal.
+        val freq = "[[[\"hspqX\",${JsonPrimitive(inner)},null,\"generic\"]]]"
+        runCatching { PhotosParser.parse(post(RequestShape.batchUrl(cal.photosEndpoint).localized(), "f.req=${freq.enc()}&", aged = true)) }.getOrDefault(emptyList())
+    }
+
+    override suspend fun streetView(location: LatLng, preferStreet: String?): app.vela.core.model.StreetViewPano? = io {
+        if (app.vela.core.data.NoGoogle.enabled) return@io null
+        // Keyless nearest-pano lookup - the JS Maps API's own GeoPhotoService.SingleImageSearch,
+        // authorized by referer (the get() helper already sends it). The parser returns null with no
+        // imagery near the point.
+        val cal = calibration.current()
+        val nearest = streetViewNearest(cal.streetViewMetaUrl, location.lat, location.lng) ?: return@io null
+
+        // Address-street preference (Google-like). Google's address geocode can sit SET-BACK from the
+        // street - a mid-block building has the frontage on the avenue and a service alley behind, and
+        // the geocode lands nearer the alley. The alley pano is then not just the nearest, its whole
+        // connectivity graph is the back cluster, so the real frontage pano is unreachable by walking.
+        // When the nearest pano isn't on the address's own street, PROBE toward the street: the nearest
+        // pano's heading is the (parallel) street axis, so the frontage sits perpendicular to it. Query
+        // a few points out along both perpendiculars and adopt the nearest pano that IS on the address's
+        // street. No-regression: no street given / already matches / nothing labeled found → keep the
+        // nearest pano, and the probes only fire in the mismatch case.
+        if (preferStreet.isNullOrBlank() ||
+            StreetViewParser.streetOf(preferStreet) == null ||
+            StreetViewParser.streetMatches(nearest.addressLabel, preferStreet)
+        ) {
+            return@io nearest
+        }
+        val perpA = (nearest.headingDeg + 90.0) % 360.0
+        val perpB = (nearest.headingDeg + 270.0) % 360.0
+        val probes = STREET_PROBE_RADII_M.flatMap {
+            listOf(location.destinationPoint(it, perpA), location.destinationPoint(it, perpB))
+        }
+        val match = coroutineScope {
+            probes.map { pt -> async { streetViewNearest(cal.streetViewMetaUrl, pt.lat, pt.lng) } }.awaitAll()
+        }.filterNotNull()
+            .filter { StreetViewParser.streetMatches(it.addressLabel, preferStreet) }
+            .distinctBy { it.panoId }
+            .minByOrNull { location.distanceTo(LatLng(it.lat, it.lng)) }
+        match ?: nearest
+    }
+
+    /** The nearest pano to a point. [metaUrl] is the old GET lookup, which Google switched off on
+     *  2026-10-05 (it answers "decommissioned"); the POST its own web library makes now is tried
+     *  first and the old one only if that fails, in case a region still serves it. */
+    private val STREETVIEW_RADII_M = listOf(50, 200)
+
+    private suspend fun streetViewNearest(metaUrl: String, lat: Double, lng: Double): app.vela.core.model.StreetViewPano? {
+        val cal = calibration.current()
+        // 50 m first (the pano on the place's own frontage), then wider: a store set back behind its
+        // lot, or a point whose only close image is a user's photo sphere, has Google's imagery
+        // within a couple of hundred meters.
+        for (radius in STREETVIEW_RADII_M) {
+            val body = cal.streetViewSearchBody
+                .replace("{LAT}", "%.7f".format(java.util.Locale.US, lat))
+                .replace("{LNG}", "%.7f".format(java.util.Locale.US, lng))
+                .replace("{RADIUS}", radius.toString())
+            runCatching {
+                val req = Request.Builder()
+                    .url(app.vela.core.config.Calibration.STREETVIEW_SEARCH_URL)
+                    .post(body.toRequestBody("application/json+protobuf".toMediaType()))
+                    .browserXhrHeaders(cal.userAgent, cal.secChUa, MAPS_REFERER)
+                    .header("x-user-agent", "grpc-web-javascript/0.1")
+                    .build()
+                http.newCall(req).execute().use { resp -> if (resp.isSuccessful) StreetViewParser.parse(resp.body?.string().orEmpty(), lat, lng) else null }
+            }.getOrNull()?.let { return it }
+        }
+        val url = metaUrl
+            .replace("callback=cb", "callback=${RequestShape.callbackName()}")
+            .replace("{LAT}", "%.7f".format(java.util.Locale.US, lat))
+            .replace("{LNG}", "%.7f".format(java.util.Locale.US, lng))
+        return runCatching { StreetViewParser.parse(get(url), lat, lng) }.getOrNull()
+    }
+
+    override suspend fun streetViewByPano(panoId: String): app.vela.core.model.StreetViewPano? = io {
+        if (app.vela.core.data.NoGoogle.enabled) return@io null
+        // Epoch-exact pano fetch (walking): photometa/v1 by id, keyless. Same parser - it handles
+        // the )]}' guard and the extra nesting. Lat/lng fall back to the response's own position.
+        val cal = calibration.current()
+        val url = cal.streetViewPanoUrl.replace("{PANOID}", panoId)
+        runCatching { StreetViewParser.parse(get(url), 0.0, 0.0) }.getOrNull()?.takeIf { it.lat != 0.0 || it.lng != 0.0 }
+    }
+
+    override suspend fun streetViewTile(panoId: String, x: Int, y: Int, zoom: Int): ByteArray? = io {
+        if (app.vela.core.data.NoGoogle.enabled) return@io null
+        // The consumer equirect tile endpoint (what maps.google.com renders) - keyless, JPEG,
+        // needs only the Google referer. Fixed template, no calibration: the panoid + x/y/zoom
+        // fully address a tile in the standard SV pyramid.
+        val url = "https://streetviewpixels-pa.googleapis.com/v1/tile" +
+            "?cb_client=maps_sv.tactile&panoid=$panoId&x=$x&y=$y&zoom=$zoom&nbt=1&fover=2"
+        runCatching { getBytes(url) }.getOrNull()
+    }
+
+    override suspend fun directions(
+        origin: LatLng,
+        destination: LatLng,
+        mode: TravelMode,
+        waypoints: List<LatLng>,
+        avoidTolls: Boolean,
+        avoidHighways: Boolean,
+        avoidFerries: Boolean,
+        urgent: Boolean,
+        departBearingDeg: Double?,
+        budgetMs: Long?,
+    ): List<Route> {
+        if (mode != TravelMode.DRIVE) return directionsPlain(origin, destination, mode, waypoints, avoidTolls, avoidHighways, avoidFerries, urgent, departBearingDeg, budgetMs)
+        // The map's roads round the destination are asked for while the routes are fetched, so
+        // the word on the last turn (withLotTurn) is a read from memory by the time they are built.
+        if (!app.vela.core.data.LowDataMode.enabled) kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            runCatching { app.vela.core.data.naming.RoadNameTiles.roadsAlong(listOf(destination)) }
+        }
+        val routes = directionsPlain(origin, destination, mode, waypoints, avoidTolls, avoidHighways, avoidFerries, urgent, departBearingDeg, budgetMs)
+        // Off the caller's thread (the view model calls from Main): the tiles' protobuf is
+        // decoded here. Every route at once, so a tile host that does not answer costs one wait.
+        return io { coroutineScope { routes.map { r -> async { withLotTurn(r, urgent) } }.awaitAll() } }
+    }
+
+    /**
+     * [route] with its last turn worded "into the parking lot" when the map shows it entering the
+     * destination's own lot (ParkingLotTurn.wordDestination). A route that cannot be driven as it
+     * is, or whose steps are Google's short ones, is left alone; so is one the map does not answer
+     * for inside the wait.
+     */
+    private suspend fun withLotTurn(route: Route, urgent: Boolean): Route {
+        if (!route.drivable || !route.hasRealSteps) return route
+        return kotlinx.coroutines.withTimeoutOrNull(if (urgent) LOT_WORD_WAIT_URGENT_MS else LOT_WORD_WAIT_MS) {
+            runCatching {
+                app.vela.core.nav.ParkingLotTurn.wordDestination(route) { left -> app.vela.core.i18n.NavStringsRegistry.current().intoLot(left) }
+            }.getOrNull()
+        } ?: route
+    }
+
+    private suspend fun directionsPlain(
+        origin: LatLng,
+        destination: LatLng,
+        mode: TravelMode,
+        waypoints: List<LatLng>,
+        avoidTolls: Boolean,
+        avoidHighways: Boolean,
+        avoidFerries: Boolean,
+        urgent: Boolean,
+        departBearingDeg: Double?,
+        budgetMs: Long?,
+    ): List<Route> = io {
+        // Mid-drive reroutes are URGENT: one shot per source, no divergence snap, no alternates
+        // polish. The retry ladders below (3x OSRM + 3x Google with backoff) are right for a
+        // planning fetch but can hold a reroute past NavSession's hard deadline on a flaky cell
+        // link, so the fetch gets canceled mid-flight and the driver waits on the next attempt
+        // (issues #185/#236). The recheck loop upgrades the lean result minutes later anyway.
+        val tries = if (urgent) 1 else 3
+        // BOUNDED fetches (issue #557): a reroute carries its deadline in. A diagnostics export
+        // showed FOSSGIS's car router hanging while its foot router answered: each urgent attempt
+        // sat 20 s on the open router (the shared client's timeouts) and never consulted Google or
+        // the downloaded region, and the escalated attempt could not even finish its three OSRM
+        // tries inside its own deadline. Now the open router gets a short call timeout and only a
+        // share of the budget, and the fallbacks get the rest. A planning fetch (no budget, not
+        // urgent) takes none of these branches.
+        val budget = RouteBudget.of(budgetMs ?: if (urgent) URGENT_DEFAULT_BUDGET_MS else null)
+        val bounded = budget.bounded
+        val osrmTryMs: Long? = when {
+            urgent -> URGENT_OSRM_TIMEOUT_MS
+            bounded -> LADDER_OSRM_TRY_MS
+            else -> null
+        }
+        val osrmBudget = when {
+            !bounded -> RouteBudget.NONE
+            urgent -> budget.slice(URGENT_OSRM_TIMEOUT_MS)
+            else -> budget.slice(((budget.remainingMs() ?: 0L) * LADDER_OSRM_SHARE).toLong())
+        }
+        val osrmWhy = java.util.concurrent.atomic.AtomicReference("empty reply")
+        val onOsrmFail: (String) -> Unit = { osrmWhy.set(it) }
+        val stage = if (urgent) "urgent" else "ladder"
+        // Bike mode routes for safety over speed (issue #401, default on): the offline engine's
+        // bicycle profile where a region is downloaded, else the open Valhalla router told to stay
+        // off busy roads. Null = neither answered, so the fastest-route chain below takes over.
+        if (mode == TravelMode.BICYCLE && RoutingPrefs.bikeSafe) {
+            bikeSafeRoutes(origin, destination, waypoints, avoidTolls, avoidHighways, avoidFerries, urgent)?.let { return@io it }
+        }
+        if (mode == TravelMode.WALK && waypoints.isEmpty()) {
+            walkRoutes(origin, destination, tries, osrmTryMs, osrmBudget, onOsrmFail, urgent)?.let { return@io it }
+        }
+        // Multi-stop (rebuilt 2026-09-21, issue #600): Google is asked for the trip THROUGH the stops
+        // (DirectionsPb.withWaypoints) and the open router is routed through them too. Same course =
+        // the open route with Google's real through-the-stops time and spans; Google left the course
+        // (traffic, an avoid) = the open router is snapped along Google's line leg by leg, with the
+        // stops as vias between the samples, exactly as the single-destination path snaps below.
+        // Before this Google was only ever asked for the DIRECT trip and its answer calibrated a
+        // speed; every trip with stops was the open router's free-flow choice with a ratio on it.
+        // A waypointed trip is a single path: neither router returns alternates for one.
+        if (waypoints.isNotEmpty()) {
+            return@io coroutineScope {
+                val phoneFirst = urgent && routeEngine.isReady(mode) && routeEngine.covers(origin, destination, mode)
+                val viaCall = {
+                    RouteGeometry.routeVia(
+                        http, listOf(origin) + waypoints + destination, mode, avoidTolls, avoidHighways, avoidFerries, departBearingDeg,
+                        tries = tries, callTimeoutMs = osrmTryMs, budget = osrmBudget, onFailure = onOsrmFail,
+                    )
+                }
+                // Outside the scope when phone first can return ahead of it: a scope waits for its
+                // children, and as one this blocking call would hold the phone's route for the
+                // rest of URGENT_OSRM_TIMEOUT_MS.
+                val viaD = if (phoneFirst) abandonableAsync { viaCall() } else async { viaCall() }
+                // Same urgent grace as the single-destination path below (issue #397).
+                val gD = if (bounded) kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).async {
+                    googleDirectionsRetried(origin, destination, mode, tries, avoidTolls, avoidHighways, avoidFerries, waypoints)
+                } else async { googleDirectionsRetried(origin, destination, mode, tries, avoidTolls, avoidHighways, avoidFerries, waypoints) }
+                // PHONE FIRST for a trip with stops: the legs chained on the downloaded region.
+                val phoneD = if (phoneFirst) {
+                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).async {
+                        runCatching { chainOnDevice(listOf(origin) + waypoints + destination, mode, avoidTolls, avoidHighways, avoidFerries, departBearingDeg, maxMs = PHONE_FIRST_ONLINE_WAIT_MS + PHONE_FIRST_ONDEVICE_WAIT_MS) }.getOrNull()
+                    }
+                } else null
+                val via = if (phoneD == null) viaD.await().firstOrNull() else {
+                    val early = kotlinx.coroutines.withTimeoutOrNull(PHONE_FIRST_ONLINE_WAIT_MS) { viaD.await() }
+                    if (!early.isNullOrEmpty()) early.first() else {
+                        val wait = minOf(PHONE_FIRST_ONDEVICE_WAIT_MS, budget.remainingMs() ?: PHONE_FIRST_ONDEVICE_WAIT_MS).coerceAtLeast(0L)
+                        val onDevice = kotlinx.coroutines.withTimeoutOrNull(wait) { phoneD.await() }
+                        if (onDevice != null) {
+                            diag.record(
+                                "directions",
+                                "urgent: phone first, on-device legs ×${waypoints.size} after ${budget.elapsedMs()} ms while the open router was " +
+                                    (if (early == null) "still out" else "empty") + "; the recheck heals traffic",
+                                "",
+                            )
+                            return@coroutineScope listOf(onDevice)
+                        }
+                        (early ?: viaD.await()).firstOrNull()
+                    }
+                }
+                if (bounded && via == null) {
+                    // Bounded + open router empty (issue #557): Google's direct route if it is back,
+                    // else the on-device legs, else nothing; never past the budget.
+                    val osrmMs = budget.elapsedMs()
+                    val fb = RerouteFallback.pick(
+                        gD,
+                        onDevice = if (routeEngine.isReady(mode)) {
+                            { listOfNotNull(chainOnDevice(listOf(origin) + waypoints + destination, mode, avoidTolls, avoidHighways, avoidFerries, departBearingDeg, maxMs = budget.remainingMs())) }
+                        } else null,
+                        budgetMs = budget.remainingMs() ?: 0L,
+                    )
+                    diag.record(
+                        "directions",
+                        "$stage: $mode multi-stop ×${waypoints.size} open router gave nothing after $osrmMs ms (${osrmWhy.get()}); " +
+                            "fallback ${fb.source.name.lowercase()} ${fb.routes.size} route(s) after ${fb.waitedMs} ms more (on-device tried=${fb.onDeviceTried})",
+                        "",
+                    )
+                    return@coroutineScope when (fb.source) {
+                        RerouteFallback.Source.GOOGLE_READY, RerouteFallback.Source.GOOGLE ->
+                            fb.routes.take(1).map { it.copy(abbreviatedSteps = true, source = RouteSource.GOOGLE_ABBREVIATED) }
+                        RerouteFallback.Source.ON_DEVICE -> fb.routes
+                        RerouteFallback.Source.NONE -> emptyList()
+                    }
+                }
+                suspend fun googleOrGrace(): List<Route> =
+                    if (urgent && via != null) kotlinx.coroutines.withTimeoutOrNull(URGENT_GOOGLE_GRACE_MS) { gD.await() } ?: emptyList()
+                    else if (bounded) kotlinx.coroutines.withTimeoutOrNull(budget.remainingMs() ?: 0L) { gD.await() } ?: emptyList()
+                    else gD.await()
+                // OSRM unreachable → route the legs on-device (origin→w1→…→dest chained), like the
+                // single-destination path's offline fallback; only then fall to Google's DIRECT route
+                // (which reaches the destination but loses the stops).
+                val onDevice = if (via == null && routeEngine.isReady(mode))
+                    chainOnDevice(listOf(origin) + waypoints + destination, mode, avoidTolls, avoidHighways, avoidFerries) else null
+                // Google is awaited only on the branches that read it (the on-device fallback with no
+                // open route never waited for it, and still does not).
+                val g: Route? = if (via != null || onDevice == null) googleOrGrace().firstOrNull() else null
+                // THE GUARD: Google's line has to pass every stop, or the reply is the direct trip
+                // (a template without the waypoint groups, or a drift) and gets the old direct-trip
+                // handling, never adopted as if it called at the stops.
+                val gStops = g?.takeIf { it.polyline.size >= 5 && RouteGeometry.stopsOnLine(it.polyline, waypoints) }
+                val avoidWantedHere = (avoidTolls || avoidHighways || avoidFerries) && mode == TravelMode.DRIVE
+                var divergentStops = false
+                var snapKeptStops = false
+                var honoredByGoogle = false
+                var result = when {
+                    via != null && gStops != null -> {
+                        divergentStops = RouteGeometry.divergent(via, gStops)
+                        var snapped: Route? = null
+                        if (divergentStops && (!urgent || avoidWantedHere)) {
+                            val pts = RouteGeometry.sampleViasThrough(gStops.polyline, waypoints)
+                            if (pts != null) {
+                                val all = listOf(origin) + pts + destination
+                                // The real stops' positions in the via list: exempt from the strict
+                                // snap-distance refusal (a stop in a lot is a stop, not an appendix).
+                                val loose = all.indices.filter { i -> i in 1 until all.lastIndex && waypoints.any { it == all[i] } }.toSet()
+                                snapped = RouteGeometry.routeVia(
+                                    http, all, mode, avoidTolls, avoidHighways, avoidFerries, departBearingDeg,
+                                    strictVias = true, looseVias = loose, tries = tries, callTimeoutMs = osrmTryMs, budget = budget,
+                                ).firstOrNull()?.copy(source = RouteSource.OSRM_VIA_SNAP)?.takeIf { r ->
+                                    r.polyline.lastOrNull()?.let { it.distanceTo(destination) <= SNAP_REACH_M } == true &&
+                                        r.distanceMeters <= gStops.distanceMeters * SNAP_LENGTH_SLACK + SNAP_LENGTH_SLACK_M &&
+                                        !spurWithTurn(r, gStops.polyline)
+                                }
+                            }
+                        }
+                        // One calibration from whichever open route follows Google's course, the
+                        // single-destination rule: both now cover the same trip through the same stops.
+                        val basis = if (!divergentStops) via else snapped
+                        val cal = basis?.takeIf { it.durationSeconds > 0 && gStops.durationSeconds > 0 }?.let { b ->
+                            val dScale = if (gStops.distanceMeters > 0) b.distanceMeters / gStops.distanceMeters else 1.0
+                            ((gStops.durationSeconds * dScale) / b.durationSeconds).coerceIn(0.5, 3.0)
+                        }
+                        val gEta = gStops.durationInTrafficSeconds ?: gStops.durationSeconds
+                        snapKeptStops = snapped != null &&
+                            (avoidWantedHere || gEta <= via.durationSeconds * (cal ?: 1.0) * SNAP_ETA_MARGIN)
+                        when {
+                            !divergentStops -> { honoredByGoogle = true; listOf(applyTraffic(via, gStops, freeFlowCal = cal)) }
+                            snapKeptStops -> { honoredByGoogle = true; listOf(applyTraffic(snapped!!, gStops, freeFlowCal = cal)) }
+                            // Avoid on and the open router could not be led along Google's avoiding
+                            // course: Google's own (abbreviated) route through the stops beats a
+                            // plain one that ignores the avoid, the single-destination rule.
+                            avoidWantedHere -> { honoredByGoogle = true; listOf(gStops.copy(abbreviatedSteps = true, source = RouteSource.GOOGLE_ABBREVIATED)) }
+                            // Google's detour was not worth it: the open route, its speed rebased on
+                            // Google's through-the-stops time, spans transferred where the roads overlap.
+                            else -> listOf(applyTraffic(via, gStops, freeFlowCal = speedCal(via, gStops)))
+                        }
+                    }
+                    // Google answered with the direct trip (or not at all): the old calibration, a
+                    // speed ratio so the distance difference cancels, spans kept off other roads.
+                    via != null -> listOf(applyTraffic(via, g, freeFlowCal = speedCal(via, g)))
+                    onDevice != null -> listOf(onDevice)
+                    else -> listOfNotNull(g).map { it.copy(abbreviatedSteps = true, source = RouteSource.GOOGLE_ABBREVIATED) }
+                }
+                // The open router cannot exclude; only a result that left Google's avoiding course
+                // (or never had one) gets the note.
+                if (avoidWantedHere && via != null && !honoredByGoogle) {
+                    result = result.map { it.copy(avoidNotHonored = true) }
+                }
+                // The plain trip's farm-track check, for a trip through stops: when the line
+                // offered is the open router's own and it cuts through a track, the other
+                // service's car route through the same points takes its place.
+                if (mode == TravelMode.DRIVE && via != null && result.firstOrNull()?.polyline === via.polyline) {
+                    offTrackRoute(via, listOf(origin) + waypoints + destination, avoidTolls, avoidHighways, avoidFerries, urgent)?.let { other ->
+                        val timed = applyTraffic(other, g, freeFlowCal = speedCal(other, g), withSpans = false)
+                        result = listOf(if (avoidWantedHere && !honoredByGoogle) timed.copy(avoidNotHonored = true) else timed)
+                    }
+                }
+                val line = "$mode multi-stop ×${waypoints.size} → via=${via != null} onDevice=${onDevice != null} " +
+                    "googleStops=${when { g == null -> "none"; gStops != null -> "honored"; else -> "IGNORED" }} " +
+                    "divergent=$divergentStops snapKept=$snapKeptStops " +
+                    "googleDirect=${result.isNotEmpty() && via == null && onDevice == null}" +
+                    if (via == null && onDevice == null && gStops == null) " (STOPS DROPPED if google won)" else ""
+                diag.record("directions", line, "")
+                // Mirrored to logcat (no coordinates in it): the diag ring needs an opt-in and an
+                // export, and whether Google took the stops is the first thing to check in the field.
+                runCatching { android.util.Log.d("VelaDirections", line) }
+                result
+            }
+        }
+        var avoidHonored = false
+        var openEdgesD: kotlinx.coroutines.Deferred<List<app.vela.core.data.ValhallaRouter.Edge>?>? = null
+        var openLine: List<LatLng>? = null
+        val fetched = coroutineScope {
+            val phoneFirst = urgent && routeEngine.isReady(mode) && routeEngine.covers(origin, destination, mode)
+            // PRIMARY: the open router (OSRM) — complete, street-named turn-by-turn + real geometry.
+            // Google's keyless directions endpoint hands back ABBREVIATED steps for longer routes
+            // (a 6-mi route came back with 2 of ~10 turns), so Google is only the FALLBACK + the
+            // live-traffic source. Fetch both in parallel so the traffic round-trip is free.
+            val openCall = {
+                RouteGeometry.route(
+                    http, origin, destination, mode, avoidTolls, avoidHighways, avoidFerries, tries, departBearingDeg,
+                    callTimeoutMs = osrmTryMs, budget = osrmBudget, onFailure = onOsrmFail,
+                )
+            }
+            // Outside the scope when phone first can return ahead of it: a scope waits for its
+            // children, and as one this blocking call would hold the phone's route for the rest
+            // of URGENT_OSRM_TIMEOUT_MS. The scope's end, or its cancellation, cancels it.
+            val openD = if (phoneFirst) abandonableAsync { openCall() } else async { openCall() }
+            // URGENT (a mid-drive reroute): Google runs on an unstructured scope so a dead or slow
+            // Google endpoint cannot hold the reroute. A diagnostics export (issue #397, 2026-09-15)
+            // showed reroutes taking 18 to 40 s while OSRM had answered in seconds, because the
+            // fetch waited for Google's empty replies and their backoff. Once the open router has
+            // a route, Google gets URGENT_GOOGLE_GRACE_MS more; past that the route goes out
+            // trafficless and the recheck's trafficUpgrade heals it minutes later. (A structured
+            // child would keep this scope open until the blocking HTTP call returned, which is the
+            // wait this exists to remove; the orphan finishes into the void, like the avoid compute.)
+            val googleD = if (bounded) kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).async {
+                googleDirectionsRetried(origin, destination, mode, tries, avoidTolls, avoidHighways, avoidFerries)
+            } else async { googleDirectionsRetried(origin, destination, mode, tries, avoidTolls, avoidHighways, avoidFerries) }
+            // PHONE FIRST: an urgent reroute over a downloaded region computes the on-device route
+            // in parallel and takes it when the open router is not back inside the short wait.
+            val phoneD = if (phoneFirst) {
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).async {
+                    runCatching {
+                        routeEngine.route(origin, destination, mode, avoidTolls, avoidHighways, avoidFerries, departBearingDeg, maxMs = PHONE_FIRST_ONLINE_WAIT_MS + PHONE_FIRST_ONDEVICE_WAIT_MS)
+                            .map { it.copy(offline = true) }
+                    }.getOrDefault(emptyList())
+                }
+            } else null
+            val openRaw = if (phoneD == null) openD.await() else {
+                val early = kotlinx.coroutines.withTimeoutOrNull(PHONE_FIRST_ONLINE_WAIT_MS) { openD.await() }
+                if (!early.isNullOrEmpty()) early else {
+                    val wait = minOf(PHONE_FIRST_ONDEVICE_WAIT_MS, budget.remainingMs() ?: PHONE_FIRST_ONDEVICE_WAIT_MS).coerceAtLeast(0L)
+                    val onDevice = kotlinx.coroutines.withTimeoutOrNull(wait) { phoneD.await() }.orEmpty()
+                    if (onDevice.isNotEmpty()) {
+                        avoidHonored = true // the obf engine applies the avoid parameters itself
+                        diag.record(
+                            "directions",
+                            "urgent: phone first, on-device route after ${budget.elapsedMs()} ms while the open router was " +
+                                (if (early == null) "still out" else "empty") + "; the recheck heals traffic",
+                            "",
+                        )
+                        return@coroutineScope onDevice
+                    }
+                    early ?: openD.await()
+                }
+            }
+            // THE OPEN ROUTER'S TURN NAMES ARE CHECKED TOO (2026-10-02): the road pieces under its
+            // own line are asked for here and read once the routes are built (after this block), so
+            // the request runs beside Google's and the stretch matching instead of ahead of them.
+            openLine = openRaw.firstOrNull()?.polyline
+            openEdgesD = if (mode == TravelMode.DRIVE && openRaw.firstOrNull()?.source == RouteSource.OSRM)
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).async {
+                    // A reply in a shape the parser does not know is no answer, not a failed route.
+                    runCatching { app.vela.core.data.ValhallaRouter.edges(http, openRaw.first().polyline, timeoutMs = if (urgent) 1_000 else 2_500) }.getOrNull()
+                } else null
+            val avoidWanted = (avoidTolls || avoidHighways || avoidFerries) && mode == TravelMode.DRIVE
+            if (bounded && openRaw.isEmpty()) {
+                // Bounded + open router empty or hung (issue #557): (a) Google's route from this
+                // same fetch if it is already back, (b) the downloaded region, (c) nothing. Google
+                // routes go out tagged abbreviated, so the recheck heal upgrades them to full
+                // steps once the open router answers again. Every decision is logged so an
+                // export shows which source answered and how long each stage took.
+                val osrmMs = budget.elapsedMs()
+                val fb = RerouteFallback.pick(
+                    googleD,
+                    onDevice = if (routeEngine.isReady(mode)) {
+                        {
+                            routeEngine.route(origin, destination, mode, avoidTolls, avoidHighways, avoidFerries, departBearingDeg, maxMs = budget.remainingMs())
+                                .map { it.copy(offline = true) }
+                        }
+                    } else null,
+                    budgetMs = budget.remainingMs() ?: 0L,
+                )
+                diag.record(
+                    "directions",
+                    "$stage: $mode open router gave nothing after $osrmMs ms (${osrmWhy.get()}); " +
+                        "fallback ${fb.source.name.lowercase()} ${fb.routes.size} route(s) after ${fb.waitedMs} ms more " +
+                        "(on-device tried=${fb.onDeviceTried}, heading=${departBearingDeg?.toInt()})",
+                    "",
+                )
+                return@coroutineScope when (fb.source) {
+                    RerouteFallback.Source.GOOGLE_READY, RerouteFallback.Source.GOOGLE -> {
+                        if (avoidWanted && DirectionsPb.avoidSupported(calibration.current().directionsPb)) avoidHonored = true
+                        fb.routes.map { it.copy(abbreviatedSteps = true, source = RouteSource.GOOGLE_ABBREVIATED) }
+                    }
+                    RerouteFallback.Source.ON_DEVICE -> {
+                        avoidHonored = true // the obf engine applies the avoid parameters itself
+                        fb.routes
+                    }
+                    RerouteFallback.Source.NONE -> emptyList()
+                }
+            }
+            val googleAll = when {
+                urgent && openRaw.isNotEmpty() ->
+                    kotlinx.coroutines.withTimeoutOrNull(URGENT_GOOGLE_GRACE_MS) { googleD.await() } ?: run {
+                        diag.record("directions", "urgent: google not back ${URGENT_GOOGLE_GRACE_MS} ms after OSRM, rerouting trafficless")
+                        emptyList()
+                    }
+                // The escalated reroute: the open router answered, Google gets what is left
+                // minus room for the traffic snap, then the route goes out trafficless.
+                bounded -> {
+                    val wait = ((budget.remainingMs() ?: 0L) - LADDER_SNAP_RESERVE_MS).coerceAtLeast(0L)
+                    kotlinx.coroutines.withTimeoutOrNull(wait) { googleD.await() } ?: run {
+                        diag.record("directions", "ladder: google not back after ${budget.elapsedMs()} ms, rerouting trafficless")
+                        emptyList()
+                    }
+                }
+                else -> googleD.await()
+            }
+            // A REROUTE GOES THE WAY THE CAR IS GOING. Google's request has no heading, so from a
+            // car that has just passed a turn its route often starts back the way the car came,
+            // and since the driven line is Google's wherever it differs, the reroute said "turn
+            // around", the driver carried on, and the next reroute said it again (a real drive,
+            // three reroutes in thirty seconds). The open router was asked with the car's heading;
+            // a Google route that starts against it is set aside when the open router answered,
+            // unless going on costs minutes more than turning around (RouteGeometry.forwardChoice).
+            val google = if (departBearingDeg != null && openRaw.isNotEmpty()) {
+                val chosen = RouteGeometry.forwardChoice(googleAll, departBearingDeg, openRaw.firstOrNull()?.durationSeconds, openRaw.firstOrNull()?.distanceMeters)
+                val against = googleAll.count { RouteGeometry.startsAgainst(it.polyline, departBearingDeg) }
+                if (against > 0) diag.record(
+                    "directions",
+                    "reroute: $against of ${googleAll.size} google route(s) start against the car's heading, " +
+                        when {
+                            chosen.isEmpty() -> "set aside for the open router's"
+                            RouteGeometry.startsAgainst(chosen.first().polyline, departBearingDeg) -> "kept: going on costs too much"
+                            else -> "set aside"
+                        },
+                )
+                chosen
+            } else googleAll
+            val gTop = google.firstOrNull()
+            val open = openRaw
+            // AVOID toggles: the public FOSSGIS OSRM rejects `exclude=` outright (probed
+            // 2026-07-11 and again 2026-08-24: InvalidValue, its profiles were not built with
+            // excludable classes). Google's keyless directions DO honor avoid (DirectionsPb.withAvoid, 2026-09-06), so
+            // online the avoiding route IS gTop: the open router cannot exclude, so its plain route
+            // diverges and the snap below follows Google's course with named turns, and Google's
+            // own in-traffic time is the ETA. The on-device engine is the avoid router only when
+            // Google is unreachable. (Until today avoid was on-device-or-nothing, with the plain
+            // route and a note otherwise; #325's broken ETA came from that branch.)
+            // Honored only when the request could actually carry the flags: a recalibrated pb
+            // template without the feature block makes withAvoid a no-op (review 2026-09-06).
+            if (avoidWanted && gTop != null && DirectionsPb.avoidSupported(calibration.current().directionsPb)) avoidHonored = true
+            if (avoidWanted && gTop == null && routeEngine.isReady(mode)) {
+                // BOUNDED: the obf engine can spend many seconds on a long route, and this branch
+                // used to wait for it unconditionally - with an offline region installed an
+                // avoid-toggled plan just sat there (the Reddit report). The compute runs on an
+                // UNSTRUCTURED scope on purpose: a structured child would keep this coroutineScope
+                // from returning until the non-cancellable native compute finished, which would
+                // defeat the timeout entirely. Past the deadline the online chain answers (tagged
+                // not-honored below) and the orphaned compute finishes and is discarded.
+                val avoidWait = budget.remainingMs()?.let { minOf(it, AVOID_ONDEVICE_TIMEOUT_MS) } ?: AVOID_ONDEVICE_TIMEOUT_MS
+                val avoidD = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).async {
+                    runCatching { routeEngine.route(origin, destination, mode, avoidTolls, avoidHighways, avoidFerries, departBearingDeg, maxMs = avoidWait).map { it.copy(offline = true) } }.getOrDefault(emptyList())
+                }
+                val avoidRoutes = kotlinx.coroutines.withTimeoutOrNull(avoidWait) { avoidD.await() } ?: emptyList()
+                if (avoidRoutes.isNotEmpty()) {
+                    avoidHonored = true
+                    // Offline (no Google answer): the engine's own time is all there is. Online,
+                    // this branch never runs; Google's avoiding route carries the traffic ETA.
+                    return@coroutineScope avoidRoutes
+                }
+            }
+            // TRAFFIC-AWARE routing (option 3): if Google's live-traffic route took a DIFFERENT path
+            // than OSRM's free-flow one — i.e. Google rerouted around a jam — re-run OSRM forced
+            // through Google's path so we follow the traffic-smart route WITH full street-named steps.
+            // (Only on real divergence, so the normal case stays the fast single OSRM call.)
+            val topDivergent = open.isNotEmpty() && gTop != null && gTop.polyline.size >= 5 &&
+                RouteGeometry.divergent(open.first(), gTop)
+            // GOOGLE'S LINE, ALWAYS (2026-10-02, a real drive: Google routed around a closed road,
+            // Vela drove into it twice). The open router knows nothing of closures, and the test
+            // above samples five points and asks for 700 m, so a detour of a few blocks read as
+            // "same course" and the open route was kept with Google's time painted on it. Now,
+            // for DRIVE, wherever Google's line leaves the open route at all the result is
+            // Google's line itself (HybridRoute): the open router's maneuvers where the two share
+            // the road, turns named from the map tiles on the stretches where they do not. Nothing
+            // is routed through sampled points, so it cannot loop. Only the tiles under the
+            // differing stretches are read. When a stretch cannot be named (tiles unreachable,
+            // too little of it on a named street) the older via-snap and plain paths stand.
+            // CAPTURE for the replay tests: Google's own line for this trip, to logcat, only when a
+            // developer asks (adb shell setprop log.tag.VelaCapture DEBUG). Lines from real trips are
+            // what NamingStudyTest.replayCapturedLines builds the route from on a desk, where
+            // Google's directions cannot be fetched.
+            if (mode == TravelMode.DRIVE && gTop != null && android.util.Log.isLoggable("VelaCapture", android.util.Log.DEBUG)) runCatching {
+                val id = System.currentTimeMillis().toString(36)
+                val enc = PolylineCodec.encode(gTop.polyline)
+                android.util.Log.d("VelaCapture", "BEGIN $id ${gTop.distanceMeters.toInt()} ${gTop.durationSeconds.toInt()} ${enc.length}")
+                enc.chunked(3000).forEachIndexed { i, c -> android.util.Log.d("VelaCapture", "P $id $i $c") }
+                android.util.Log.d("VelaCapture", "END $id")
+            }
+            val hybridStretches = if (mode == TravelMode.DRIVE && open.isNotEmpty() && gTop != null && gTop.polyline.size >= 5)
+                app.vela.core.data.naming.HybridRoute.stretchesFor(gTop.polyline, open.first()) else emptyList()
+            // Which stretch ends the trip is read off the line's own length: stretches are meters
+            // along the line, and Google's stated distance is not.
+            val gLineM = if (hybridStretches.isEmpty() || gTop == null) 0.0 else app.vela.core.data.naming.HybridRoute.lengthOf(gTop.polyline)
+            val tHybrid = System.currentTimeMillis()
+            // Each stretch where Google leaves the open route gets its steps from the best source
+            // that answers, in this order (how many took each is logged):
+            //  1. a MAP MATCH of the stretch (ValhallaRouter.match): the road network's own steps
+            //     for the roads the line is on, so a name is never a guess. Checked against the
+            //     line before it is trusted.
+            //  2. the map tiles, strictly (LineNamer): a name only where the map is sure. A study
+            //     of 90 routes put this at 1.4% wrong names, which is why it is second.
+            //  3. the line's bends alone: bare "Turn right".
+            // It is always Google's line. A missing street name costs nothing; a wrong one, or the
+            // open router's own route through whatever Google went around, sends the driver wrong
+            // (the owner's rule, 2026-10-02).
+            val untrusted = java.util.Collections.synchronizedList(ArrayList<app.vela.core.data.naming.HybridRoute.Stretch>()) // where a kept match is off Google's line
+            val stretchNames = IntArray(4) // on matched stretches: turn names kept, renamed, bare; stretches whose edges did not come back
+            val stretchSource = IntArray(4) // matched, from tiles, bare, and of the matched: with the open router's lane detail
+            // The matched road shape per stretch (OpenStreetMap geometry), for the line to DRAW.
+            val matchedShapes = java.util.concurrent.ConcurrentHashMap<app.vela.core.data.naming.HybridRoute.Stretch, List<LatLng>>()
+            // Each stretch's steps from the best source in hand when the route has to go out
+            // (StretchNamer). The tiles are read beside the matcher, so a slow matcher costs no
+            // names; and what a stretch has when the deadline passes is kept, so one slow stretch
+            // does not strip the others, and a matched stretch keeps its road shape for the line.
+            val matches = java.util.concurrent.ConcurrentHashMap<app.vela.core.data.naming.HybridRoute.Stretch, app.vela.core.data.ValhallaRouter.Match>()
+            val nudgedM = java.util.concurrent.atomic.AtomicInteger(0) // meters of the drawn line moved onto the roads' middle
+            fun pieceOf(st: app.vela.core.data.naming.HybridRoute.Stretch) = app.vela.core.data.naming.HybridRoute.slice(gTop!!.polyline, st.fromM, st.toM)
+            val namer = app.vela.core.data.naming.StretchNamer(
+                match = { st ->
+                    val (startSlack, endSlack) = app.vela.core.data.naming.HybridRoute.tripEndSlack(st, gLineM, MATCH_TRIP_END_SLACK_M)
+                    val m = if (st.toM - st.fromM <= MATCH_MAX_M && !app.vela.core.data.ValhallaRouter.matchOff)
+                        app.vela.core.data.ValhallaRouter.matchWithEdges(
+                            http, pieceOf(st), timeoutMs = if (urgent) 1_200 else 2_500,
+                            startSlackM = startSlack, endSlackM = endSlack,
+                            // Only a stretch that starts the trip has its first step said.
+                            departSaid = st.fromM <= 0.0,
+                        ) else null
+                    m?.let {
+                        matches[st] = it
+                        it.off.forEach { o -> untrusted += app.vela.core.data.naming.HybridRoute.Stretch(st.fromM + o.first, st.fromM + o.second) }
+                        if (it.off.isEmpty()) matchedShapes[st] = it.route.polyline
+                        app.vela.core.data.naming.StretchNamer.Named(
+                            it.route.maneuvers, app.vela.core.data.naming.StretchNamer.Source.MATCHED,
+                            names = it.names.copyOf(3), noEdges = it.edges == null,
+                        )
+                    }
+                },
+                // LANES: the matcher gives names, exit numbers and signs but no lane arrows; only
+                // the open router has those. The matched path is on the road network exactly, so
+                // the open router can be led along it with a point in the middle of each step
+                // (never at a turn, which a via swallows), each with the path's heading. Its steps
+                // are used only when its path is the matched path (8 m); else the matcher's stand.
+                // Those steps carry the open router's names, so they pass the same check against
+                // the matched edges; borrowed lanes sit on the matcher's steps, whose names are
+                // already checked. Without edges the matcher's stand.
+                lanes = { st, plain ->
+                    val m = matches[st]
+                    val edges = m?.edges
+                    if (urgent || m == null || edges == null) null else {
+                        val (startSlack, endSlack) = app.vela.core.data.naming.HybridRoute.tripEndSlack(st, gLineM, MATCH_TRIP_END_SLACK_M)
+                        laneDetail(m.route, LANE_TRY_MS, trimStartM = startSlack, trimEndM = endSlack)?.let { (ms, replaced) ->
+                            val dt = IntArray(4)
+                            val steps = if (replaced) app.vela.core.data.ValhallaRouter.recheck(ms, edges, keepUnplaced = false, tally = dt) else ms
+                            app.vela.core.data.naming.StretchNamer.Named(
+                                steps, app.vela.core.data.naming.StretchNamer.Source.MATCHED, lanes = true,
+                                names = if (replaced) intArrayOf(dt[0], dt[1], dt[2] + dt[3]) else plain.names,
+                            )
+                        }
+                    }
+                },
+                tiles = { st, fetch ->
+                    val piece = pieceOf(st)
+                    val len = st.toM - st.fromM
+                    val sub = gTop!!.copy(
+                        polyline = piece, distanceMeters = len, legs = emptyList(), trafficSpans = emptyList(),
+                        durationSeconds = if (gTop.distanceMeters > 0) gTop.durationSeconds * len / gTop.distanceMeters else 0.0,
+                    )
+                    val lines = app.vela.core.data.naming.RoadNameTiles.linesAlong(piece, fetchMissing = fetch).orEmpty()
+                    app.vela.core.data.naming.LineNamer.name(sub, lines, mode, strict = true)?.maneuvers?.let {
+                        app.vela.core.data.naming.StretchNamer.Named(
+                            it, if (lines.isEmpty()) app.vela.core.data.naming.StretchNamer.Source.BARE else app.vela.core.data.naming.StretchNamer.Source.TILES,
+                        )
+                    }
+                },
+                // On a link where bytes are precious the tiles wait for the matcher to fail.
+                hedgeAfterMs = when {
+                    app.vela.core.data.LowDataMode.enabled -> TILE_HEDGE_NEVER_MS
+                    urgent -> TILE_HEDGE_URGENT_MS
+                    else -> TILE_HEDGE_MS
+                },
+            )
+            suspend fun hybridOf(online: Boolean): Route? = coroutineScope {
+                val named = hybridStretches.map { st ->
+                    async(Dispatchers.IO) { st to (if (online) namer.name(st) else namer.inHand(st))?.steps }
+                }.awaitAll()
+                if (named.any { it.second == null }) return@coroutineScope null
+                // The open router's steps that are carried over get their names checked first, at
+                // their own positions (the stitch moves them onto Google's line). The request has
+                // been running since the open router answered.
+                val ed = openEdgesD
+                val tally = IntArray(4)
+                val openChecked = (if (online && ed != null) kotlinx.coroutines.withTimeoutOrNull(if (urgent) OPEN_NAMES_WAIT_URGENT_MS else OPEN_NAMES_WAIT_MS) { ed.await() } else null)
+                    ?.let { app.vela.core.data.ValhallaRouter.recheck(open.first(), it, keepUnplaced = true, tally = tally) }
+                if (openChecked != null) runCatching { android.util.Log.i("VelaDirections", "open names (hybrid): kept ${tally[0]} renamed ${tally[1]} bare ${tally[2]} unplaced ${tally[3]}") }
+                val openUsed = openChecked ?: open.first()
+                // THE DRAWN LINE ON THE ROADS' MIDDLE: a stretch with no matched shape would be
+                // drawn on Google's own line, which runs in the driving lane and hangs off a
+                // street drawn from OpenStreetMap. Its points are moved onto the map's roads
+                // where one is within RoadCenter.MAX_OFF_M, from the tiles the naming already
+                // read (nothing is requested for this), and left alone past that.
+                val unshaped = hybridStretches.filter { matchedShapes[it] == null }
+                val roads = unshaped.flatMap { app.vela.core.data.naming.RoadNameTiles.roadsAlong(pieceOf(it), fetchMissing = false, maxTiles = DRAW_ROADS_MAX_TILES).orEmpty() }
+                nudgedM.set(0)
+                val nudge: ((List<LatLng>) -> List<LatLng>)? = if (roads.isEmpty()) null else { piece ->
+                    app.vela.core.data.naming.RoadCenter.nudgeCounted(piece, roads).let { (line, movedM) -> nudgedM.addAndGet(movedM); line }
+                }
+                app.vela.core.data.naming.HybridRoute.stitch(gTop!!, openUsed, named.map { it.first to it.second!! }, untrusted.toList())
+                    ?.let { r -> r.copy(drawPolyline = app.vela.core.data.naming.HybridRoute.drawLine(gTop.polyline, openUsed.polyline, hybridStretches, matchedShapes, nudge)) }
+            }
+            // Anything the matching or the stitch throws costs the hybrid, never the route: the
+            // paths below it still answer. (A cancellation is the deadline or the caller, and passes.)
+            suspend fun hybridOrNull(online: Boolean): Route? = try { hybridOf(online) } catch (c: kotlinx.coroutines.CancellationException) { throw c } catch (t: Throwable) {
+                runCatching { android.util.Log.w("VelaDirections", "hybrid failed: ${t.javaClass.simpleName}") }
+                null
+            }
+            var namedInTime = false
+            val hybridBuilt = if (hybridStretches.isEmpty()) null else
+                kotlinx.coroutines.withTimeoutOrNull(if (urgent) HYBRID_WAIT_URGENT_MS else HYBRID_WAIT_MS) { hybridOrNull(online = true).also { namedInTime = true } }
+                    ?: hybridOrNull(online = false)
+            for (st in hybridStretches) {
+                val r = namer.result(st) ?: continue
+                when (r.source) {
+                    app.vela.core.data.naming.StretchNamer.Source.MATCHED -> {
+                        stretchSource[0]++
+                        if (r.lanes) stretchSource[3]++
+                        for (k in 0..2) stretchNames[k] += r.names[k]
+                        if (r.noEdges) stretchNames[3]++
+                    }
+                    app.vela.core.data.naming.StretchNamer.Source.TILES -> stretchSource[1]++
+                    app.vela.core.data.naming.StretchNamer.Source.BARE -> stretchSource[2]++
+                }
+            }
+            // How the steps were made rides on the route into the trip file (Route.made): which
+            // source named each stretch, how long it took, and whether the deadline passed first.
+            val hybrid = hybridBuilt?.copy(
+                made = listOfNotNull(
+                    "open=${open.first().source.name.lowercase()}${open.first().maneuvers.size}",
+                    "stretches=${hybridStretches.size}",
+                    "stretchM=${hybridStretches.sumOf { it.toM - it.fromM }.toInt()}",
+                    "matched=${stretchSource[0]}", "tiled=${stretchSource[1]}", "bare=${stretchSource[2]}", "lanes=${stretchSource[3]}",
+                    "naming=${System.currentTimeMillis() - tHybrid}ms",
+                    "nudged=${nudgedM.get()}m".takeIf { nudgedM.get() > 0 },
+                    "namingLate".takeIf { !namedInTime },
+                    "urgent".takeIf { urgent },
+                ).joinToString(";"),
+                // A stretch that went out bare is asked for again during the drive (RouteHeal).
+                namesShort = !namedInTime || stretchSource[2] > 0,
+            )
+            if (hybridStretches.isNotEmpty()) runCatching {
+                android.util.Log.i("VelaDirections", "google line: ${hybridStretches.size} stretch(es) off the open route, " +
+                    "${hybridStretches.sumOf { it.toM - it.fromM }.toInt()} m of ${gLineM.toInt()} m (Google states ${gTop?.distanceMeters?.toInt()} m), " +
+                    (if (hybrid != null) "hybrid ${hybrid.maneuvers.size} steps (open ${open.first().maneuvers.size}); stretches matched ${stretchSource[0]} (${stretchSource[3]} with lane detail), from tiles ${stretchSource[1]}, bare ${stretchSource[2]}; their turn names kept ${stretchNames[0]} renamed ${stretchNames[1]} dropped ${stretchNames[2]}, no edges for ${stretchNames[3]}, off the line in ${untrusted.size} place(s), ${nudgedM.get()} m drawn on the roads' middle" else "NOT placed, older path") +
+                    " in ${System.currentTimeMillis() - tHybrid} ms")
+                // Do the steps describe Google's line? Counts only (StepAudit).
+                if (hybrid != null) {
+                    val audit = app.vela.core.nav.StepAudit.check(hybrid)
+                    android.util.Log.i("VelaDirections", audit.summary())
+                    // The whole list with where each step came from, for reading a trip by hand:
+                    // adb shell setprop log.tag.VelaSteps DEBUG. Distances along the route only.
+                    if (android.util.Log.isLoggable("VelaSteps", android.util.Log.DEBUG)) {
+                        var at = 0.0
+                        hybrid.maneuvers.forEach { m ->
+                            val from = if (hybridStretches.any { at >= it.fromM && at <= it.toM }) "stretch" else "open"
+                            android.util.Log.d("VelaSteps", "${at.toInt()} m [$from] ${m.type} len=${m.distanceMeters.toInt()} lanes=${m.lanes.size} | ${m.instruction}")
+                            at += m.distanceMeters
+                        }
+                        hybridStretches.forEach { android.util.Log.d("VelaSteps", "stretch ${it.fromM.toInt()}..${it.toM.toInt()} m") }
+                        audit.findings.forEach { android.util.Log.d("VelaSteps", "audit ${it.atM.toInt()} m: ${it.what}") }
+                    }
+                }
+            }
+            val viaRoute = when {
+                hybrid != null -> hybrid
+                (!urgent || avoidWanted) && topDivergent -> RouteGeometry.routeVia(
+                    http, listOf(origin) + RouteGeometry.sampleVias(gTop!!.polyline) + destination, mode,
+                    avoidTolls, avoidHighways, avoidFerries, departBearingDeg, strictVias = true,
+                    tries = tries, callTimeoutMs = osrmTryMs, budget = budget,
+                ).firstOrNull()?.copy(source = RouteSource.OSRM_VIA_SNAP) // a trip log can tell a jam snap from a plain route
+                else -> null
+            }
+            // Cheap checks first, the shape test last (it walks the whole route): the via route
+            // must reach the destination and not be markedly LONGER than the course it followed
+            // (a via that snapped to a side road adds a detour).
+            val viaReaches = viaRoute != null && gTop != null &&
+                viaRoute.polyline.lastOrNull()?.let { it.distanceTo(destination) <= SNAP_REACH_M } == true &&
+                viaRoute.distanceMeters <= gTop.distanceMeters * SNAP_LENGTH_SLACK + SNAP_LENGTH_SLACK_M
+            // The "appendix": a stretch that travels without progressing along Google's line,
+            // then comes back. Refused only when a TURN or U-TURN sits on it - a loop ramp that
+            // OSM draws in full and Google's line chords is the same shape without one (review
+            // 2026-09-06), and a loop ramp is a MERGE/RAMP, never a U-turn.
+            val trafficRoute = viaRoute?.takeIf { r ->
+                viaReaches && !spurWithTurn(r, gTop!!.polyline)
+            }
+            // OFFLINE fallback: OSRM (and Google) need the network. When OSRM came back empty — no
+            // connectivity, or the FOSSGIS server is down — route fully ON-DEVICE from a downloaded
+            // obf region file, if one covers this area. No traffic offline, but complete named turns.
+            // (Planning only: a bounded fetch with an empty open router returned above.)
+            val onDevice = if (open.isEmpty() && trafficRoute == null && routeEngine.isReady(mode))
+                routeEngine.route(origin, destination, mode, avoidTolls, avoidHighways, avoidFerries, departBearingDeg).map { it.copy(offline = true) } else emptyList()
+            // Lead with Google's jam-avoiding path (option 3) only when it EARNS it: its live in-traffic
+            // ETA is within a small margin of OSRM's FREE-FLOW best, so even Google's detour is time-
+            // competitive → the jam is real. The old code led with the snap on ANY >700 m divergence, so a
+            // longer/wonky snapped path could win even when it wasn't faster (the "fucky reroute"); now such
+            // a snap steps aside for OSRM's clean route. (A true per-alternate re-rank isn't possible: Google
+            // hands back ONE live-traffic figure, so applyTraffic scales every route by the same ratio and
+            // can't reorder the OSRM alternates — this ETA gate is the meaningful lever.)
+            val avoidTag = when {
+                !avoidWanted -> ""
+                gTop != null -> " avoid=google"
+                else -> " avoid=none"
+            }
+            val googleEtaS = gTop?.durationInTrafficSeconds ?: gTop?.durationSeconds
+            // The snapped via-route must actually REACH the destination — a truncated one ending at an
+            // intermediate via (short ETA, wrong last step) is the "10 min away" nav bug — AND be time-
+            // competitive with OSRM's free-flow best.
+            val snapReaches = trafficRoute != null
+            // One calibration for the whole response (issue #227): OSRM's free-flow model has no
+            // signal timing, so on an arterial it runs far under Google's TYPICAL for the same
+            // road. Taken from the route that FOLLOWS Google's course: the top OSRM route when it
+            // does, else the via-snap, which follows Google's course by construction. Before the
+            // 2026-09-12 review the divergent case (Google routing around a jam, exactly when it
+            // matters) got no calibration at all, so the plain OSRM route kept its fiction of an
+            // ETA and sorted ahead of Google's honest alternates as "Fastest". Alternates share
+            // the same optimiztic speed model, so rebasing them all by one factor keeps the
+            // picker's ranking fair.
+            val freeFlowCal = gTop?.takeIf { it.durationSeconds > 0 && it.polyline.size >= 5 }?.let { g ->
+                // Never the hybrid: its times ARE Google's, so it says nothing about the open
+                // router's speed model, which is what this factor corrects.
+                val basis = open.firstOrNull()?.takeIf { !RouteGeometry.divergent(it, g) }
+                    ?: trafficRoute?.takeIf { it.source != RouteSource.GOOGLE_HYBRID && !RouteGeometry.divergent(it, g) }
+                basis?.takeIf { it.durationSeconds > 0 }?.let { b ->
+                    val dScale = if (g.distanceMeters > 0) b.distanceMeters / g.distanceMeters else 1.0
+                    ((g.durationSeconds * dScale) / b.durationSeconds).coerceIn(0.5, 3.0)
+                }
+            }
+            // With avoid on, the snap is the point (Google's avoiding course is slower than the
+            // open router's unrestricted one by construction), so the ETA margin test is skipped.
+            // The margin compares Google's live ETA against OSRM's CALIBRATED free-flow: the raw
+            // free-flow is the very number the calibration exists to correct, and judged against
+            // it a jam-avoiding snap lost to the fiction every time.
+            // The hybrid is Google's own line, the route Google would drive: it leads without the
+            // margin test, which exists to keep a wonky SNAPPED path from winning.
+            val snapWorthIt = trafficRoute != null && snapReaches && open.isNotEmpty() && googleEtaS != null &&
+                (avoidWanted || hybrid != null || googleEtaS <= open.first().durationSeconds * (freeFlowCal ?: 1.0) * SNAP_ETA_MARGIN)
+            // Avoid on, Google answered, but the open router could not be led along its course:
+            // Google's own (abbreviated) steps beat a plain route that ignores the avoid.
+            // Only when the open route actually left Google's avoiding course; when it already
+            // follows it (no toll or motorway on the way anyway), the open route with its full
+            // named turns IS the avoiding route (review 2026-09-06: this used to throw it away).
+            val avoidFallbackToGoogle = avoidWanted && gTop != null && !snapWorthIt && topDivergent
+            diag.record(
+                "directions",
+                "$mode → OSRM ${open.size} routes / ${open.firstOrNull()?.maneuvers?.size ?: 0} steps; " +
+                    "google ${google.size} (typ=${gTop?.durationSeconds?.toInt()}s traf=${gTop?.durationInTrafficSeconds?.toInt()}s spans=${gTop?.trafficSpans?.size} " +
+                    "ratio=${gTop?.durationInTrafficSeconds?.let { t -> gTop?.durationSeconds?.takeIf { it > 0 }?.let { String.format(java.util.Locale.US, "%.2f", t / it) } }}); " +
+                    "rerouted=${trafficRoute != null} hybrid=${hybrid != null} stretches=${hybridStretches.size} (matched ${stretchSource[0]} tiles ${stretchSource[1]} bare ${stretchSource[2]}) snapKept=$snapWorthIt snapReaches=$snapReaches " +
+                    "(gEta=${googleEtaS?.toInt()}s osrmFF=${open.firstOrNull()?.durationSeconds?.toInt()}s " +
+                    "sameCourse=${open.firstOrNull()?.let { t -> gTop?.takeIf { it.polyline.size >= 5 }?.let { !RouteGeometry.divergent(t, it) } }} " +
+                    "cal=${freeFlowCal?.let { String.format(java.util.Locale.US, "%.2f", it) }}); " +
+                    "onDevice=${onDevice.size}$avoidTag",
+                "",
+            )
+            if (open.isEmpty()) {
+                // OSRM unreachable → the on-device offline route, or Google's abbreviated one, whichever
+                // we have. The Google routes are TAGGED abbreviated so an adopted one can be silently
+                // upgraded to full steps by the nav recheck once the open router recovers.
+                if (onDevice.isNotEmpty()) onDevice else google.map { it.copy(abbreviatedSteps = true, source = RouteSource.GOOGLE_ABBREVIATED) }
+            } else {
+                if (avoidFallbackToGoogle) return@coroutineScope google.map { it.copy(abbreviatedSteps = true, source = RouteSource.GOOGLE_ABBREVIATED) }
+                // With avoid on, the open router's unrestricted routes are not offered as alternates.
+                // With the hybrid leading, which of the open router's routes are still offered:
+                // none of them when Google went a genuinely different way (their times are the
+                // open router's uncalibrated free-flow, which would sort ahead of honest ones), and
+                // not its top route otherwise (that is the way Google chose not to go, a closure
+                // as far as anyone can tell, and on time it would tie and lead again).
+                val openOffered = when {
+                    avoidWanted -> emptyList()
+                    hybrid != null -> if (topDivergent) emptyList() else open.drop(1)
+                    else -> open
+                }
+                val primary = if (snapWorthIt) (listOf(applyTraffic(trafficRoute!!, gTop, if (hybrid != null) 1.0 else freeFlowCal)) + openOffered.map { applyTraffic(it, gTop, freeFlowCal) })
+                    // Avoid on and the open router's top route already follows Google's avoiding
+                    // course: that one route IS the avoiding route, but the open router's OTHER
+                    // routes were computed with no avoid at all (it cannot exclude), so they are
+                    // not offered, the same rule as the snapped branch. Before this they were, and
+                    // with Google having honored the avoid, without the "may still use" note.
+                    else (if (avoidWanted && gTop != null) open.take(1) else open).map { applyTraffic(it, gTop, freeFlowCal) }
+                // ALTERNATES to choose from = Google's OWN alternate routes (the real, traffic-aware ones you
+                // miss). Kept PROVISIONAL: their polyline + live ETA are shown now, but turn-by-turn is named
+                // only when you PICK one to drive ([nameRoute]) — so the picker loads fast and we never snap a
+                // route you don't take. Google's routes already carry duration_in_traffic + congestion spans.
+                val googleAlts = google.drop(1).filter { it.polyline.size >= 5 }.map { it.copy(provisional = true, source = RouteSource.GOOGLE_PROVISIONAL) }
+                // Rank by live in-traffic ETA so the FASTEST-right-now route leads (Google-style), sorting by
+                // the EXACT value the picker shows (`durationInTrafficSeconds ?: durationSeconds`, RouteOption)
+                // so the top/selected route is always the one the picker tags "Fastest" — otherwise the sort
+                // and the displayed times disagree and the fastest-shown route isn't at the top (the bug).
+                // The traffic axis is already fair without a fudge factor: PRIMARY routes are run through
+                // applyTraffic above (their durationInTrafficSeconds = free-flow × the top Google route's
+                // in-traffic ratio), and Google's own alternates carry their real per-route duration_in_traffic
+                // — so a route only falls back to raw durationSeconds when there's genuinely no traffic signal
+                // for it, and then showing/sorting that free-flow time is the honest, self-consistent fallback.
+                // Dedupe by path (keeps the fastest of look-alikes) + cap so the picker stays short.
+                dedupeRoutes(
+                    (listOf(primary.first()) + googleAlts + primary.drop(1))
+                        .sortedWith(
+                            compareBy(
+                                { it.durationInTrafficSeconds ?: it.durationSeconds },
+                                { it.provisional }, // stable tie-break: a fully-named route leads over a provisional look-alike
+                            ),
+                        ),
+                ).take(MAX_ROUTES)
+            }
+        }
+        // The open router's turn names, checked against the road pieces under its line: a turn
+        // whose street is not the one the line is on right after it is renamed or goes out bare
+        // (ValhallaRouter.recheck). Only the route on that very line; the hybrid's carried-over
+        // steps were checked before the stitch. No answer in time = the names stand.
+        val planned = openEdgesD?.let { d ->
+            val t0 = System.currentTimeMillis()
+            val edges = kotlinx.coroutines.withTimeoutOrNull(if (urgent) OPEN_NAMES_WAIT_URGENT_MS else OPEN_NAMES_WAIT_MS) { d.await() }
+                ?: return@let null
+            // The open router drove through a farm track: its route goes, and the other
+            // service's car route takes its place (ValhallaRouter.driveRoute). Only when that
+            // route answers in time and is no great detour; otherwise the open route stands.
+            val trackM = app.vela.core.data.ValhallaRouter.throughTrackM(edges)
+            val onOpenLine = fetched.firstOrNull { it.polyline === openLine }
+            val offTrack = if (trackM >= THROUGH_TRACK_MIN_M && onOpenLine != null) withContext(Dispatchers.IO) {
+                app.vela.core.data.ValhallaRouter.driveRoute(
+                    http, listOf(origin, destination), avoidTolls, avoidHighways, avoidFerries, timeoutMs = if (urgent) OFF_TRACK_WAIT_URGENT_MS else OFF_TRACK_WAIT_MS,
+                )
+            }?.takeIf { it.distanceMeters <= onOpenLine.distanceMeters * OFF_TRACK_MAX_RATIO + OFF_TRACK_MAX_EXTRA_M } else null
+            if (trackM >= THROUGH_TRACK_MIN_M) runCatching {
+                android.util.Log.i("VelaDirections", "open route drives ${trackM.toInt()} m of track: " +
+                    (if (offTrack != null) "replaced, ${offTrack.distanceMeters.toInt()} m for ${onOpenLine?.distanceMeters?.toInt()} m" else if (onOpenLine == null) "not offered" else "kept, no other route in time"))
+            }
+            if (offTrack != null) return@let dedupeRoutes(fetched.map { r -> if (r === onOpenLine) offTrack.copy(durationInTrafficSeconds = null) else r })
+            val tally = IntArray(4)
+            fetched.map { r ->
+                if (r.polyline === openLine)
+                    app.vela.core.data.ValhallaRouter.recheck(r, edges, keepUnplaced = true, tally = tally)
+                        .let { it.copy(made = "openNames=kept${tally[0]}renamed${tally[1]}bare${tally[2]}unplaced${tally[3]}") } else r
+            }.also {
+                runCatching { android.util.Log.i("VelaDirections", "open names: kept ${tally[0]} renamed ${tally[1]} bare ${tally[2]} unplaced ${tally[3]}, waited ${System.currentTimeMillis() - t0} ms more") }
+            }
+        } ?: fetched
+        if ((avoidTolls || avoidHighways || avoidFerries) && mode == TravelMode.DRIVE && !avoidHonored) {
+            planned.map { it.copy(avoidNotHonored = true) }
+        } else planned
+    }
+
+    /**
+     * The other open service's car route through [points] when [open], the open router's own
+     * line, drives through a farm track; null when it does not, or when nothing better answers
+     * in time. Two requests at most, both bounded. A line past the matcher's 200 km is not
+     * checked: the edge request fails and the open route stands.
+     */
+    private fun offTrackRoute(
+        open: Route, points: List<LatLng>, avoidTolls: Boolean, avoidHighways: Boolean, avoidFerries: Boolean, urgent: Boolean,
+    ): Route? {
+        if (open.source != RouteSource.OSRM) return null
+        val edges = runCatching { ValhallaRouter.edges(http, open.polyline, timeoutMs = if (urgent) 1_000 else 2_500) }.getOrNull() ?: return null
+        val trackM = ValhallaRouter.throughTrackM(edges)
+        if (trackM < THROUGH_TRACK_MIN_M) return null
+        val other = ValhallaRouter.driveRoute(
+            http, points, avoidTolls, avoidHighways, avoidFerries, timeoutMs = if (urgent) OFF_TRACK_WAIT_URGENT_MS else OFF_TRACK_WAIT_MS,
+        )?.takeIf { it.distanceMeters <= open.distanceMeters * OFF_TRACK_MAX_RATIO + OFF_TRACK_MAX_EXTRA_M }
+        runCatching {
+            android.util.Log.i("VelaDirections", "open route through ${points.size - 2} stop(s) drives ${trackM.toInt()} m of track: " +
+                if (other != null) "replaced, ${other.distanceMeters.toInt()} m for ${open.distanceMeters.toInt()} m" else "kept, no other route in time")
+        }
+        return other
+    }
+
+    /**
+     * Safety-weighted bike routes (issue #401). The on-device bicycle profile prefers signed cycle
+     * routes and lanes and needs no network, so where a downloaded region covers the trip it is the
+     * router, consistently, for planning and for every reroute; it is BOUNDED like the avoid branch
+     * (the obf engine can spend seconds on a long route and the chooser must not hang), and past
+     * the deadline the online router answers. Online that is FOSSGIS Valhalla with low `use_roads`
+     * ([ValhallaRouter]); alternates only for a plain trip. No Google traffic overlay: bikes do not
+     * sit in car traffic and Google's bike ETA models a different route. Null when nothing answered.
+     */
+    /**
+     * Walking (issue #478): the open router's foot routes, plus Google's walk only when it is at least
+     * [WALK_GOOGLE_SHORTER] shorter (OSM missing a crossing or a path), and then with its own line
+     * kept and its steps named from the map tiles ([LineNamer]), never snapped. Null = the open
+     * router gave nothing and Google's walk could not be named, so the general chain below runs.
+     */
+    private suspend fun walkRoutes(
+        origin: LatLng, destination: LatLng, tries: Int, osrmTryMs: Long?, osrmBudget: RouteBudget,
+        onOsrmFail: (String) -> Unit, urgent: Boolean,
+    ): List<Route>? = coroutineScope {
+        val openD = async {
+            RouteGeometry.route(http, origin, destination, TravelMode.WALK, tries = tries, callTimeoutMs = osrmTryMs, budget = osrmBudget, onFailure = onOsrmFail)
+        }
+        val googleD = async {
+            if (urgent || !app.vela.core.data.RoutingPrefs.googleTraffic) emptyList()
+            else kotlinx.coroutines.withTimeoutOrNull(WALK_GOOGLE_WAIT_MS) {
+                runCatching { googleDirections(origin, destination, TravelMode.WALK, walkCompare = true) }.getOrNull().orEmpty()
+            }.orEmpty()
+        }
+        val open = openD.await()
+        val gTop = googleD.await().firstOrNull()
+        val openTop = open.firstOrNull()
+        val shorter = gTop != null && gTop.polyline.size >= 2 &&
+            (openTop == null || gTop.distanceMeters <= openTop.distanceMeters * (1.0 - WALK_GOOGLE_SHORTER))
+        val t0 = System.currentTimeMillis()
+        var tilesMs = 0L
+        var tileLines = 0
+        val named = if (shorter) {
+            kotlinx.coroutines.withTimeoutOrNull(WALK_NAME_WAIT_MS) {
+                val lines = app.vela.core.data.naming.RoadNameTiles.linesAlong(gTop!!.polyline)
+                tilesMs = System.currentTimeMillis() - t0
+                tileLines = lines?.size ?: -1
+                lines?.let { app.vela.core.data.naming.LineNamer.name(gTop, it, TravelMode.WALK) }
+            }
+        } else null
+        val line = "walk: open ${openTop?.distanceMeters?.toInt()} m, google ${gTop?.distanceMeters?.toInt()} m" +
+            (if (shorter) (if (named != null) ", google named (${named.maneuvers.size} steps)" else ", google shorter but not named") else "") +
+            (if (shorter) " tiles ${tilesMs} ms ($tileLines lines), named share ${"%.2f".format(app.vela.core.data.naming.LineNamer.lastNamedShare)}, total ${System.currentTimeMillis() - t0} ms" else "")
+        diag.record("directions", line)
+        android.util.Log.d("VelaWalk", line)
+        when {
+            named != null -> listOf(named) + open
+            open.isNotEmpty() -> open
+            else -> null
+        }
+    }
+
+    private suspend fun bikeSafeRoutes(
+        origin: LatLng,
+        destination: LatLng,
+        waypoints: List<LatLng>,
+        avoidTolls: Boolean,
+        avoidHighways: Boolean,
+        avoidFerries: Boolean,
+        urgent: Boolean,
+    ): List<Route>? {
+        val mode = TravelMode.BICYCLE
+        val points = listOf(origin) + waypoints + destination
+        if (routeEngine.isReady(mode)) {
+            val budget = if (urgent) BIKE_ONDEVICE_URGENT_MS else BIKE_ONDEVICE_TIMEOUT_MS
+            val onDeviceD = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).async {
+                runCatching {
+                    if (waypoints.isEmpty()) routeEngine.route(origin, destination, mode, avoidTolls, avoidHighways, avoidFerries, maxMs = budget).map { it.copy(offline = true) }
+                    else listOfNotNull(chainOnDevice(points, mode, avoidTolls, avoidHighways, avoidFerries, maxMs = budget))
+                }.getOrDefault(emptyList())
+            }
+            val onDevice = kotlinx.coroutines.withTimeoutOrNull(budget) { onDeviceD.await() } ?: emptyList()
+            if (onDevice.isNotEmpty()) {
+                diag.record("directions", "BICYCLE safe → on-device ${onDevice.size} routes / ${onDevice.first().maneuvers.size} steps", "")
+                return onDevice
+            }
+        }
+        val online = ValhallaRouter.route(http, points, alternates = waypoints.isEmpty(), tries = if (urgent) 1 else 2)
+        if (online.isNotEmpty()) {
+            diag.record("directions", "BICYCLE safe → valhalla ${online.size} routes / ${online.first().maneuvers.size} steps", "")
+            return online
+        }
+        diag.record("directions", "BICYCLE safe → nothing answered, falling to the fastest chain", "")
+        return null
+    }
+
+    /** True when [RouteGeometry.spurAt] finds a spur on [route] AND one of the route's own
+     *  maneuvers within [SPUR_TURN_NEAR_M] of it is a turn or U-turn. */
+    /**
+     * The open router's own steps (lane arrows, exits, renames) for a path the map matcher
+     * returned, or null when the open router cannot be shown to drive that same path. Vias sit
+     * mid-step on the matched line, at most [LANE_VIAS_MAX], each with the line's heading.
+     */
+    private fun laneDetail(matched: Route, tryMs: Long?, trimStartM: Double = 0.0, trimEndM: Double = 0.0): Pair<List<app.vela.core.model.Maneuver>, Boolean>? {
+        val whole = matched.polyline
+        if (whole.size < 2) return null
+        val wholeCum = app.vela.core.nav.RouteProjection.cumulative(whole)
+        val total = wholeCum.last()
+        val from = trimStartM.coerceAtMost(total / 3); val to = total - trimEndM.coerceAtMost(total / 3)
+        val trimmed = from > 0.0 || to < total
+        // At a trip's ends the matched path runs through a parking lot the open router will not
+        // drive, and one refused point used to cost the whole stretch its lanes: the open router
+        // is asked only for the part past the lot.
+        val line = if (trimmed) app.vela.core.data.naming.HybridRoute.slice(whole, from, to) else whole
+        if (line.size < 2) return null
+        val cum = app.vela.core.nav.RouteProjection.cumulative(line)
+        var at = 0.0
+        val mids = ArrayList<Double>()
+        for (m in matched.maneuvers) {
+            val mid = at + m.distanceMeters / 2
+            if (m.distanceMeters >= LANE_VIA_MIN_STEP_M && mid > from + 20.0 && mid < to - 20.0) mids += mid - from
+            at += m.distanceMeters
+        }
+        val picked = if (mids.size <= LANE_VIAS_MAX) mids else (0 until LANE_VIAS_MAX).map { mids[it * (mids.size - 1) / (LANE_VIAS_MAX - 1)] }
+        val vias = picked.map { app.vela.core.nav.RouteProjection.pointAt(line, cum, it) }
+        val pts = listOf(line.first()) + vias + line.last()
+        val bearings = listOf(RouteGeometry.headingOnLine(line, line.first())) + vias.map { RouteGeometry.headingOnLine(line, it) } + listOf<Double?>(null)
+        val r = RouteGeometry.routeVia(
+            http, pts, TravelMode.DRIVE, strictVias = true, tries = 1, callTimeoutMs = tryMs ?: 3_000, waypointBearings = bearings,
+        ).firstOrNull() ?: return null
+        if (!trimmed && ValhallaRouter.followsLine(r.polyline, line, LANE_SAME_PATH_M)) return r.maneuvers to true
+        // Not the same path end to end (or only part of it was asked for): take the open router's
+        // LANES step by step, wherever it makes the same turn at the same junction and its path
+        // through that junction is the matched path.
+        val grid = RouteGeometry.SegmentGrid(whole, wholeCum)
+        val rCum = app.vela.core.nav.RouteProjection.cumulative(r.polyline)
+        fun side(t: app.vela.core.model.ManeuverType) = when { t.name.endsWith("LEFT") -> -1; t.name.endsWith("RIGHT") -> 1; else -> 0 }
+        var rAt = 0.0
+        val laned = r.maneuvers.mapNotNull { o ->
+            val here = rAt; rAt += o.distanceMeters
+            if (o.lanes.isEmpty()) return@mapNotNull null
+            val through = listOf(-60.0, -30.0, 30.0, 60.0).all { d ->
+                val x = here + d
+                x < 0.0 || x > rCum.last() || grid.along(app.vela.core.nav.RouteProjection.pointAt(r.polyline, rCum, x), LANE_BORROW_PATH_M) != null
+            }
+            if (through) o else null
+        }
+        if (laned.isEmpty()) return null
+        var any = false
+        val out = matched.maneuvers.map { m ->
+            val o = laned.filter { it.location.distanceTo(m.location) <= LANE_BORROW_AT_M && side(it.type) == side(m.type) }
+                .minByOrNull { it.location.distanceTo(m.location) } ?: return@map m
+            any = true
+            m.copy(lanes = o.lanes, laneHint = o.laneHint ?: m.laneHint)
+        }
+        return if (any) out to false else null
+    }
+
+    private fun spurWithTurn(route: Route, course: List<LatLng>): Boolean {
+        val at = RouteGeometry.spurAt(route.polyline, course) ?: return false
+        val cum = app.vela.core.nav.RouteProjection.cumulative(route.polyline)
+        val idx = cum.indexOfFirst { it >= at }.let { if (it < 0) route.polyline.lastIndex else it }
+        val here = route.polyline[idx]
+        return route.maneuvers.any { m ->
+            (m.type == app.vela.core.model.ManeuverType.UTURN || m.type.name.startsWith("TURN")) &&
+                m.location.distanceTo(here) <= SPUR_TURN_NEAR_M
+        }
+    }
+
+    /** Drop routes that follow ~the same path as an earlier one (keeps the picker to genuinely distinct
+     *  choices). Order is preserved, so the primary stays first. */
+    private fun dedupeRoutes(routes: List<Route>): List<Route> {
+        val kept = mutableListOf<Route>()
+        for (r in routes) if (kept.none { routesSimilar(it, r) }) kept += r
+        return kept
+    }
+
+    /** Two routes are "the same" if a handful of points sampled along one all sit within ~150 m of the
+     *  other's line — i.e. they trace essentially the same roads. */
+    private fun routesSimilar(a: Route, b: Route): Boolean {
+        if (a.polyline.size < 2 || b.polyline.size < 2) return false
+        return (1..4).all { k ->
+            val p = b.polyline[(b.polyline.size * k / 5).coerceIn(0, b.polyline.size - 1)]
+            a.polyline.minOf { p.distanceTo(it) } < 150.0
+        }
+    }
+
+    /** Overlay Google's live-traffic ETA + congestion onto an open-router [route] (best-effort):
+     *  scale the route's free-flow duration by Google's in-traffic/typical ratio, and map its
+     *  congestion spans onto the open geometry by fraction. No Google traffic → keep free-flow. */
+    private fun applyTraffic(route: Route, g: Route?, freeFlowCal: Double? = null, withSpans: Boolean = true): Route {
+        val typical = g?.durationSeconds?.takeIf { it > 0 } ?: return route
+        val inTraffic = g.durationInTrafficSeconds ?: return route
+        val factor = (inTraffic / typical).coerceIn(0.5, 4.0)
+        val scale = if (g.distanceMeters > 0) route.distanceMeters / g.distanceMeters else 1.0
+        // FREE-FLOW CALIBRATION (issue #227): OSRM's speed model has no signal timing, so on
+        // signalized arterials its free-flow time can run far below Google's TYPICAL for the very
+        // same road (a reporter's diag: OSRM 16 min where Google's typical was 30 with a traffic
+        // ratio of ~0.97 — the shown ETA was the ratio applied to the wrong baseline). When this
+        // route follows Google's course, rebase it onto Google's typical: step/leg/route durations
+        // scale up to the typical time (so nav's remaining-time sums agree), the live ETA becomes
+        // Google's actual in-traffic figure, and trafficRatio stays traffic-vs-typical (colors
+        // don't turn red just because OSRM was optimiztic). A divergent route (a genuinely
+        // different path) can inherit the caller's calibration (the bias is the road network's,
+        // not one route's); with none it keeps the old ratio-only overlay.
+        val sameCourse = route.durationSeconds > 0 && route.polyline.size >= 2 &&
+            g.polyline.size >= 5 && !RouteGeometry.divergent(route, g)
+        val cal = freeFlowCal ?: if (sameCourse) ((typical * scale) / route.durationSeconds).coerceIn(0.5, 3.0) else 1.0
+        val calibrated = if (cal == 1.0) route else route.copy(
+            durationSeconds = route.durationSeconds * cal,
+            legs = route.legs.map { leg ->
+                leg.copy(
+                    durationSeconds = leg.durationSeconds * cal,
+                    maneuvers = leg.maneuvers.map { m -> m.copy(durationSeconds = m.durationSeconds * cal) },
+                )
+            },
+        )
+        return calibrated.copy(
+            durationInTrafficSeconds = calibrated.durationSeconds * factor,
+            // Google's per-leg times belong to its course too, stretched like its typical.
+            legTimes = if (sameCourse && g.legTimes.isNotEmpty()) g.legTimes.map {
+                it.copy(distanceMeters = it.distanceMeters * scale, typicalSeconds = it.typicalSeconds * scale, trafficSeconds = it.trafficSeconds?.times(scale))
+            } else route.legTimes,
+            // Google's "usually X-Y" typical range belongs to its course; on a same-course route the
+            // primary's durationSeconds IS Google's typical now, so the range applies to it too and
+            // the depart-time chooser can show it (before, only provisional alternates had one).
+            typicalLowSeconds = if (sameCourse) g.typicalLowSeconds?.times(scale) else route.typicalLowSeconds,
+            typicalHighSeconds = if (sameCourse) g.typicalHighSeconds?.times(scale) else route.typicalHighSeconds,
+            // Google's congestion spans belong to Google's course: mapped by fraction onto a route
+            // that takes different roads they painted red segments on roads Google never reported
+            // on (review 2026-09-06).
+            // Same course: Google's spans map by fraction. Any other geometry (a divergent open
+            // route, an alternate, a trip with stops): carry the spans over wherever the two
+            // share the road (issue #403); the stretches Google did not drive stay uncolored.
+            trafficSpans = when {
+                !withSpans -> emptyList()
+                sameCourse -> g.trafficSpans.map { it.copy(startMeters = it.startMeters * scale, lengthMeters = it.lengthMeters * scale) }
+                else -> RouteGeometry.transferSpans(g, route)
+            },
+        )
+    }
+
+    /** Offline multi-stop: route each leg (origin→w1, w1→w2, …, wn→dest) on the on-device engine and
+     *  stitch them into ONE continuous route — polylines joined (dropping each leg's duplicated joint
+     *  point), each non-final leg's ARRIVE and non-first leg's DEPART dropped (mirroring what routeVia's
+     *  parser does for via boundaries), distances/durations summed. Null if any leg can't be routed
+     *  (cross-region or off-graph), so the caller can fall through. */
+    private fun chainOnDevice(
+        points: List<LatLng>,
+        mode: TravelMode,
+        avoidTolls: Boolean = false,
+        avoidHighways: Boolean = false,
+        avoidFerries: Boolean = false,
+        departBearingDeg: Double? = null,
+        maxMs: Long? = null,
+    ): Route? {
+        val startMs = System.currentTimeMillis()
+        val legs = points.zipWithNext().mapIndexed { i, (a, b) ->
+            // Only the first leg starts where the car is pointing; a stop is just a place.
+            val bearing = if (i == 0) departBearingDeg else null
+            // One limit for the whole chain: each leg gets what is left of it.
+            val left = maxMs?.let { it - (System.currentTimeMillis() - startMs) }
+            runCatching { routeEngine.route(a, b, mode, avoidTolls, avoidHighways, avoidFerries, bearing, maxMs = left).firstOrNull()?.copy(offline = true) }.getOrNull() ?: return null
+        }
+        val polyline = legs.flatMapIndexed { i, leg -> if (i == 0) leg.polyline else leg.polyline.drop(1) }
+        // Boundary DEPART/ARRIVE steps are dropped, but their step distance is FOLDED into the
+        // last kept maneuver so step lengths keep TILING the stitched polyline — NavEngine locates
+        // each maneuver by a prefix-sum of them (same fold as parseOsrmRoute's via filter).
+        val maneuvers = mutableListOf<app.vela.core.model.Maneuver>()
+        legs.forEachIndexed { i, leg ->
+            leg.maneuvers.forEach { m ->
+                val boundary = (m.type == app.vela.core.model.ManeuverType.ARRIVE && i != legs.lastIndex) ||
+                    (m.type == app.vela.core.model.ManeuverType.DEPART && i != 0)
+                if (!boundary) {
+                    maneuvers += m
+                } else if (maneuvers.isNotEmpty() && (m.distanceMeters > 0.0 || m.durationSeconds > 0.0)) {
+                    val prev = maneuvers.removeAt(maneuvers.lastIndex)
+                    maneuvers += prev.copy(distanceMeters = prev.distanceMeters + m.distanceMeters, durationSeconds = prev.durationSeconds + m.durationSeconds)
+                }
+            }
+        }
+        if (polyline.size < 2 || maneuvers.size < 2) return null
+        val dist = legs.sumOf { it.distanceMeters }
+        val dur = legs.sumOf { it.durationSeconds }
+        return Route(
+            polyline = polyline,
+            legs = listOf(app.vela.core.model.RouteLeg(dist, dur, null, maneuvers)),
+            distanceMeters = dist,
+            durationSeconds = dur,
+            durationInTrafficSeconds = null, // offline: no live traffic
+            legTimes = legs.map { app.vela.core.model.LegTime(it.distanceMeters, it.durationSeconds, null) },
+            summary = legs.firstOrNull()?.summary,
+            offline = true,
+            source = legs.firstOrNull()?.source ?: RouteSource.UNKNOWN,
+        )
+    }
+
+    /** Free-flow calibration for a route that does NOT follow Google's course (a stops trip is
+     *  routed through its stops while Google's keyless answer is the direct trip): compare average
+     *  SPEEDS instead of times, so the distance difference cancels and what is left is the speed
+     *  model's bias for that network. Null when either side lacks a duration or a distance. */
+    private fun speedCal(route: Route, g: Route?): Double? {
+        if (g == null || g.durationSeconds <= 0 || g.distanceMeters <= 0 || route.durationSeconds <= 0 || route.distanceMeters <= 0) return null
+        val gSpeed = g.distanceMeters / g.durationSeconds
+        val rSpeed = route.distanceMeters / route.durationSeconds
+        return (rSpeed / gSpeed).coerceIn(0.5, 3.0)
+    }
+
+    /** Name a provisional alternate the moment the user picks it to drive: snap its (Google) polyline
+     *  through OSRM for real named turn-by-turn, guarded to reach the destination, and re-apply Google's
+     *  live-traffic overlay. Failure keeps Google's own (abbreviated) steps so nav still works.
+     *  (An on-device map-match for downloaded regions could plug in here next.) */
+    override suspend fun nameRoute(route: Route, origin: LatLng, destination: LatLng, mode: TravelMode, avoidTolls: Boolean, avoidHighways: Boolean, avoidFerries: Boolean): Route {
+        val named = nameRoutePlain(route, origin, destination, mode, avoidTolls, avoidHighways, avoidFerries)
+        return if (mode == TravelMode.DRIVE) io { withLotTurn(named, urgent = false) } else named
+    }
+
+    private suspend fun nameRoutePlain(route: Route, origin: LatLng, destination: LatLng, mode: TravelMode, avoidTolls: Boolean, avoidHighways: Boolean, avoidFerries: Boolean): Route = io {
+        if (!route.provisional || route.polyline.size < 3) return@io route.copy(provisional = false)
+        val vias = listOf(origin) + RouteGeometry.sampleVias(route.polyline) + destination
+        // The avoid flags ride along on the snap, but they add nothing on the public server:
+        // OSRM_SUPPORTS_EXCLUDE is off, so no `exclude=` is sent and the vias alone hold the
+        // snap to Google's chosen path.
+        // The traffic snap's guards (issue #478): a sampled point that lands on a flyover deck, the
+        // far carriageway or a dead-end lane forces an out-and-back or a loop, so the snap must reach
+        // the destination, stay within SNAP_LENGTH_SLACK of the route it names, and carry no spur.
+        val named = RouteGeometry.routeVia(http, vias, mode, avoidTolls, avoidHighways, avoidFerries, strictVias = true).firstOrNull()
+            ?.takeIf { it.polyline.lastOrNull()?.let { p -> p.distanceTo(destination) <= SNAP_REACH_M } == true }
+            ?.takeIf { it.distanceMeters <= route.distanceMeters * SNAP_LENGTH_SLACK + SNAP_LENGTH_SLACK_M }
+            ?.takeIf { !spurWithTurn(it, route.polyline) }
+        // Keep the route's OWN time figures through the snap. The picker sorted and displayed this
+        // route by its Google per-route ETA; applyTraffic here would swap in a recomputed one
+        // (OSRM free-flow x the ratio) IN PLACE, which can leapfrog a neighboring row and leave
+        // the "Fastest" tag sitting below a slower first row. Naming is for geometry + named
+        // turn-by-turn (and the congestion spans remapped onto that geometry), not a new ETA.
+        if (named != null) applyTraffic(named, route).copy(
+            provisional = false,
+            source = RouteSource.OSRM_VIA_SNAP,
+            durationSeconds = route.durationSeconds,
+            durationInTrafficSeconds = route.durationInTrafficSeconds,
+        )
+        // The snap failed or was refused: keep Google's line and name its turns from the map tiles
+        // (LineNamer). Only when that fails too does nav run on Google's abbreviated steps, tagged so
+        // the in-drive recheck can silently upgrade to full steps once the open router answers.
+        else kotlinx.coroutines.withTimeoutOrNull(WALK_NAME_WAIT_MS) {
+            app.vela.core.data.naming.RoadNameTiles.linesAlong(route.polyline)
+                ?.let { app.vela.core.data.naming.LineNamer.name(route, it, mode) }
+        } ?: route.copy(provisional = false, abbreviatedSteps = true, source = RouteSource.GOOGLE_ABBREVIATED)
+    }
+
+    /** [googleDirections] with the same transient-blip retry the OSRM path has (routeOsrm goes
+     *  3x with backoff; Google got ONE shot). The keyless endpoint intermittently hands back a
+     *  degraded or empty reply — worst right after a burst of requests, e.g. ending a route and
+     *  restarting it — and a single miss used to cost the whole fetch its traffic ratio, its
+     *  jam-avoiding snap AND Google's alternates: the picker then led with free-flow OSRM routes
+     *  whose white, trafficless ETAs read minutes faster than anything traffic-aware and varied
+     *  drastically between restarts (user real-drive report 2026-07-14). Two short backoff
+     *  retries recover the routine blips; a genuinely unreachable Google still degrades to
+     *  free-flow exactly as before, just honestly rarer. */
+    private suspend fun googleDirectionsRetried(origin: LatLng, destination: LatLng, mode: TravelMode, tries: Int = 3, avoidTolls: Boolean = false, avoidHighways: Boolean = false, avoidFerries: Boolean = false, waypoints: List<LatLng> = emptyList()): List<Route> {
+        var routes: List<Route> = emptyList()
+        if (!app.vela.core.data.RoutingPrefs.googleTraffic) return routes
+        for (attempt in 0 until tries) {
+            if (attempt > 0) kotlinx.coroutines.delay(app.vela.core.util.Jitter.around(300L * attempt, 0.5))
+            routes = runCatching { googleDirections(origin, destination, mode, avoidTolls, avoidHighways, avoidFerries, waypoints) }.getOrNull().orEmpty()
+            if (routes.isNotEmpty()) return routes
+        }
+        diag.record("directions", "google directions empty after $tries attempt(s) — trafficless fetch")
+        return routes
+    }
+
+    /** Google's keyless directions — now the FALLBACK router (OSRM unreachable) and the
+     *  live-traffic source (ETA / duration-in-traffic / congestion spans). Its step list is
+     *  abbreviated for long routes, which is exactly why OSRM is primary. */
+    private suspend fun googleDirections(origin: LatLng, destination: LatLng, mode: TravelMode, avoidTolls: Boolean = false, avoidHighways: Boolean = false, avoidFerries: Boolean = false, waypoints: List<LatLng> = emptyList(), walkCompare: Boolean = false): List<Route> {
+        // Without Google the open router's answer stands alone: no traffic, no Google alternates,
+        // no abbreviated fallback. Every caller already handles an empty reply as "Google did not
+        // answer", which is exactly the state this is.
+        if (app.vela.core.data.NoGoogle.enabled || !app.vela.core.data.RoutingPrefs.googleTraffic) return emptyList()
+        // Walking is the open router's (issue #478): Google adds no traffic on foot, its keyless
+        // walking steps are abbreviated, and snapping a foot route through points on its line forces
+        // crossings and double-backs (measured +20-110% on Davis, Sacramento and Dhaka walks). Only
+        // the walking branch of directions() asks, to see whether Google's walk is much shorter.
+        if (mode == TravelMode.WALK && !walkCompare) return emptyList()
+        session.ensure()
+        val cal = calibration.current()
+        val pb = DirectionsPb.build(origin, destination, mode, cal.directionsPb, avoidTolls, avoidHighways, avoidFerries, waypoints)
+        val url = "${cal.directionsEndpoint}&pb=${pb.enc()}"
+        val routes = try {
+            DirectionsParser.parse(GoogleResponse.parse(get(url)), cal.directionsPaths)
+        } catch (e: CalibrationNeededException) {
+            diag.record("drift", "directions parse drift: ${e.message}", url)
+            throw e
+        }
+        return if (routes.all { it.polyline.size > 2 }) routes
+        else {
+            val geoms = RouteGeometry.fetchAll(http, origin, destination, mode)
+            routes.mapIndexed { i, r ->
+                if (r.polyline.size > 2) r
+                else RouteGeometry.reposition(r, geoms.getOrNull(i) ?: listOf(origin, destination))
+            }
+        }
+    }
+
+    /** Google Maps shared-list import (issue #1), fully keyless. The share link resolves
+     *  logged-out to the list page, whose HTML embeds a READY-MADE prefetch URL for the
+     *  `/maps/preview/entitylist/getlist` RPC (list id + page session token included) —
+     *  lift it verbatim, call it, parse. No pb construction, so a Google-side pb change
+     *  can't break the URL builder (only the parser paths, which are documented in
+     *  [EntityListParser]). Calibrated live 2026-07-08. */
+    override suspend fun importList(shareUrl: String): app.vela.core.model.ImportedList? = io {
+        // The link resolves on Google's own servers, so "Use Vela without Google" refuses it.
+        if (app.vela.core.data.NoGoogle.enabled) return@io null
+        runCatching {
+            session.ensure()
+            // The endpoint answers from the list id alone, with no token from the page (971 of
+            // 971, 2026-10-12). The share page used to carry the request as a link; since
+            // 2026-10 the shortener lands on a page that holds only the id, so the request is
+            // built here, and the page is read only for a link whose form carries no id.
+            val id = app.vela.core.data.ShortLinks.listId(shareUrl)
+            val href = if (id != null) {
+                "/maps/preview/entitylist/getlist?authuser=0&hl=en&gl=us&pb=" +
+                    "!1m4!1s${id.enc()}!2e1!3m1!1e1!2e2!3e2!4i$LIST_PAGE_SIZE!28e2!16b1"
+            } else {
+                val html = get(shareUrl.trim(), kind = "shared list")
+                Regex("""(/maps/preview/entitylist/getlist\?[^"'\s]+)""")
+                    .find(html)?.groupValues?.get(1)
+                    ?.replace("&amp;", "&")
+                    // The page asks for the first 500 (`!4i500` in the pb); the endpoint answers a
+                    // bigger count as asked (issue #755).
+                    ?.replace("%214i500", "%214i$LIST_PAGE_SIZE")?.replace("!4i500", "!4i$LIST_PAGE_SIZE")
+                    ?: return@runCatching null
+            }
+            EntityListParser.parse(get("https://www.google.com$href", kind = "shared list", client = largeReplyHttp))
+        }.getOrNull()
+    }
+
+    /** A My Maps custom map (issue #669): Google serves any map shared by link as KML at a fixed
+     *  URL, with no key and no session (checked from a plain client, 2026-10-04). */
+    override suspend fun importMyMap(mid: String): app.vela.core.model.ImportedList? = io {
+        if (app.vela.core.data.NoGoogle.enabled) return@io null
+        runCatching {
+            val kml = get("https://www.google.com/maps/d/kml?mid=${mid.enc()}&forcekml=1", kind = "my map", client = largeReplyHttp)
+            // The viewer page names the map's marker icons; without it the pins keep their colors.
+            val viewer = if (kml.contains("#icon-")) runCatching { get("https://www.google.com/maps/d/viewer?mid=${mid.enc()}", kind = "my map", client = largeReplyHttp) }.getOrNull() else null
+            app.vela.core.data.MyMapKml.parse(kml, mid, viewer)
+        }.getOrNull()
+    }
+
+    // --- plumbing -----------------------------------------------------------
+
+    /** For a reply that runs to megabytes (a custom map's KML and its viewer page): the shared
+     *  client's 12 s call timeout cuts such a body off, and the failure is swallowed. Derived from
+     *  the shared client, so the request is still counted and still goes out through Cronet. The
+     *  deadline is set rather than removed: the Cronet transport reads `callTimeout(0)` as 30 s. */
+    private val largeReplyHttp by lazy {
+        http.newBuilder()
+            .callTimeout(LARGE_REPLY_TIMEOUT_S, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+    }
+
+    /** [aged]: a per-place request (details, photos, the review feed) that rides the WebView's aged
+     *  Google session when calibration `agedSession` is on (default 1), see [AgedSession]. */
+    private fun agedTag(b: Request.Builder, aged: Boolean): Request.Builder =
+        if (aged && calibration.current().tune("agedSession", 1.0) >= 0.5) b.tag(app.vela.core.net.AgedSession::class.java, app.vela.core.net.AgedSession) else b
+
+    private fun get(url: String, aged: Boolean = false, kind: String? = null, client: OkHttpClient = http): String {
+        val cal = calibration.current()
+        val req = Request.Builder()
+            .url(url)
+            .apply { kind?.let { tag(app.vela.core.net.GoogleUsage.Kind::class.java, app.vela.core.net.GoogleUsage.Kind(it)) } }
+            .browserXhrHeaders(cal.userAgent, cal.secChUa, MAPS_REFERER)
+            .let { agedTag(it, aged) }
+            .build()
+        client.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) {
+                throw CalibrationNeededException("HTTP ${resp.code} from ${req.url.encodedPath}")
+            }
+            return resp.body?.string().orEmpty()
+        }
+    }
+
+    private fun post(url: String, body: String, aged: Boolean = false): String {
+        val cal = calibration.current()
+        val media = "application/x-www-form-urlencoded;charset=UTF-8".toMediaType()
+        val req = Request.Builder()
+            .url(url)
+            .post(body.toRequestBody(media))
+            .browserXhrHeaders(cal.userAgent, cal.secChUa, MAPS_REFERER)
+            .header("X-Same-Domain", "1") // batchexecute expects this from a same-origin caller
+            .apply { if (cal.rpcContext.isNotBlank()) header("x-maps-diversion-context-bin", cal.rpcContext) } // the gate; see Calibration.rpcContext
+            .let { agedTag(it, aged) }
+            .build()
+        http.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) {
+                throw CalibrationNeededException("HTTP ${resp.code} from ${req.url.encodedPath}")
+            }
+            return resp.body?.string().orEmpty()
+        }
+    }
+
+    /** GET raw bytes (Street View tiles) with the Google referer the tile host requires. An
+     *  image subresource, not a navigation — so the Sec-Fetch triple says so. */
+    private fun getBytes(url: String): ByteArray? {
+        val cal = calibration.current()
+        val req = Request.Builder()
+            .url(url)
+            .browserHeaders(
+                ua = cal.userAgent,
+                secChUa = cal.secChUa,
+                referer = "https://www.google.com/",
+                accept = "image/avif,image/webp,image/apng,*/*;q=0.8",
+                fetchDest = "image",
+                fetchMode = "no-cors",
+                fetchSite = "cross-site",
+                networkHints = false,
+            )
+            .build()
+        http.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) return null
+            return resp.body?.bytes()
+        }
+    }
+
+    /** Nominatim is a COMMUNITY service: it gets the honest, contactable identifier its usage
+     *  policy asks for, never the browser UA. Was a hardcoded "VelaMaps/0.1" that drifted from
+     *  the app's real version; [VelaConfig.VELA_UA] is now the single source. */
+    private fun getNominatim(url: String): String {
+        val req = Request.Builder()
+            .url(url)
+            .header("User-Agent", VelaConfig.VELA_UA)
+            .header("Accept-Language", "en")
+            .build()
+        http.newCall(req).execute().use { resp -> return resp.body?.string().orEmpty() }
+    }
+
+    private suspend fun <T> io(block: suspend () -> T): T = withContext(Dispatchers.IO) { block() }
+
+    private fun String.enc(): String = URLEncoder.encode(this, "UTF-8")
+
+    /** Rewrite the endpoint's `hl=en` to the app/system language so Google returns categories, hours
+     *  and open/closed status IN THE USER'S LANGUAGE (Google-Maps-style). The open/closed BOOLEAN is
+     *  parsed from that localized status text against the same language's keyword table
+     *  (`SearchParser.parseOpenNow` reads the same `Locale.getDefault()` this rewrite does), so text
+     *  and boolean can't disagree. `Locale.getDefault()` reflects the in-app language override
+     *  (AppLocale sets it) or the system locale. **No-op for English → English users are
+     *  byte-for-byte unchanged.** */
+    private fun String.localized(force: String? = null): String {
+        val out = regionalized()
+        // A caller's own language (the tap resolve, for a label in another script) wins outright;
+        // its status text is parsed against that language's table where there is one.
+        if (force != null) return out.replace("hl=en", "hl=$force")
+        val locale = java.util.Locale.getDefault()
+        val lang = locale.language.lowercase()
+        // Only rewrite to a language the STATUS parser can read (SearchParser.STATUS_LANGS). For any
+        // other locale, keep hl=en: an unparseable status string leaves openNow null forever and the
+        // UI can't color open/closed — English status text the English table handles is the safer
+        // fallback than localized-but-unparseable (audit 2026-07-06).
+        if (lang == "en" || lang !in SearchParser.STATUS_LANGS) return out
+        // Chinese needs the SCRIPT in the hl tag: hl=zh-TW answers Traditional, hl=zh-CN Simplified
+        // (bare hl=zh is treated as Simplified). parseOpenNow keys on the bare "zh" either way —
+        // its keyword table carries both scripts.
+        val hl = if (lang == "zh") {
+            val hant = locale.script.equals("Hant", ignoreCase = true) ||
+                locale.country.uppercase() in setOf("TW", "HK", "MO")
+            if (hant) "zh-TW" else "zh-CN"
+        } else lang
+        return out.replace("hl=en", "hl=$hl")
+    }
+
+    /** Rewrite `gl=us` to the REGION the phone is actually in ([glRegion], set by the app layer
+     *  from the cell network's country, falling back to the locale's) so results are biased to
+     *  where the user is, not to the US — the "US-shaped results in Jerusalem" half of issue #71.
+     *  Region only tunes ranking/bias, not the response SHAPE (hl already varies per language and
+     *  the parsers are shape-searched), so this is safe for any 2-letter code; anything else is
+     *  ignored and gl=us stays. No-op for US users: byte-for-byte unchanged. */
+    private fun String.regionalized(): String {
+        val region = glRegion?.lowercase()?.takeIf { it.length == 2 && it.all { c -> c in 'a'..'z' } }
+            ?: return this
+        if (region == "us") return this
+        return replace("gl=us", "gl=$region")
+    }
+
+    private companion object {
+        // Cap on waiting for the on-device avoid route: the obf engine can take many seconds on a
+        // long route, and the route chooser must not hang.
+        /** The autocomplete window when the caller has no viewport: a town, like the web page's default. */
+        const val SUGGEST_SPAN_M = 20_000.0
+        /** The whole call for a reply of megabytes ([largeReplyHttp]). */
+        const val LARGE_REPLY_TIMEOUT_S = 90L
+        /** How many places a shared list is asked for in one reply; the page itself asks for 500. */
+        const val LIST_PAGE_SIZE = 5000
+        const val AVOID_ONDEVICE_TIMEOUT_MS = 4_000L
+        /** A mid-drive reroute waits this long for Google's traffic once the open router has answered. */
+        const val URGENT_GOOGLE_GRACE_MS = 2_500L
+        /** PHONE FIRST (2026-09-28): with a downloaded region under the whole trip, a mid-drive
+         *  reroute starts the on-device route at once and takes it when the open router has not
+         *  answered inside this wait; a healthy open router answers in 1 to 3 s, a hung one used to
+         *  hold the driver on "Re-routing" for the attempt's whole deadline (issues #557, #258).
+         *  The on-device route is trafficless, so the degraded recheck (20 s) swaps in the online
+         *  route on the same course, or offers it as a faster route on another. */
+        const val PHONE_FIRST_ONLINE_WAIT_MS = 2_500L
+        /** How long past that the on-device compute may still take before the attempt goes back
+         *  to waiting on the open router; a city reroute finishes well inside it. */
+        const val PHONE_FIRST_ONDEVICE_WAIT_MS = 4_000L
+        /** Issue #557: the urgent reroute's one open-router call, connect + read included. FOSSGIS
+         *  answers a healthy reroute in 1-3 s; a hung call used to hold the attempt for the shared
+         *  client's 12 s call timeout (and 15 s connect, 20 s read) before any fallback was asked. */
+        const val URGENT_OSRM_TIMEOUT_MS = 6_000L
+        /** An urgent fetch with no budget from the caller gets this much in total. */
+        const val URGENT_DEFAULT_BUDGET_MS = 16_000L
+        /** The escalated reroute's per-try open-router timeout, and the share of its budget the
+         *  open router may use before the fallbacks get the rest. */
+        const val LADDER_OSRM_TRY_MS = 8_000L
+        const val LADDER_OSRM_SHARE = 0.55
+        /** Room the escalated reroute keeps for the traffic snap after waiting on Google. */
+        const val LADDER_SNAP_RESERVE_MS = 6_000L
+        /** The bike-safe branch's on-device budgets (issue #401): a bike trip is short, so the obf
+         *  engine usually answers well inside these; past them the online router takes over. */
+        const val BIKE_ONDEVICE_TIMEOUT_MS = 6_000L
+        const val BIKE_ONDEVICE_URGENT_MS = 3_000L
+        // Fallback viewport when no user location is available — search is
+        // viewport-driven and needs one. Callers normally pass the real location.
+        val DEFAULT_VIEWPORT = LatLng(37.7749, -122.4194)
+        const val PHOTO_COUNT = 50 // gallery page size for the hspqX request
+        // Follow Google's jam-avoiding reroute only if its live ETA is within this ×OSRM-free-flow-best
+        // (its detour is time-competitive with OSRM's ideal → the jam justifies the reroute). Tunable from
+        // real side-by-side data — the `directions` diag logs gEta/osrmFF so the threshold can be pinned.
+        const val SNAP_ETA_MARGIN = 1.2
+        /** How long naming the stretches where Google leaves the open route may take (tile
+         *  fetches, usually cached and under a second) before the older paths are used. */
+        /** The map-matching service refuses a line over 200 km; a stretch that long is rare
+         *  (two routes that differ for hours) and goes to the tiles. */
+        const val MATCH_MAX_M = 180_000.0
+        /** Lane detail for a matched stretch: a via in the middle of every step at least this
+         *  long, at most this many, and the open router's path within this of the matched one. */
+        const val LANE_VIA_MIN_STEP_M = 80.0
+        const val LANE_VIAS_MAX = 20
+        const val LANE_SAME_PATH_M = 8.0
+        /** How long the route waits, after Google is back, for the road pieces that check the
+         *  open router's turn names. They were asked for when the open router answered. */
+        /** How much of Google's line at the very start or end of the trip may sit off the matched
+         *  path (the loop out of a parking lot, the last turn into a driveway). */
+        const val MATCH_TRIP_END_SLACK_M = 150.0
+        const val OPEN_NAMES_WAIT_MS = 1_500L
+        /** A farm track driven through for less than this is matching noise, not a route choice. */
+        const val THROUGH_TRACK_MIN_M = 30.0
+        /** How long the car route that keeps off tracks may take to answer. */
+        const val OFF_TRACK_WAIT_MS = 4_000L
+        const val OFF_TRACK_WAIT_URGENT_MS = 1_500L
+        /** It replaces the open route only up to this much longer: past it the track is the road. */
+        const val OFF_TRACK_MAX_RATIO = 1.3
+        const val OFF_TRACK_MAX_EXTRA_M = 2_000.0
+        const val OPEN_NAMES_WAIT_URGENT_MS = 300L
+        const val HYBRID_WAIT_MS = 5_500L // a match (2.5 s) and its lane detail (1.8 s) at their slowest
+        /** How long a stretch's match may run before the map tiles under it are read as well, so
+         *  the names are in hand if the match is late. The matcher answers a town stretch in 0.35
+         *  to 1.2 s (replayed captured lines, 2026-10-09), so a healthy one costs no tile request. */
+        const val TILE_HEDGE_MS = 1_000L
+        /** How long a built route waits for the map's word on whether its last turn enters the
+         *  destination's parking lot. The tiles are asked for when the fetch starts, so this is
+         *  normally no wait at all. */
+        const val LOT_WORD_WAIT_MS = 1_200L
+        /** The most tiles whose roads are read to draw a stretch on the roads' middle (the same
+         *  bound the street names have). */
+        const val DRAW_ROADS_MAX_TILES = 48
+        const val LOT_WORD_WAIT_URGENT_MS = 300L
+        const val TILE_HEDGE_URGENT_MS = 300L
+        /** Longer than any deadline: the tiles are read only once the match has failed. */
+        const val TILE_HEDGE_NEVER_MS = 60_000L
+        const val LANE_TRY_MS = 1_800L
+        /** Borrowing lanes step by step: the open router's step within this of the matcher's, and
+         *  its path within [LANE_BORROW_PATH_M] of the matched path 60 m either side. */
+        const val LANE_BORROW_AT_M = 20.0
+        const val LANE_BORROW_PATH_M = 12.0
+        const val HYBRID_WAIT_URGENT_MS = 1_500L
+        /** Google's walk is offered only this much shorter than the open router's (issue #478). */
+        const val WALK_GOOGLE_SHORTER = 0.15
+        private const val WALK_GOOGLE_WAIT_MS = 6_000L
+        private const val WALK_NAME_WAIT_MS = 8_000L
+        private const val SPUR_TURN_NEAR_M = 150.0
+    private const val SNAP_LENGTH_SLACK = 1.05
+        private const val SNAP_LENGTH_SLACK_M = 400.0
+        const val SNAP_REACH_M = 500.0 // the snapped route's last point must be within this of the destination
+        const val MAX_ROUTES = 4       // primary + up to 3 alternates in the picker
+        // Radii (m) to probe out toward the street when the geocode is set-back from it. Two rings
+        // cover the usual sidewalk+setback distance; each ring probes both perpendiculars → 4 probes.
+        val STREET_PROBE_RADII_M = doubleArrayOf(24.0, 40.0)
+    }
+}

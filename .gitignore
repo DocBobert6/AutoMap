@@ -1,0 +1,50 @@
+# Gradle
+.gradle/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# IntelliJ / Android Studio
+*.iml
+.idea/
+*.ipr
+*.iws
+out/
+gen/
+.cxx/
+.externalNativeBuild/
+captures/
+.kotlin/
+
+# Local config — machine-specific, must NOT be committed
+local.properties
+
+# Generated APKs and signing
+*.apk
+*.aab
+*.dex
+*.keystore
+*.jks
+release/
+# ...except the app's release source set, which holds the baseline profile every release build bakes in.
+!app/src/release/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs / temp
+*.log
+*.bak
+*.tmp
+
+# Large regenerable on-device perf-test graph (ghprobe) — not committed
+ghprobe/src/androidTest/assets/seam-graph.zip
+
+# Vendored native AAR (sherpa-onnx neural TTS runtime) — large binary, fetched out-of-band
+app/libs/*.aar
+core/libs/*.jar
+
+# Python bytecode
+__pycache__/
+*.pyc

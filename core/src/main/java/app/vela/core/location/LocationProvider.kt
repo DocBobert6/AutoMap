@@ -1,0 +1,258 @@
+package app.vela.core.location
+
+import android.annotation.SuppressLint
+import android.content.Context
+import android.content.SharedPreferences
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
+import android.os.Bundle
+import android.os.Looper
+import androidx.core.content.getSystemService
+import app.vela.core.model.LatLng
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/** Provider name on a fix that stands for the simulated position. */
+const val SIM_PROVIDER = "sim"
+/** Provider name on a fix from a demo drive or a trip replay. */
+const val REPLAY_PROVIDER = "replay"
+
+/** One point of a recorded trip, replayed as a synthetic [Location]. */
+data class ReplayFix(val lat: Double, val lng: Double, val t: Long, val bearing: Float, val speed: Float)
+
+/**
+ * Location, the degoogled way.
+ *
+ * Uses AOSP [LocationManager] — NOT FusedLocationProviderClient, which lives in
+ * Play Services and is absent on GrapheneOS/Calyx/etc. We request the GPS and
+ * NETWORK providers simultaneously and surface whichever fixes first; on
+ * GrapheneOS the NETWORK provider is backed by its own BeaconDB service, giving
+ * a fast coarse fix to seed the map while GPS warms up.
+ *
+ * Cold-fix strategy (see also the PSDS tip the UI shows): we cache the last
+ * known location and expose [cachedLatLng]/[lastKnown] so the map can recenter
+ * instantly on launch instead of staring at null while GPS locks. Callers
+ * should start collecting [updates] as early as possible (onCreate) to pre-warm.
+ */
+@Singleton
+class LocationProvider @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val diag: app.vela.core.diag.DiagLog,
+) {
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences("vela_location", Context.MODE_PRIVATE)
+
+    private val lm: LocationManager? = context.getSystemService()
+
+    /** Cached last-known coordinate from a previous session, if any. */
+    fun cachedLatLng(): LatLng? {
+        val lat = prefs.getFloat(KEY_LAT, Float.NaN)
+        val lng = prefs.getFloat(KEY_LNG, Float.NaN)
+        return if (lat.isNaN() || lng.isNaN()) null else LatLng(lat.toDouble(), lng.toDouble())
+    }
+
+    /** Most recent OS last-known across providers, falling back to our cache. */
+    @SuppressLint("MissingPermission")
+    fun lastKnown(): LatLng? {
+        pinned?.let { return it }
+        val mgr = lm ?: return cachedLatLng()
+        val best = PROVIDERS
+            .filter { mgr.allProviders.contains(it) }
+            .mapNotNull { runCatching { mgr.getLastKnownLocation(it) }.getOrNull() }
+            .maxByOrNull { it.time }
+        return best?.let { LatLng(it.latitude, it.longitude) } ?: cachedLatLng()
+    }
+
+    /**
+     * Cold stream of fixes from GPS + NETWORK. Caller must hold
+     * ACCESS_FINE_LOCATION (checked at the UI layer before collecting).
+     */
+    // minDistanceM MUST stay 0: a distance filter (the old 2 m) makes LocationManager deliver
+    // NOTHING while the device is stationary — so the last fix delivered while braking (with its
+    // nonzero doppler speed) was the freshest data for an entire red light. The speedometer froze
+    // at the braking speed, the puck's Kalman never measured 0, and the dead-reckoned puck crept
+    // ahead on the stuck speed ("mph keeps going when stopped"). At 0 m the stack gets ~1 Hz
+    // fixes with doppler ≈ 0 while parked and everything settles by itself; the battery delta
+    // during active use is negligible (the GPS engine runs either way — the filter only gated
+    // CALLBACKS, not the hardware).
+    fun updates(minIntervalMs: Long = 1_000L, minDistanceM: Float = 0f): Flow<Location> = channelFlow {
+        simulating.collectLatest { sim ->
+            (if (sim) simulatedUpdates() else deviceUpdates(minIntervalMs, minDistanceM)).collect { send(it) }
+        }
+    }
+
+    /** A pretend position (Settings > Diagnostics > Simulate my location). While set, [lastKnown]
+     *  and [updates] answer with it and the phone's own fixes are not asked for at all. The phone
+     *  map applies the setting itself; this is what makes the car screens follow it too, so a
+     *  demo on a head unit never shows where the phone really is. */
+    var pinned: LatLng?
+        get() = pinnedPoint
+        set(value) { pinnedPoint = value; simulating.value = value != null || replayActive }
+
+    @Volatile private var pinnedPoint: LatLng? = null
+    @Volatile private var replayActive = false
+    private val simulating = MutableStateFlow(false)
+    /** Fixes of a running [replay], so every collector of [updates] follows the same drive. */
+    private val mirrored = MutableSharedFlow<Location>(extraBufferCapacity = 16, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+    private fun simulatedUpdates(): Flow<Location> = channelFlow {
+        launch { mirrored.collect { send(it) } }
+        while (true) {
+            val p = pinnedPoint
+            if (p != null && !replayActive) {
+                send(Location(SIM_PROVIDER).apply { latitude = p.lat; longitude = p.lng; accuracy = 5f; time = System.currentTimeMillis() })
+            }
+            delay(1_000)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun deviceUpdates(minIntervalMs: Long, minDistanceM: Float): Flow<Location> =
+        callbackFlow {
+            val mgr = lm ?: run { close(); return@callbackFlow }
+            // An explicit object, NOT the SAM lambda: the lambda only implements
+            // onLocationChanged. The provider-state callbacks have default bodies only from
+            // Android 11 - on 10 and below the framework interface has none, and the OS calls
+            // onProviderDisabled as soon as a registered provider is off (degoogled devices
+            // often have the NETWORK provider present but disabled), so the lambda died with
+            // AbstractMethodError on every launch (user report, Android 10).
+            // Diagnostics (issue #362, a phone that "never" gets a fix): which providers exist
+            // and are on, then how long the FIRST fix took and from which provider. No
+            // coordinates are recorded.
+            val startedAt = android.os.SystemClock.elapsedRealtime()
+            var firstLogged = false
+            val listener = object : LocationListener {
+                override fun onLocationChanged(loc: Location) {
+                    if (!firstLogged) {
+                        firstLogged = true
+                        diag.record(
+                            "location",
+                            "first fix from ${loc.provider} after ${(android.os.SystemClock.elapsedRealtime() - startedAt) / 1000} s",
+                            "accuracy=${if (loc.hasAccuracy()) loc.accuracy.toInt().toString() + " m" else "none"} speed=${loc.hasSpeed()}",
+                        )
+                    }
+                    cache(loc)
+                    trySend(loc)
+                }
+
+                override fun onProviderEnabled(provider: String) {}
+
+                override fun onProviderDisabled(provider: String) {}
+
+                @Deprecated("Deprecated in Java")
+                override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+            }
+            val active = PROVIDERS.filter { mgr.allProviders.contains(it) }
+            diag.record(
+                "location",
+                "providers: " + PROVIDERS.joinToString(" ") { p ->
+                    if (!mgr.allProviders.contains(p)) "$p=absent"
+                    else "$p=" + (if (runCatching { mgr.isProviderEnabled(p) }.getOrDefault(false)) "on" else "off")
+                },
+                "all: ${mgr.allProviders.joinToString(",")}",
+            )
+            active.forEach { p ->
+                runCatching {
+                    mgr.requestLocationUpdates(p, minIntervalMs, minDistanceM, listener, Looper.getMainLooper())
+                }
+            }
+            awaitClose { mgr.removeUpdates(listener) }
+        }
+
+    /** Replay a recorded trip as a synthetic fix stream — same shape as [updates], so
+     *  the nav loop, camera and dot run exactly as if driving. Gaps between fixes are
+     *  honored (divided by [speedup], capped at 2 s so a long stop doesn't stall). */
+    fun replay(fixes: List<ReplayFix>, speedup: Float = 1f): Flow<Location> = replay(fixes, { speedup }, 0)
+
+    /** A replay whose speed can change while it runs ([speed] is read before every fix; 0 = paused)
+     *  and that can start partway in: fixes before [startAt] are emitted with no wait, so the
+     *  consumer runs through them to arrive at that moment in the right state. */
+    fun replay(fixes: List<ReplayFix>, speed: () -> Float, startAt: Int): Flow<Location> = flow {
+        replayActive = true
+        simulating.value = true
+        try {
+        var prevT: Long? = null
+        for ((i, fix) in fixes.withIndex()) {
+            while (i >= startAt && speed() <= 0f) delay(100)
+            val gap = if (i < startAt) 0L else prevT?.let { ((fix.t - it) / speed().coerceAtLeast(0.1f)).toLong().coerceIn(0L, 2_000L) } ?: 0L
+            if (gap > 0) delay(gap)
+            prevT = fix.t
+            val loc = Location(REPLAY_PROVIDER).apply {
+                latitude = fix.lat
+                longitude = fix.lng
+                bearing = fix.bearing
+                this.speed = fix.speed
+                accuracy = 5f
+                time = fix.t // recorded fix time, so consumers can compute the real inter-fix dt
+            }
+            if (i >= startAt) mirrored.tryEmit(loc)
+            emit(loc)
+        }
+        } finally {
+            replayActive = false
+            simulating.value = pinnedPoint != null
+        }
+    }
+
+    private var cachedAtMs = 0L
+    private var cachedLat = Double.NaN
+    private var cachedLng = Double.NaN
+
+    /** The last-known seed for the next launch: written at most once a minute, or sooner after
+     *  moving [CACHE_MOVE_M], not on every fix (each write rewrote the prefs file, ~2 a second
+     *  with GPS and network both on). */
+    private fun cache(loc: Location) {
+        val now = android.os.SystemClock.elapsedRealtime()
+        val moved = if (cachedLat.isNaN()) Float.MAX_VALUE else FloatArray(1).also {
+            Location.distanceBetween(cachedLat, cachedLng, loc.latitude, loc.longitude, it)
+        }[0]
+        if (now - cachedAtMs < CACHE_EVERY_MS && moved < CACHE_MOVE_M) return
+        cachedAtMs = now; cachedLat = loc.latitude; cachedLng = loc.longitude
+        prefs.edit()
+            .putFloat(KEY_LAT, loc.latitude.toFloat())
+            .putFloat(KEY_LNG, loc.longitude.toFloat())
+            .apply()
+    }
+
+    /** A location permission, precise or approximate, is granted. Reads the grant; asks for nothing. */
+    fun hasPermission(): Boolean = PERMISSIONS.any {
+        context.checkSelfPermission(it) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    }
+
+    /** Fixes can arrive: a permission is granted and a provider is switched on, or a position is
+     *  being simulated. */
+    fun canLocate(): Boolean = pinned != null ||
+        (hasPermission() && PROVIDERS.any { p -> runCatching { lm?.isProviderEnabled(p) == true }.getOrDefault(false) })
+
+    /** The system has a network location provider and it is on. Without one (GrapheneOS until
+     *  its Network location is switched on, any phone with it off) only GPS answers, and indoors
+     *  that can be never. */
+    fun networkLocationOn(): Boolean =
+        runCatching { lm?.isProviderEnabled(LocationManager.NETWORK_PROVIDER) == true }.getOrDefault(false)
+
+    private companion object {
+        // GPS first (accurate), NETWORK second (fast coarse seed).
+        val PROVIDERS = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+        val PERMISSIONS = listOf(
+            android.Manifest.permission.ACCESS_FINE_LOCATION,
+            android.Manifest.permission.ACCESS_COARSE_LOCATION,
+        )
+        const val CACHE_EVERY_MS = 60_000L
+        const val CACHE_MOVE_M = 100f
+        const val KEY_LAT = "last_lat"
+        const val KEY_LNG = "last_lng"
+    }
+}
