@@ -48,7 +48,7 @@ object PuckStyle {
     fun whiteDisc(): Boolean = style.value == STYLE_WHITE
     fun key(): String = "${size.value}/${style.value}/${shape.value}/${carColor.value}"
 
-    /** The nav icon (discussion #611): the arrow, or a top-down Altima in [carColor].
+    /** The nav icon (discussion #611): the arrow, or a top-down car in [carColor].
      *  AutoMap 2026-10-26: [carColor] is a hex colour (#RRGGBB), chosen in Settings with a
      *  wheel, sliders, or a hex field. A saved legacy name (red/blue/white/green/yellow)
      *  maps to its exact old hex, so a user who never opens the picker keeps their colour. */
@@ -57,7 +57,7 @@ object PuckStyle {
     const val SHAPE_UFO = "ufo"
     const val SHAPE_SHIP = "ship"
     const val SHAPE_DUCK = "duck"
-    const val DEFAULT_CAR_COLOR = "#D93025"
+    const val DEFAULT_CAR_COLOR = "#FFFFFF" // AutoMap 2026-10-27: white is the first-install default; a saved choice still wins
     private val LEGACY_CAR_COLORS = mapOf(
         "red" to "#D93025", "blue" to "#1A46E5", "white" to "#F4F5F7",
         "green" to "#1E9E5A", "yellow" to "#F2C230",

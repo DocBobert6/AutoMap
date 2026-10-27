@@ -10347,21 +10347,34 @@ private fun applyData(
     // Two modes, Google-style. NAV: the puck IS the position — a solid blue arrow — so
     // hide the dot and swap the heading layer's icon to the arrow. BROWSE: the blue dot
     // (gray when the fix is stale) + a faint heading cone. The cone/puck both hide while
-    // stale (old bearing).
+    // stale (old bearing). AutoMap 2026-10-27: ROOT CAUSE of the "only a blue
+    // dot" report — upstream Vela only ever drew the selected puck during
+    // navigation; in browse it always drew the blue dot + heading cone and
+    // ignored the shape preference entirely, so NO shape (car, arrow, UFO,
+    // ship, duck) ever appeared on the map outside a route. AutoMap changes
+    // that design: in BROWSE, the selected shape's puck replaces the blue
+    // dot at the current location too — oriented to the GPS bearing when
+    // one is available, falling back to north-up (the ME source already
+    // carries bearing 0 when none is known, see above). The puck bitmap
+    // (NAV_PUCK_IMG) already draws every shape, so no shape keeps the old
+    // browse behaviour. A stale fix keeps the dot, so a frozen puck is
+    // never drawn with confidence.
     val showPuck = navMode && me != null && bearing != null && !meStale
+    val showBrowsePuck = !navMode && me != null && !meStale
     // Key-gated (AUDIT FIX 3b): four JNI property sets per recomposition for values that only
     // change on a mode/staleness flip.
     val meLayerKey = (if (navMode) 1 else 0) or (if (meStale) 2 else 0) or
-        (if (showPuck) 4 else 0) or (if (me != null && bearing != null) 8 else 0)
+        (if (showPuck) 4 else 0) or (if (me != null && bearing != null) 8 else 0) or
+        (if (showBrowsePuck) 16 else 0)
     if (meLayerKey != lastMeLayerKey) {
         lastMeLayerKey = meLayerKey
         style.getLayer(ME_LAYER)?.setProperties(
             PropertyFactory.circleColor(if (meStale) "#9AA0A6" else "#4285F4"),
-            PropertyFactory.visibility(if (showPuck) Property.NONE else Property.VISIBLE),
+            PropertyFactory.visibility(if (showPuck || showBrowsePuck) Property.NONE else Property.VISIBLE),
         )
         style.getLayer(ME_ARROW_LAYER)?.setProperties(
-            PropertyFactory.iconImage(if (navMode) NAV_PUCK_IMG else ME_ARROW_IMG),
-            PropertyFactory.visibility(if (me != null && bearing != null && !meStale && !puckOverlayOwnsArrow) Property.VISIBLE else Property.NONE),
+            PropertyFactory.iconImage(if (navMode || showBrowsePuck) NAV_PUCK_IMG else ME_ARROW_IMG),
+            PropertyFactory.visibility(if ((me != null && bearing != null && !meStale && !puckOverlayOwnsArrow) || (showBrowsePuck && !puckOverlayOwnsArrow)) Property.VISIBLE else Property.NONE),
         )
     }
 
@@ -10491,16 +10504,20 @@ internal fun navPuckBitmap(
     return bmp
 }
 
-/** A top-down Altima pointing up, centered in the 176-space the arrow uses
- *  (discussion #611; AutoMap 2026-10-26: Altima proportions, hex body colour, wheels,
- *  mirrors, hood and trunk). This is the flat symbol path; the follow-mode overlay
- *  draws the 3D mesh of the same car. */
+/** A top-down sedan pointing up, centered in the 176-space the arrow uses
+ *  (discussion #611; AutoMap 2026-10-27: refined sedan proportions, hex body
+ *  colour, wheels at the true wheelbase, mirrors, hood and trunk). This is
+ *  the flat symbol path; the follow-mode overlay draws the 3D mesh of the
+ *  same car. Canvas mapping (nose at the top): shell y 22..152, body half
+ *  width 24, front wheel centre y 53, rear wheel centre y 127 — wheelbase
+ *  74 px on a 130 px body, centre 3 px rear of the body centre, matching
+ *  the 3D mesh (2825 mm wheelbase on a 4900 mm body). */
 private fun drawCarPuck(canvas: Canvas, colorName: String) {
     val body = runCatching {
         android.graphics.Color.parseColor(
-            app.vela.ui.PuckStyle.normalizeCarColor(colorName) ?: "#D93025",
+            app.vela.ui.PuckStyle.normalizeCarColor(colorName) ?: "#FFFFFF",
         )
-    }.getOrDefault(android.graphics.Color.parseColor("#D93025"))
+    }.getOrDefault(android.graphics.Color.parseColor("#FFFFFF"))
     val hsv = FloatArray(3).also { android.graphics.Color.colorToHSV(body, it) }
     val edge = android.graphics.Color.HSVToColor(floatArrayOf(hsv[0], hsv[1], hsv[2] * 0.62f))
     val roof = android.graphics.Color.HSVToColor(floatArrayOf(hsv[0], hsv[1] * 0.85f, (hsv[2] * 1.08f).coerceAtMost(1f)))
@@ -10510,7 +10527,7 @@ private fun drawCarPuck(canvas: Canvas, colorName: String) {
         if (stroke > 0f) { style = Paint.Style.STROKE; strokeWidth = stroke } else style = Paint.Style.FILL
     }
     val cx = 88f
-    val shell = android.graphics.RectF(cx - 26f, 24f, cx + 26f, 152f)
+    val shell = android.graphics.RectF(cx - 24f, 22f, cx + 24f, 152f)
     // Soft shadow, then wheels, mirrors, and the body with a darker rim.
     canvas.drawRoundRect(
         android.graphics.RectF(shell.left, shell.top + 6f, shell.right, shell.bottom + 6f), 22f, 22f,
@@ -10520,33 +10537,44 @@ private fun drawCarPuck(canvas: Canvas, colorName: String) {
         },
     )
     val tire = paint(android.graphics.Color.parseColor("#1B1B1B"))
-    canvas.drawRoundRect(android.graphics.RectF(cx - 34f, 52f, cx - 24f, 70f), 3f, 3f, tire)
-    canvas.drawRoundRect(android.graphics.RectF(cx + 24f, 52f, cx + 34f, 70f), 3f, 3f, tire)
-    canvas.drawRoundRect(android.graphics.RectF(cx - 34f, 108f, cx - 24f, 126f), 3f, 3f, tire)
-    canvas.drawRoundRect(android.graphics.RectF(cx + 24f, 108f, cx + 34f, 126f), 3f, 3f, tire)
-    canvas.drawOval(android.graphics.RectF(cx - 34f, 66f, cx - 24f, 76f), paint(body))
-    canvas.drawOval(android.graphics.RectF(cx + 24f, 66f, cx + 34f, 76f), paint(body))
+    // Wheels at the true wheelbase: front centre 53, rear centre 127, 18 px tall.
+    canvas.drawRoundRect(android.graphics.RectF(cx - 34f, 44f, cx - 24f, 62f), 3f, 3f, tire)
+    canvas.drawRoundRect(android.graphics.RectF(cx + 24f, 44f, cx + 34f, 62f), 3f, 3f, tire)
+    canvas.drawRoundRect(android.graphics.RectF(cx - 34f, 118f, cx - 24f, 136f), 3f, 3f, tire)
+    canvas.drawRoundRect(android.graphics.RectF(cx + 24f, 118f, cx + 34f, 136f), 3f, 3f, tire)
+    canvas.drawOval(android.graphics.RectF(cx - 34f, 50f, cx - 24f, 56f), paint(body))
+    canvas.drawOval(android.graphics.RectF(cx + 24f, 50f, cx + 34f, 56f), paint(body))
     canvas.drawRoundRect(shell, 22f, 22f, paint(body))
     canvas.drawRoundRect(shell, 22f, 22f, paint(edge, 3f))
+    // Mirrors at the A-pillar (canvas y 64..70, at the windshield base).
+    canvas.drawRoundRect(android.graphics.RectF(cx - 30f, 64f, cx - 24f, 70f), 2f, 2f, paint(body))
+    canvas.drawRoundRect(android.graphics.RectF(cx + 24f, 64f, cx + 30f, 70f), 2f, 2f, paint(body))
     // Hood and trunk seams, windshield, roof with sunroof, rear window.
-    canvas.drawLine(cx - 22f, 52f, cx + 22f, 52f, paint(edge, 2f))
-    canvas.drawLine(cx - 22f, 126f, cx + 22f, 126f, paint(edge, 2f))
+    canvas.drawLine(cx - 21f, 59f, cx + 21f, 59f, paint(edge, 2f))
+    canvas.drawLine(cx - 21f, 121f, cx + 21f, 121f, paint(edge, 2f))
     canvas.drawPath(Path().apply {
-        moveTo(cx - 19f, 54f); lineTo(cx + 19f, 54f); lineTo(cx + 22f, 72f); lineTo(cx - 22f, 72f); close()
+        moveTo(cx - 21f, 59f); lineTo(cx + 21f, 59f); lineTo(cx + 18f, 70f); lineTo(cx - 18f, 70f); close()
     }, paint(glass))
-    canvas.drawRoundRect(android.graphics.RectF(cx - 20f, 74f, cx + 20f, 112f), 8f, 8f, paint(roof))
-    canvas.drawRoundRect(android.graphics.RectF(cx - 10f, 84f, cx + 10f, 100f), 4f, 4f, paint(glass))
+    canvas.drawRoundRect(android.graphics.RectF(cx - 18f, 70f, cx + 18f, 105f), 8f, 8f, paint(roof))
+    canvas.drawRoundRect(android.graphics.RectF(cx - 9f, 80f, cx + 9f, 96f), 4f, 4f, paint(glass))
     canvas.drawPath(Path().apply {
-        moveTo(cx - 20f, 114f); lineTo(cx + 20f, 114f); lineTo(cx + 17f, 124f); lineTo(cx - 17f, 124f); close()
+        moveTo(cx - 18f, 105f); lineTo(cx + 18f, 105f); lineTo(cx + 16f, 121f); lineTo(cx - 16f, 121f); close()
     }, paint(glass))
-    // Headlights, grille, and taillights.
+    // Boomerang headlights (main block + sweep back along the flank),
+    // wide grille, and boomerang taillights.
     val head = paint(android.graphics.Color.parseColor("#FFF6C8"))
-    canvas.drawOval(android.graphics.RectF(cx - 21f, 27f, cx - 10f, 34f), head)
-    canvas.drawOval(android.graphics.RectF(cx + 10f, 27f, cx + 21f, 34f), head)
-    canvas.drawRoundRect(android.graphics.RectF(cx - 8f, 28f, cx + 8f, 33f), 2f, 2f, paint(android.graphics.Color.parseColor("#14181D")))
+    canvas.drawPath(Path().apply {
+        moveTo(cx - 21f, 25f); lineTo(cx - 10f, 25f); lineTo(cx - 12f, 34f); lineTo(cx - 21f, 44f); close()
+    }, head)
+    canvas.drawPath(Path().apply {
+        moveTo(cx + 10f, 25f); lineTo(cx + 21f, 25f); lineTo(cx + 21f, 44f); lineTo(cx + 12f, 34f); close()
+    }, head)
+    canvas.drawRoundRect(android.graphics.RectF(cx - 8f, 26f, cx + 8f, 31f), 2f, 2f, paint(android.graphics.Color.parseColor("#14181D")))
     val tail = paint(android.graphics.Color.parseColor("#B3261E"))
-    canvas.drawRoundRect(android.graphics.RectF(cx - 22f, 145f, cx - 11f, 149f), 2f, 2f, tail)
-    canvas.drawRoundRect(android.graphics.RectF(cx + 11f, 145f, cx + 22f, 149f), 2f, 2f, tail)
+    canvas.drawRoundRect(android.graphics.RectF(cx - 21f, 143f, cx - 11f, 148f), 2f, 2f, tail)
+    canvas.drawRoundRect(android.graphics.RectF(cx + 11f, 143f, cx + 21f, 148f), 2f, 2f, tail)
+    canvas.drawRoundRect(android.graphics.RectF(cx - 22f, 132f, cx - 17f, 143f), 2f, 2f, tail)
+    canvas.drawRoundRect(android.graphics.RectF(cx + 17f, 132f, cx + 22f, 143f), 2f, 2f, tail)
 }
 
 private fun fill(c: Int) = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = c; style = Paint.Style.FILL }

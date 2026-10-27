@@ -1467,7 +1467,7 @@
     <string name="settings_car_green">Green</string>
     <string name="settings_car_yellow">Yellow</string>
     <string name="settings_puck_color_title" translatable="false">Vehicle colour</string>
-    <string name="settings_puck_color_hint" translatable="false">The top-down 3D Altima below is the exact car shown on the map. Pick a colour with the wheel, the sliders, or a hex code. It applies to the map car at once.</string>
+    <string name="settings_puck_color_hint" translatable="false">The top-down 3D car below is the exact car shown on the map. Pick a colour with the wheel, the sliders, or a hex code. It applies to the map car at once.</string>
     <string name="settings_puck_hex_label" translatable="false">Hex code, for example #1F6FEB</string>
     <string name="settings_puck_hex_invalid" translatable="false">Enter six hex digits, with or without a leading hash.</string>
     <string name="settings_puck_hue" translatable="false">Hue</string>

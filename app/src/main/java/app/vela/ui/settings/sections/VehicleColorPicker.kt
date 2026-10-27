@@ -34,22 +34,22 @@ import androidx.compose.ui.unit.dp
 import app.vela.R
 import app.vela.ui.PuckStyle
 import app.vela.ui.map.PuckModels
-import app.vela.ui.map.altimaTopDownPreviewBitmap
+import app.vela.ui.map.carTopDownPreviewBitmap
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.sqrt
 
 /**
- * AutoMap vehicle colour picker (2026-10-26): the top-down 3D Altima preview, drawn by the
+ * AutoMap vehicle colour picker (2026-10-26): the top-down 3D car preview, drawn by the
  * same mesh code as the map puck, plus a colour wheel, HSV and RGB sliders, and a hex field,
  * all kept in sync and all writing the same persisted preference. An invalid hex entry is
  * rejected (shown as an error, never applied); a valid one applies immediately.
  */
 @Composable
-internal fun AltimaColorPicker() {
+internal fun VehicleColorPicker() {
     val context = LocalContext.current
     val currentHex = PuckStyle.carColor.value
-    val bodyInt = runCatching { android.graphics.Color.parseColor(currentHex) }.getOrDefault(0xFFD93025.toInt())
+    val bodyInt = runCatching { android.graphics.Color.parseColor(currentHex) }.getOrDefault(0xFFFFFFFF.toInt())
     val hsv = FloatArray(3).also { android.graphics.Color.colorToHSV(bodyInt, it) }
     val hue = hsv[0]; val sat = hsv[1]; val value = hsv[2]
     val red = android.graphics.Color.red(bodyInt)
@@ -69,10 +69,10 @@ internal fun AltimaColorPicker() {
         style = MaterialTheme.typography.titleMedium,
         modifier = Modifier.padding(start = 20.dp, top = 12.dp, bottom = 4.dp),
     )
-    // The large preview: the exact Altima mesh, top-down 3D, in the picked colour.
+    // The large preview: the exact car mesh, top-down 3D, in the picked colour.
     val mesh = PuckModels.forShape(PuckStyle.SHAPE_CAR, currentHex)
     if (mesh != null) {
-        val preview = remember(currentHex) { altimaTopDownPreviewBitmap(mesh, 360).asImageBitmap() }
+        val preview = remember(currentHex) { carTopDownPreviewBitmap(mesh, 360).asImageBitmap() }
         Image(preview, contentDescription = null, modifier = Modifier.padding(start = 20.dp, top = 4.dp).size(144.dp))
     }
     Text(
@@ -166,7 +166,7 @@ internal fun AltimaColorPicker() {
     SliderRow(stringResource(R.string.settings_puck_blue), blue.toFloat(), 0f..255f, { commitRgb(red, green, it.toInt()) }, blue.toString())
 
     Row(Modifier.padding(start = 20.dp, top = 4.dp, bottom = 8.dp)) {
-        TextButton(onClick = { commitHex("#D93025") }) {
+        TextButton(onClick = { commitHex("#FFFFFF") }) {
             Text(stringResource(R.string.settings_puck_reset))
         }
         Spacer(Modifier.width(8.dp))

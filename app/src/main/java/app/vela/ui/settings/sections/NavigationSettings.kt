@@ -294,7 +294,7 @@ internal fun NavigationSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
         )
         }
         if (app.vela.ui.PuckStyle.isCar()) {
-            AltimaColorPicker()
+            VehicleColorPicker()
         }
 
         var trafficLights by remember { mutableStateOf(prefs.getBoolean("nav_traffic_lights", false)) }

@@ -222,8 +222,8 @@ internal object PuckModels {
 
     /** Body colour from a hex string, with the old named colours as a fallback. */
     fun carBody(colorName: String) = runCatching {
-        c(app.vela.ui.PuckStyle.normalizeCarColor(colorName) ?: "#D93025")
-    }.getOrDefault(c("#D93025"))
+        c(app.vela.ui.PuckStyle.normalizeCarColor(colorName) ?: "#FFFFFF")
+    }.getOrDefault(c("#FFFFFF"))
 
     private fun shadeOf(color: Int, valueScale: Float, satScale: Float = 1f): Int {
         val hsv = FloatArray(3).also { android.graphics.Color.colorToHSV(color, it) }
@@ -232,13 +232,20 @@ internal object PuckModels {
         )
     }
 
-    /** Top-down 3D Nissan Altima sedan (AutoMap 2026-10-26): a longer, narrower body
-     *  than the old generic car (2.20 long, 0.86 wide, the Altima sedan proportion), with a
-     *  raised hood and trunk, a glass cabin with a body-coloured roof and a sunroof, mirrors,
-     *  wheels with silver hubs, a front grille, and LED-style headlights and taillights.
-     *  Model space: x right, y forward, so the nose is at +y. The body fill is the picked
-     *  colour; edges are a darker shade of it and the roof a lighter one, so the shading
-     *  works over any body colour, light or dark. */
+    /** Top-down 3D mid-size sedan (AutoMap 2026-10-27, refined from the 2026-10-26
+     *  generic sedan): true 2019 mid-size-sedan proportions in model space —
+     *  2.20 long, 0.86 wide (4900 x 1850 mm, ratio 2.65), wheelbase 1.26
+     *  (2825 mm) with its centre 0.05 behind the body centre, so the front
+     *  wheel sits at +0.58 and the rear at -0.68 — not the old symmetric
+     *  +/-0.72. Wheels are true tyre size (0.32 across, not 0.40). Long hood
+     *  with crease ridges, a trapezoidal roof narrowing toward the rear,
+     *  sloping windshield and rear glass, boomerang headlights and taillights
+     *  that sweep back along the flanks, a wide front grille,
+     *  a short trunk with a spoiler lip, mirrors at the A-pillar, and door
+     *  shut lines. Model space: x right, y forward, so the nose is at +y.
+     *  The body fill is the picked colour; edges are a darker shade of it
+     *  and the roof a lighter one, so the shading works over any body
+     *  colour, light or dark. */
     private fun car(colorName: String): PuckMesh = Builder().apply {
         val body = carBody(colorName)
         val edge = shadeOf(body, 0.62f)
@@ -246,45 +253,61 @@ internal object PuckModels {
         val glass = c("#1E2833")
         val tire = c("#1B1B1B")
         val silver = c("#C9CED6")
-        // Wheels, front and rear, protruding past the flanks, with silver hubs on top.
-        for (y in listOf(0.72f, -0.72f)) {
-            box(-0.49f, -0.37f, y - 0.20f, y + 0.20f, 0f, 0.34f, tire)
-            box(0.37f, 0.49f, y - 0.20f, y + 0.20f, 0f, 0.34f, tire)
-            box(-0.46f, -0.40f, y - 0.12f, y + 0.12f, 0.34f, 0.37f, silver)
-            box(0.40f, 0.46f, y - 0.12f, y + 0.12f, 0.34f, 0.37f, silver)
+        // Wheels at the true wheelbase: front +0.58, rear -0.68, tyre 0.32
+        // across, protruding past the flanks, silver hubs on top.
+        for (y in listOf(0.58f, -0.68f)) {
+            box(-0.49f, -0.37f, y - 0.16f, y + 0.16f, 0f, 0.32f, tire)
+            box(0.37f, 0.49f, y - 0.16f, y + 0.16f, 0f, 0.32f, tire)
+            box(-0.46f, -0.40f, y - 0.10f, y + 0.10f, 0.32f, 0.35f, silver)
+            box(0.40f, 0.46f, y - 0.10f, y + 0.10f, 0.32f, 0.35f, silver)
         }
-        // Lower body: tapered nose, square tail.
+        // Lower body: pointed V-motion nose, wide shoulders, square tail.
+        // 14-point outline, tapered at both ends, widest at the doors.
         val outline = listOf(
-            -0.40f to -1.08f, 0.40f to -1.08f, 0.43f to -0.70f, 0.43f to 0.70f,
-            0.38f to 1.02f, 0.28f to 1.10f, -0.28f to 1.10f, -0.38f to 1.02f,
-            -0.43f to 0.70f, -0.43f to -0.70f,
+            -0.38f to -1.08f, 0.38f to -1.08f, 0.42f to -0.72f, 0.43f to -0.30f,
+            0.43f to 0.30f, 0.41f to 0.72f, 0.36f to 1.00f, 0.26f to 1.10f,
+            -0.26f to 1.10f, -0.36f to 1.00f, -0.41f to 0.72f, -0.43f to 0.30f,
+            -0.43f to -0.30f, -0.42f to -0.72f,
         )
         loft(ring(outline, 0.10f), ring(outline, 0.42f), body, sideColors = List(outline.size) { edge }, topColor = body)
-        // Raised hood and trunk panels (bottom caps off: they sit on the body top face).
+        // Long raised hood (windshield base at 0.48) with crease ridges.
         loft(
-            ring(listOf(-0.36f to 0.60f, 0.36f to 0.60f, 0.36f to 1.00f, 0.26f to 1.08f, -0.26f to 1.08f, -0.36f to 1.00f), 0.42f),
-            ring(listOf(-0.34f to 0.62f, 0.34f to 0.62f, 0.34f to 0.98f, 0.25f to 1.06f, -0.25f to 1.06f, -0.34f to 0.98f), 0.47f),
+            ring(listOf(-0.34f to 0.48f, 0.34f to 0.48f, 0.34f to 0.96f, 0.25f to 1.06f, -0.25f to 1.06f, -0.34f to 0.96f), 0.42f),
+            ring(listOf(-0.32f to 0.50f, 0.32f to 0.50f, 0.32f to 0.94f, 0.24f to 1.04f, -0.24f to 1.04f, -0.32f to 0.94f), 0.47f),
             body, topColor = body, capBottom = false,
         )
+        box(-0.24f, -0.20f, 0.55f, 0.95f, 0.47f, 0.49f, edge)
+        box(0.20f, 0.24f, 0.55f, 0.95f, 0.47f, 0.49f, edge)
+        // Short trunk with a spoiler lip on its rear edge.
         loft(
-            ring(listOf(-0.36f to -1.02f, 0.36f to -1.02f, 0.36f to -0.62f, -0.36f to -0.62f), 0.42f),
-            ring(listOf(-0.34f to -1.00f, 0.34f to -1.00f, 0.34f to -0.64f, -0.34f to -0.64f), 0.45f),
+            ring(listOf(-0.36f to -1.04f, 0.36f to -1.04f, 0.36f to -0.60f, -0.36f to -0.60f), 0.42f),
+            ring(listOf(-0.34f to -1.02f, 0.34f to -1.02f, 0.34f to -0.62f, -0.34f to -0.62f), 0.45f),
             body, topColor = body, capBottom = false,
         )
-        // Cabin: glass sides, body-coloured roof, sunroof inset on the roof.
-        val cabBottom = ring(listOf(-0.37f to -0.55f, 0.37f to -0.55f, 0.37f to 0.42f, -0.37f to 0.42f), 0.42f)
-        val cabTop = ring(listOf(-0.31f to -0.38f, 0.31f to -0.38f, 0.31f to 0.25f, -0.31f to 0.25f), 0.72f)
+        box(-0.34f, 0.34f, -1.08f, -1.02f, 0.45f, 0.49f, edge)
+        // Cabin: glass sides, trapezoidal body-coloured roof narrowing toward
+        // the rear, sunroof inset, sloping windshield and rear glass.
+        val cabBottom = ring(listOf(-0.37f to -0.58f, 0.37f to -0.58f, 0.37f to 0.48f, -0.37f to 0.48f), 0.42f)
+        val cabTop = ring(listOf(-0.30f to -0.32f, 0.30f to -0.32f, 0.33f to 0.28f, -0.33f to 0.28f), 0.72f)
         loft(cabBottom, cabTop, glass, topColor = roofCol, capBottom = false)
-        box(-0.17f, 0.17f, -0.18f, 0.08f, 0.72f, 0.74f, glass)
-        // Mirrors, grille, headlights, taillights (front pieces sit just past the nose so
-        // their faces are not hidden inside the body volume).
-        box(-0.52f, -0.42f, 0.30f, 0.42f, 0.42f, 0.52f, body)
-        box(0.42f, 0.52f, 0.30f, 0.42f, 0.42f, 0.52f, body)
-        box(-0.22f, 0.22f, 1.08f, 1.14f, 0.20f, 0.34f, c("#14181D"))
-        box(-0.38f, -0.20f, 1.00f, 1.13f, 0.30f, 0.38f, c("#FFF6C8"))
-        box(0.20f, 0.38f, 1.00f, 1.13f, 0.30f, 0.38f, c("#FFF6C8"))
+        box(-0.16f, 0.16f, -0.16f, 0.10f, 0.72f, 0.74f, glass)
+        // Door shut lines on the body top face.
+        box(-0.36f, 0.36f, 0.03f, 0.05f, 0.42f, 0.435f, edge)
+        box(-0.36f, 0.36f, -0.37f, -0.35f, 0.42f, 0.435f, edge)
+        // Mirrors at the A-pillar, grille, boomerang headlights and taillights
+        // (a main block plus a sweep back along the flank, so each light wraps
+        // the corner instead of sitting as a flat rectangle on the nose/tail).
+        box(-0.52f, -0.43f, 0.32f, 0.42f, 0.42f, 0.52f, body)
+        box(0.43f, 0.52f, 0.32f, 0.42f, 0.42f, 0.52f, body)
+        box(-0.24f, 0.24f, 1.08f, 1.14f, 0.20f, 0.34f, c("#14181D"))
+        box(-0.38f, -0.18f, 0.98f, 1.10f, 0.30f, 0.38f, c("#FFF6C8"))
+        box(0.18f, 0.38f, 0.98f, 1.10f, 0.30f, 0.38f, c("#FFF6C8"))
+        box(-0.40f, -0.30f, 0.78f, 0.98f, 0.30f, 0.36f, c("#FFF6C8"))
+        box(0.30f, 0.40f, 0.78f, 0.98f, 0.30f, 0.36f, c("#FFF6C8"))
         box(-0.40f, -0.20f, -1.10f, -1.04f, 0.30f, 0.38f, c("#C62828"))
         box(0.20f, 0.40f, -1.10f, -1.04f, 0.30f, 0.38f, c("#C62828"))
+        box(-0.42f, -0.32f, -1.02f, -0.82f, 0.30f, 0.36f, c("#C62828"))
+        box(0.32f, 0.42f, -1.02f, -0.82f, 0.30f, 0.36f, c("#C62828"))
     }.build()
 
     private fun ufo(): PuckMesh = Builder().apply {
@@ -336,9 +359,9 @@ internal fun puck3DPreviewBitmap(mesh: PuckMesh, sizePx: Int): Bitmap {
     return bmp
 }
 
-/** A still of the Altima for the Settings colour picker: the same mesh, seen top-down
+/** A still of the car for the Settings colour picker: the same mesh, seen top-down
  *  with 3D depth (a low tilt, nose pointing up, as on the map), not a side view. */
-internal fun altimaTopDownPreviewBitmap(mesh: PuckMesh, sizePx: Int): Bitmap {
+internal fun carTopDownPreviewBitmap(mesh: PuckMesh, sizePx: Int): Bitmap {
     val bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
     mesh.draw(Canvas(bmp), sizePx / 2f, sizePx * 0.56f, sizePx * 0.88f, 0f, 32f)
     return bmp
