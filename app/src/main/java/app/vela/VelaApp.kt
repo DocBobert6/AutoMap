@@ -210,6 +210,7 @@ class VelaApp : Application(), coil.ImageLoaderFactory {
         app.vela.ui.NavNorthUp.init(this)
         app.vela.ui.ZoomToTurn.init(this) // zoom out to the next turn while driving, off by default (issue #781)
         app.vela.ui.PuckStyle.init(this)
+        app.vela.ui.CarAlwaysOn.init(this) // AutoMap: "Car always on" toggle for the Bluetooth-gated browse puck
         app.vela.ui.HouseNumbers.init(this) // house-number zoom gate (issue #329)
         app.vela.ui.MapNames.init(this) // which name a map label shows (issue #738)
         app.vela.ui.PreferButtons.init(this)

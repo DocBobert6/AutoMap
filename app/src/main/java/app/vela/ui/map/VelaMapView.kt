@@ -1120,6 +1120,12 @@ fun VelaMapView(
     val driveFollowingHolder = rememberUpdatedState(driveFollowing)
     val browseCam = remember { doubleArrayOf(Double.NaN, Double.NaN) } // eased free-drive camera [lat,lng]; NaN = re-seed
     val browseBeam = remember { floatArrayOf(Float.NaN) }              // smoothed browse heading (NaN = idle, use raw)
+    // AutoMap 2026-10-27: Bluetooth-gated browse puck — bumped by the receiver
+    // below whenever a Bluetooth device connects or disconnects, so the
+    // composable re-runs applyData and the puck/dot flip without waiting for
+    // the next location fix. Read as an argument to applyData, which is what
+    // subscribes this composition to the state.
+    val bluetoothTick = remember { mutableStateOf(0) }
     val browseAtt = remember { doubleArrayOf(0.0, 0.0) } // next-frame [bearing (signed), tilt], recomputed from the LIVE camera each frame
     // Free-drive dead reckon: the last fix + its speed/course, so the follow target GLIDES between
     // the ~1 Hz fixes instead of jumping and sitting (the per-second surge-and-stall jitter).
@@ -1792,6 +1798,33 @@ fun VelaMapView(
             warmPending[0]?.let { warmHandler.removeCallbacks(it) }
             warmSnapshotter[0]?.cancel(); warmSnapshotter[0] = null
         }
+    }
+
+    // AutoMap 2026-10-27: Bluetooth-gated browse puck — a connection change
+    // bumps bluetoothTick (above), which re-runs applyData. Activity-context
+    // receivers are not exported on Android 13+, and the flag overload does
+    // not exist before it, so the two branches are both needed.
+    DisposableEffect(Unit) {
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: android.content.Context?, intent: android.content.Intent?) {
+                bluetoothTick.value++
+            }
+        }
+        val filter = android.content.IntentFilter().apply {
+            addAction(android.bluetooth.BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED)
+            addAction(android.bluetooth.BluetoothAdapter.ACTION_STATE_CHANGED)
+            addAction(android.bluetooth.BluetoothDevice.ACTION_ACL_CONNECTED)
+            addAction(android.bluetooth.BluetoothDevice.ACTION_ACL_DISCONNECTED)
+        }
+        runCatching {
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                context.registerReceiver(receiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                @Suppress("UnspecifiedRegisterReceiverFlag")
+                context.registerReceiver(receiver, filter)
+            }
+        }
+        onDispose { runCatching { context.unregisterReceiver(receiver) } }
     }
 
     // Deep satellite imagery (issue #244): the base source is capped at z19, so past that the
@@ -5275,7 +5308,7 @@ fun VelaMapView(
                 }
                 if (satelliteOn) applySatelliteLabels(style)
                 emphasizeShields(context, style)
-                applyData(map, style, context, darkTheme, ambientCoversView, routePolyline, routeColor, routeDashed, routeTrafficSpans, alternates, altColor, markers, ambientPois, trafficControls, flockCameras, speedCameras, transitStops, mePaint, meBearing, myAccuracyM, locationStale, previewTarget, routeProgress, navMode, navDriveMode, parkingSpot, savedPins, poisEnabled, svPose)
+                applyData(map, style, context, darkTheme, ambientCoversView, routePolyline, routeColor, routeDashed, routeTrafficSpans, alternates, altColor, markers, ambientPois, trafficControls, flockCameras, speedCameras, transitStops, mePaint, meBearing, myAccuracyM, locationStale, previewTarget, routeProgress, navMode, navDriveMode, parkingSpot, savedPins, poisEnabled, svPose, bluetoothTick.value)
                 ensureSatellite(style, satelliteOn)
                 ensureNavRoadLabels(style, navMode, darkTheme, context.resources.displayMetrics.density, navLabelExclude)
                 // The traffic raster is Google's tile server; off entirely without Google, and
@@ -5289,7 +5322,7 @@ fun VelaMapView(
             }
         } else {
             styleRef?.let {
-                applyData(map, it, context, darkTheme, ambientCoversView, routePolyline, routeColor, routeDashed, routeTrafficSpans, alternates, altColor, markers, ambientPois, trafficControls, flockCameras, speedCameras, transitStops, mePaint, meBearing, myAccuracyM, locationStale, previewTarget, routeProgress, navMode, navDriveMode, parkingSpot, savedPins, poisEnabled, svPose)
+                applyData(map, it, context, darkTheme, ambientCoversView, routePolyline, routeColor, routeDashed, routeTrafficSpans, alternates, altColor, markers, ambientPois, trafficControls, flockCameras, speedCameras, transitStops, mePaint, meBearing, myAccuracyM, locationStale, previewTarget, routeProgress, navMode, navDriveMode, parkingSpot, savedPins, poisEnabled, svPose, bluetoothTick.value)
                 // AUDIT FIX 3e (2026-07-15): the ensure* helpers are idempotent but each call
                 // probes the style over JNI (getLayer/getSource) - per recomposition, that's
                 // four probe sets during every camera flight for nothing. They only need to run
@@ -5708,7 +5741,10 @@ fun VelaMapView(
     if (puckOverlayOn.value && puckMesh != null) {
         // The car, UFO, ship and duck are 3D models drawn from the camera's own tilt and the
         // heading each frame (both read in the draw phase, so no recomposition per frame).
-        val sizePx = (202 * app.vela.ui.PuckStyle.scale()).toInt()
+        // AutoMap 2026-10-27: 283 = 202 x 1.4, matching the symbol bitmap
+        // above, so the follow overlay grows by the same factor and the
+        // size setting still scales from the larger base.
+        val sizePx = (283 * app.vela.ui.PuckStyle.scale()).toInt()
         androidx.compose.foundation.Canvas(
             Modifier
                 .graphicsLayer {
@@ -9835,6 +9871,7 @@ private fun applyData(
     savedPins: List<SavedPin> = emptyList(),
     poisEnabled: Boolean = true,
     svPose: DoubleArray? = null, // Street View pose [lat, lng, compassYawDeg]; null = viewer closed
+    bluetoothTick: Int = 0, // AutoMap 2026-10-27: bumped on Bluetooth connect/disconnect so the browse-puck gate below re-evaluates; its parity also feeds meLayerKey so a tick alone re-applies the layer
 ) {
     // Accuracy halo: shown only for a vague fix (see ACCURACY_HALO_MIN_M) and never during nav,
     // where the puck snaps to the road anyway. Identity-gated like everything else here.
@@ -10360,12 +10397,22 @@ private fun applyData(
     // browse behaviour. A stale fix keeps the dot, so a frozen puck is
     // never drawn with confidence.
     val showPuck = navMode && me != null && bearing != null && !meStale
-    val showBrowsePuck = !navMode && me != null && !meStale
+    // AutoMap 2026-10-27, Bluetooth gating (Robert, final 2026-10-27):
+    // DEFAULT: the browse location shows a blue dot, and the car appears
+    // only when a Bluetooth device is connected. "Car always on" (below, in
+    // Navigation settings) overrides the gate and always shows the car.
+    // Navigation is NOT gated: showPuck above ignores Bluetooth entirely,
+    // so a route always shows its puck. A stale fix still keeps the dot,
+    // so a frozen puck is never drawn with confidence.
+    val bluetoothOk = app.vela.ui.CarAlwaysOn.on.value || app.vela.ui.CarAlwaysOn.isBluetoothConnected(context)
+    val showBrowsePuck = !navMode && me != null && !meStale && bluetoothOk
     // Key-gated (AUDIT FIX 3b): four JNI property sets per recomposition for values that only
-    // change on a mode/staleness flip.
+    // change on a mode/staleness flip. Bit 32 is the Bluetooth-tick parity,
+    // so a connect/disconnect alone re-applies the layer even if every
+    // other input is unchanged.
     val meLayerKey = (if (navMode) 1 else 0) or (if (meStale) 2 else 0) or
         (if (showPuck) 4 else 0) or (if (me != null && bearing != null) 8 else 0) or
-        (if (showBrowsePuck) 16 else 0)
+        (if (showBrowsePuck) 16 else 0) or (if (bluetoothTick % 2 != 0) 32 else 0)
     if (meLayerKey != lastMeLayerKey) {
         lastMeLayerKey = meLayerKey
         style.getLayer(ME_LAYER)?.setProperties(
@@ -10443,9 +10490,16 @@ internal fun navPuckBitmap(
     scale: Float = app.vela.ui.PuckStyle.scale(),
     whiteDisc: Boolean = app.vela.ui.PuckStyle.whiteDisc(),
 ): Bitmap {
-    // 202 = +15% per issue #251 (2026-08-10); the earlier chain was 96 -> 112 -> 136 -> 176.
-    // [scale] is the Settings "Arrow size" (issue #344): Large 1.25x, Extra large 1.5x.
-    val size = (202 * scale).toInt()
+    // AutoMap 2026-10-27: 283 = 202 x 1.4, so the puck is wider than the
+    // road the way Google's is, instead of sitting inside it (Robert's
+    // 2026-10-27 nav screenshot). The 202 chain was 96 -> 112 -> 136 ->
+    // 176, then +15% per issue #251 (2026-08-10). [scale] is the Settings
+    // "Arrow size" (issue #344): Large 1.25x, Extra large 1.5x — the
+    // setting still works, it now scales from the larger base. This is
+    // the ONE size change for the symbol path: the car screen scales
+    // this bitmap to its own px (see CarMapRenderer.drawPuck), so it
+    // must not also get a second multiplier there.
+    val size = (283 * scale).toInt()
     val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bmp)
     // Drawn in the original 176-space and scaled whole, so the disc/arrow/shadow proportions the
@@ -10511,7 +10565,10 @@ internal fun navPuckBitmap(
  *  same car. Canvas mapping (nose at the top): shell y 22..152, body half
  *  width 24, front wheel centre y 53, rear wheel centre y 127 — wheelbase
  *  74 px on a 130 px body, centre 3 px rear of the body centre, matching
- *  the 3D mesh (2825 mm wheelbase on a 4900 mm body). */
+ *  the 3D mesh (2825 mm wheelbase on a 4900 mm body). 2026-10-27
+ *  refinement: the shell is a curved silhouette (rounded nose and tail,
+ *  bulging flanks), not a roundRect, and the headlights stay bright
+ *  (#FFF6C8) so they read as illuminated on a dark night map. */
 private fun drawCarPuck(canvas: Canvas, colorName: String) {
     val body = runCatching {
         android.graphics.Color.parseColor(
@@ -10527,15 +10584,32 @@ private fun drawCarPuck(canvas: Canvas, colorName: String) {
         if (stroke > 0f) { style = Paint.Style.STROKE; strokeWidth = stroke } else style = Paint.Style.FILL
     }
     val cx = 88f
-    val shell = android.graphics.RectF(cx - 24f, 22f, cx + 24f, 152f)
+    // AutoMap 2026-10-27 likeness refinement: the shell is a curved
+    // silhouette, not a roundRect — a rounded nose, sides that bulge
+    // gently at the fenders and haunches, and a rounded tail, matching
+    // the 3D mesh outline. Same bounding box as before (y 22..152,
+    // half-width 24), so every detail below still lands inside it.
+    val shellPath = Path().apply {
+        moveTo(cx, 22f)
+        cubicTo(cx + 10f, 22f, cx + 20f, 26f, cx + 23f, 38f)
+        cubicTo(cx + 24f, 60f, cx + 24f, 95f, cx + 23f, 120f)
+        cubicTo(cx + 22f, 140f, cx + 14f, 152f, cx, 152f)
+        cubicTo(cx - 14f, 152f, cx - 22f, 140f, cx - 23f, 120f)
+        cubicTo(cx - 24f, 95f, cx - 24f, 60f, cx - 23f, 38f)
+        cubicTo(cx - 20f, 26f, cx - 10f, 22f, cx, 22f)
+        close()
+    }
     // Soft shadow, then wheels, mirrors, and the body with a darker rim.
-    canvas.drawRoundRect(
-        android.graphics.RectF(shell.left, shell.top + 6f, shell.right, shell.bottom + 6f), 22f, 22f,
+    canvas.save()
+    canvas.translate(0f, 6f)
+    canvas.drawPath(
+        shellPath,
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = android.graphics.Color.argb(80, 0, 0, 0)
             maskFilter = android.graphics.BlurMaskFilter(10f, android.graphics.BlurMaskFilter.Blur.NORMAL)
         },
     )
+    canvas.restore()
     val tire = paint(android.graphics.Color.parseColor("#1B1B1B"))
     // Wheels at the true wheelbase: front centre 53, rear centre 127, 18 px tall.
     canvas.drawRoundRect(android.graphics.RectF(cx - 34f, 44f, cx - 24f, 62f), 3f, 3f, tire)
@@ -10544,8 +10618,8 @@ private fun drawCarPuck(canvas: Canvas, colorName: String) {
     canvas.drawRoundRect(android.graphics.RectF(cx + 24f, 118f, cx + 34f, 136f), 3f, 3f, tire)
     canvas.drawOval(android.graphics.RectF(cx - 34f, 50f, cx - 24f, 56f), paint(body))
     canvas.drawOval(android.graphics.RectF(cx + 24f, 50f, cx + 34f, 56f), paint(body))
-    canvas.drawRoundRect(shell, 22f, 22f, paint(body))
-    canvas.drawRoundRect(shell, 22f, 22f, paint(edge, 3f))
+    canvas.drawPath(shellPath, paint(body))
+    canvas.drawPath(shellPath, paint(edge, 3f))
     // Mirrors at the A-pillar (canvas y 64..70, at the windshield base).
     canvas.drawRoundRect(android.graphics.RectF(cx - 30f, 64f, cx - 24f, 70f), 2f, 2f, paint(body))
     canvas.drawRoundRect(android.graphics.RectF(cx + 24f, 64f, cx + 30f, 70f), 2f, 2f, paint(body))

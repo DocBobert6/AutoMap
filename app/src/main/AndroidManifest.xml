@@ -22,6 +22,15 @@
          Settings toggle on), matched entirely on-device. -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
 
+    <!-- Bluetooth-gated location puck (AutoMap 2026-10-27): whether a Bluetooth
+         device is connected decides whether the browse location shows the car
+         or the blue dot. BLUETOOTH is install-time on old Android; on Android
+         12+ BLUETOOTH_CONNECT is a runtime permission, asked in Settings at
+         the point of use — without it the check reads "not connected" and
+         the blue dot stays, never a crash. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
     <!-- Haptic turn cues during navigation (normal permission, auto-granted). -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Voice search, tier-1 ONLY: recording the mic for the on-device Whisper model. Requested

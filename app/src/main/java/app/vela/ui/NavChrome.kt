@@ -1,7 +1,14 @@
 package app.vela.ui
 
+import android.Manifest
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothProfile
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.compose.runtime.mutableStateOf
+import androidx.core.content.ContextCompat
 
 /** Where the name of the road you are driving is shown during navigation (issue #288 asked for
  *  it under the arrow; that pill cannot be centered for long names because it is pinned to the
@@ -108,6 +115,52 @@ object PuckStyle {
     private const val KEY_STYLE = "puck_style"
     private const val KEY_SHAPE = "puck_shape"
     private const val KEY_CAR_COLOR = "puck_car_color"
+}
+
+/**
+ * AutoMap 2026-10-27, Bluetooth-gated location puck (Robert, final 2026-10-27):
+ * by DEFAULT the location shows a blue dot and the car appears only when a
+ * Bluetooth device is connected; the "Car always on" toggle below overrides
+ * that and always shows the car, even without Bluetooth. Navigation is NOT
+ * gated — only the browse/location display uses this, so a route always
+ * shows its puck. Bluetooth here means ANY connected Bluetooth device
+ * (headset, A2DP audio, or GATT), not a car-specific profile: there is no
+ * reliable car-only signal on stock Android, and guessing one would hide
+ * the car from a paired car stereo that presents as plain A2DP.
+ * [isBluetoothConnected] never throws: no permission, no adapter, or a
+ * SecurityException all read as "not connected", so the blue dot stays
+ * instead of crashing the map. BLUETOOTH_CONNECT (Android 12+) is a
+ * runtime permission; the Settings page asks for it at the point of use.
+ */
+object CarAlwaysOn {
+    /** True = always show the car, ignoring Bluetooth. False (default) = gated. */
+    val on = mutableStateOf(false)
+
+    fun init(context: Context) {
+        on.value = prefs(context).getBoolean(KEY, false)
+    }
+
+    fun set(context: Context, value: Boolean) {
+        on.value = value
+        prefs(context).edit().putBoolean(KEY, value).apply()
+    }
+
+    fun isBluetoothConnected(context: Context): Boolean {
+        return runCatching {
+            if (Build.VERSION.SDK_INT >= 31 &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+            ) return false
+            val manager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager ?: return false
+            val adapter: BluetoothAdapter = manager.adapter ?: return false
+            if (!adapter.isEnabled) return false
+            listOf(BluetoothProfile.HEADSET, BluetoothProfile.A2DP, BluetoothProfile.GATT).any {
+                adapter.getProfileConnectionState(it) == BluetoothProfile.STATE_CONNECTED
+            }
+        }.getOrDefault(false)
+    }
+
+    private fun prefs(c: Context) = c.getSharedPreferences("vela_settings", Context.MODE_PRIVATE)
+    private const val KEY = "car_always_on"
 }
 
 /** "Prefer buttons over swipes": keeps a discrete button wherever a gesture has one (today: the

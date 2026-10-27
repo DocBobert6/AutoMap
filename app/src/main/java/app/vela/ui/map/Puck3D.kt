@@ -245,7 +245,11 @@ internal object PuckModels {
      *  shut lines. Model space: x right, y forward, so the nose is at +y.
      *  The body fill is the picked colour; edges are a darker shade of it
      *  and the roof a lighter one, so the shading works over any body
-     *  colour, light or dark. */
+     *  colour, light or dark. 2026-10-27 refinement: the outline is a
+     *  29-point curved silhouette (rounded nose and tail, haunch bulges)
+     *  instead of a 14-point rectangle, and the headlights (#FFF6C8) and
+     *  taillights (#C62828) stay bright — on a dark night map they read
+     *  as illuminated, which Robert asked to keep. */
     private fun car(colorName: String): PuckMesh = Builder().apply {
         val body = carBody(colorName)
         val edge = shadeOf(body, 0.62f)
@@ -261,34 +265,52 @@ internal object PuckModels {
             box(-0.46f, -0.40f, y - 0.10f, y + 0.10f, 0.32f, 0.35f, silver)
             box(0.40f, 0.46f, y - 0.10f, y + 0.10f, 0.32f, 0.35f, silver)
         }
-        // Lower body: pointed V-motion nose, wide shoulders, square tail.
-        // 14-point outline, tapered at both ends, widest at the doors.
+        // Lower body, AutoMap 2026-10-27 likeness refinement (Robert, with
+        // side-profile + front-3/4 photos): the old 14-point outline read as
+        // a rectangle with a pointed nose. A real 2019 mid-size sedan is
+        // NOT a rectangle — the nose is rounded, the flanks bulge gently
+        // at the front fenders and again at the rear haunches, the tail
+        // is rounded, and the whole silhouette flows. So this outline is
+        // 29 points with short segments around the nose and tail curves
+        // (a loft joins points with straight segments, so point density
+        // IS the curvature), widest at the haunches, slightly pinched at
+        // the doors, and rounded at both ends. Dimensions unchanged:
+        // 2.20 long, 0.86 wide, wheelbase 1.26.
         val outline = listOf(
-            -0.38f to -1.08f, 0.38f to -1.08f, 0.42f to -0.72f, 0.43f to -0.30f,
-            0.43f to 0.30f, 0.41f to 0.72f, 0.36f to 1.00f, 0.26f to 1.10f,
-            -0.26f to 1.10f, -0.36f to 1.00f, -0.41f to 0.72f, -0.43f to 0.30f,
-            -0.43f to -0.30f, -0.42f to -0.72f,
+            0.00f to 1.12f, 0.16f to 1.11f, 0.28f to 1.07f, 0.36f to 1.00f,
+            0.41f to 0.88f, 0.43f to 0.70f, 0.43f to 0.45f, 0.42f to 0.10f,
+            0.42f to -0.25f, 0.43f to -0.55f, 0.42f to -0.80f, 0.38f to -0.98f,
+            0.30f to -1.07f, 0.16f to -1.11f, 0.00f to -1.11f,
+            -0.16f to -1.11f, -0.30f to -1.07f, -0.38f to -0.98f, -0.42f to -0.80f,
+            -0.43f to -0.55f, -0.42f to -0.25f, -0.42f to 0.10f, -0.43f to 0.45f,
+            -0.43f to 0.70f, -0.41f to 0.88f, -0.36f to 1.00f, -0.28f to 1.07f,
+            -0.16f to 1.11f,
         )
         loft(ring(outline, 0.10f), ring(outline, 0.42f), body, sideColors = List(outline.size) { edge }, topColor = body)
-        // Long raised hood (windshield base at 0.48) with crease ridges.
+        // Long raised hood (windshield base at 0.48) with crease ridges,
+        // its front edge rounded to match the nose above.
         loft(
-            ring(listOf(-0.34f to 0.48f, 0.34f to 0.48f, 0.34f to 0.96f, 0.25f to 1.06f, -0.25f to 1.06f, -0.34f to 0.96f), 0.42f),
-            ring(listOf(-0.32f to 0.50f, 0.32f to 0.50f, 0.32f to 0.94f, 0.24f to 1.04f, -0.24f to 1.04f, -0.32f to 0.94f), 0.47f),
+            ring(listOf(-0.34f to 0.48f, 0.34f to 0.48f, 0.34f to 0.92f, 0.28f to 1.02f, 0.14f to 1.07f, 0.00f to 1.08f, -0.14f to 1.07f, -0.28f to 1.02f, -0.34f to 0.92f), 0.42f),
+            ring(listOf(-0.32f to 0.50f, 0.32f to 0.50f, 0.32f to 0.90f, 0.27f to 1.00f, 0.14f to 1.05f, 0.00f to 1.06f, -0.14f to 1.05f, -0.27f to 1.00f, -0.32f to 0.90f), 0.47f),
             body, topColor = body, capBottom = false,
         )
         box(-0.24f, -0.20f, 0.55f, 0.95f, 0.47f, 0.49f, edge)
         box(0.20f, 0.24f, 0.55f, 0.95f, 0.47f, 0.49f, edge)
-        // Short trunk with a spoiler lip on its rear edge.
+        // Short trunk, its rear edge rounded to match the tail above,
+        // with a spoiler lip on that edge.
         loft(
-            ring(listOf(-0.36f to -1.04f, 0.36f to -1.04f, 0.36f to -0.60f, -0.36f to -0.60f), 0.42f),
-            ring(listOf(-0.34f to -1.02f, 0.34f to -1.02f, 0.34f to -0.62f, -0.34f to -0.62f), 0.45f),
+            ring(listOf(-0.36f to -0.60f, 0.36f to -0.60f, 0.36f to -0.96f, 0.30f to -1.04f, 0.14f to -1.07f, 0.00f to -1.08f, -0.14f to -1.07f, -0.30f to -1.04f, -0.36f to -0.96f), 0.42f),
+            ring(listOf(-0.34f to -0.62f, 0.34f to -0.62f, 0.34f to -0.94f, 0.29f to -1.02f, 0.14f to -1.05f, 0.00f to -1.06f, -0.14f to -1.05f, -0.29f to -1.02f, -0.34f to -0.94f), 0.45f),
             body, topColor = body, capBottom = false,
         )
         box(-0.34f, 0.34f, -1.08f, -1.02f, 0.45f, 0.49f, edge)
-        // Cabin: glass sides, trapezoidal body-coloured roof narrowing toward
-        // the rear, sunroof inset, sloping windshield and rear glass.
-        val cabBottom = ring(listOf(-0.37f to -0.58f, 0.37f to -0.58f, 0.37f to 0.48f, -0.37f to 0.48f), 0.42f)
-        val cabTop = ring(listOf(-0.30f to -0.32f, 0.30f to -0.32f, 0.33f to 0.28f, -0.33f to 0.28f), 0.72f)
+        // Cabin: glass sides, trapezoidal body-coloured roof narrowing
+        // toward the rear (the fastback roofline in the photos), sunroof
+        // inset, sloping windshield and rear glass. The roof's rear edge
+        // is narrower than its front edge, so the cabin reads as sloping
+        // back into the short trunk instead of sitting as a box on it.
+        val cabBottom = ring(listOf(-0.37f to -0.60f, 0.37f to -0.60f, 0.37f to 0.50f, -0.37f to 0.50f), 0.42f)
+        val cabTop = ring(listOf(-0.28f to -0.34f, 0.28f to -0.34f, 0.34f to 0.30f, -0.34f to 0.30f), 0.72f)
         loft(cabBottom, cabTop, glass, topColor = roofCol, capBottom = false)
         box(-0.16f, 0.16f, -0.16f, 0.10f, 0.72f, 0.74f, glass)
         // Door shut lines on the body top face.

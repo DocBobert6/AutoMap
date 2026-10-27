@@ -1,5 +1,6 @@
 package app.vela.ui.settings.sections
 
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -295,6 +297,39 @@ internal fun NavigationSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
         }
         if (app.vela.ui.PuckStyle.isCar()) {
             VehicleColorPicker()
+        }
+
+        // AutoMap 2026-10-27, Bluetooth-gated location puck (Robert, final
+        // 2026-10-27): by default the location shows a blue dot and the
+        // car appears only when a Bluetooth device is connected. This
+        // toggle overrides the gate and always shows the car. Navigation
+        // is not gated — a route always shows its puck either way.
+        GroupDivider()
+        ToggleRow(
+            label = stringResource(R.string.settings_car_always_on),
+            checked = app.vela.ui.CarAlwaysOn.on.value,
+            onCheckedChange = { app.vela.ui.CarAlwaysOn.set(context, it) },
+            hint = stringResource(R.string.settings_car_always_on_hint),
+        )
+        // BLUETOOTH_CONNECT is a runtime permission on Android 12+, asked
+        // here at the point of use (the SearchSettings contacts pattern):
+        // without it the gate can never see a connection, so the blue dot
+        // stays even in the car. On older Android the permission is
+        // install-time, so this row never shows there.
+        if (android.os.Build.VERSION.SDK_INT >= 31 &&
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.BLUETOOTH_CONNECT,
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            val btPermission = rememberLauncherForActivityResult(
+                androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+            ) { /* granted -> the next applyData pass sees the connection; denied -> the blue dot stays */ }
+            androidx.compose.material3.TextButton(
+                onClick = { btPermission.launch(android.Manifest.permission.BLUETOOTH_CONNECT) },
+                modifier = Modifier.padding(start = 20.dp),
+            ) {
+                Text(stringResource(R.string.settings_car_bluetooth_permission))
+            }
         }
 
         var trafficLights by remember { mutableStateOf(prefs.getBoolean("nav_traffic_lights", false)) }

@@ -1395,10 +1395,15 @@ class CarMapRenderer(
         // Settings > Navigation > Puck size (PuckStyle) scales it the same way it scales the phone's.
         // The phone's puck bitmap (disc, shadow, chevron), not a chevron of the car's own; the
         // bitmap's arrow points up, so it turns by the heading against the camera's bearing:
-        // straight up in heading-up nav, by the course in a north-up view. An eighth of the
-        // short side, about what the phone draws relative to its width (user 2026-09-22: the
-        // fortieth-based size read too small on the car), times the Settings puck size.
-        val px = (minOf(width, height) / 8f * app.vela.ui.PuckStyle.scale()).roundToInt().coerceIn(24, 220)
+        // straight up in heading-up nav, by the course in a north-up view. AutoMap
+        // 2026-10-27: a sixth of the short side, not an eighth (user 2026-09-22:
+        // the fortieth-based size read too small on the car; Robert's
+        // 2026-10-27 nav screenshot: the car still read smaller than the
+        // road, where Google's reads wider than it). The phone bitmap grew
+        // by the same ~1.4x, but the car scales that bitmap to px here, so
+        // this divisor change is the car screen's only size change — no
+        // double scaling. Times the Settings puck size, as before.
+        val px = (minOf(width, height) / 6f * app.vela.ui.PuckStyle.scale()).roundToInt().coerceIn(24, 290)
         val bmp = puckBitmap?.takeIf { puckBitmapPx == px } ?: android.graphics.Bitmap.createScaledBitmap(
             app.vela.ui.map.navPuckBitmap(scale = 1f), px, px, true,
         ).also { puckBitmap = it; puckBitmapPx = px }

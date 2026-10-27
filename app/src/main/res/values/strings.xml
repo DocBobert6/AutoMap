@@ -1494,6 +1494,9 @@
     <string name="settings_puck_green" translatable="false">Green</string>
     <string name="settings_puck_blue" translatable="false">Blue</string>
     <string name="settings_puck_reset" translatable="false">Reset to default</string>
+    <string name="settings_car_always_on" translatable="false">Car always on</string>
+    <string name="settings_car_always_on_hint" translatable="false">Off by default: your location shows a blue dot, and the car appears only when a Bluetooth device is connected. Turn this on to always show the car, even without Bluetooth. Navigation is not affected — a route always shows its puck.</string>
+    <string name="settings_car_bluetooth_permission" translatable="false">Allow Bluetooth access</string>
     <string name="settings_puck_shape_ufo">UFO</string>
     <string name="settings_puck_shape_ship">Pirate ship</string>
     <string name="settings_puck_shape_duck">Rubber duck</string>
