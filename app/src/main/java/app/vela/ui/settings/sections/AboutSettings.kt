@@ -254,6 +254,24 @@ internal fun AboutSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     )
+                    // Release notes BEFORE Download (2026-10-28, alpha.16):
+                    // the target release's body, already held in the Release
+                    // object, rendered here — reading it triggers no download
+                    // and touches no check/verify/install code. Null or blank
+                    // notes show the plain fallback, never invented notes.
+                    Text(
+                        stringResource(R.string.settings_automap_update_notes_heading),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                    Text(
+                        st.release.notes?.takeIf { it.isNotBlank() }
+                            ?: stringResource(R.string.settings_automap_update_notes_unavailable),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                    Spacer(Modifier.height(8.dp))
                     DpadRingBox(androidx.compose.material3.ButtonDefaults.filledTonalShape, Modifier.padding(horizontal = 16.dp)) {
                         FilledTonalButton(onClick = { app.vela.update.AutoMapUpdater.download(updContext, st.release) }) {
                             Text(stringResource(R.string.settings_automap_update_download))

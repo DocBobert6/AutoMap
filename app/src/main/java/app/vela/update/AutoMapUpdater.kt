@@ -71,6 +71,11 @@ object AutoMapUpdater {
         val size: Long,
         val sha256: String?,
         val pageUrl: String,
+        // Release notes (GitHub release body), shown in Settings > About >
+        // AutoMap updates BEFORE Download (2026-10-28, alpha.16). Null when
+        // the release JSON carried no body, so the page shows the
+        // "Release notes unavailable" fallback instead of invented notes.
+        val notes: String? = null,
     )
 
     sealed interface State {
@@ -271,6 +276,7 @@ object AutoMapUpdater {
             size = apk.optLong("size", -1),
             sha256 = apk.optString("digest").takeIf { it.startsWith("sha256:") }?.removePrefix("sha256:"),
             pageUrl = json.optString("html_url"),
+            notes = json.optString("body").takeIf { it.isNotBlank() },
         )
     }
 
@@ -322,6 +328,7 @@ object AutoMapUpdater {
             .put("size", release.size)
             .put("sha256", release.sha256 ?: "")
             .put("pageUrl", release.pageUrl)
+            .put("notes", release.notes ?: "")
         prefs(context).edit().putString(KEY_FOUND, json.toString()).apply()
     }
 
@@ -333,6 +340,7 @@ object AutoMapUpdater {
             size = json.optLong("size", -1),
             sha256 = json.optString("sha256").ifBlank { null },
             pageUrl = json.optString("pageUrl"),
+            notes = json.optString("notes").ifBlank { null },
         )
         return release.takeIf { isNewer(it.version, BuildConfig.VERSION_NAME) }
     }

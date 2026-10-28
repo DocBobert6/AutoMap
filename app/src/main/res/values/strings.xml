@@ -876,6 +876,8 @@
     <string name="settings_automap_update_checking" translatable="false">Checking GitHub for AutoMap updates.</string>
     <string name="settings_automap_update_none" translatable="false">You are on the latest AutoMap version for this channel.</string>
     <string name="settings_automap_update_available" translatable="false">AutoMap %1$s is available</string>
+    <string name="settings_automap_update_notes_heading" translatable="false">What is new in this update</string>
+    <string name="settings_automap_update_notes_unavailable" translatable="false">Release notes unavailable</string>
     <string name="settings_automap_update_downloading" translatable="false">Downloading update. %1$d%%</string>
     <string name="settings_automap_update_download" translatable="false">Download update</string>
     <string name="settings_automap_update_install" translatable="false">Install update</string>
