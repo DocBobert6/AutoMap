@@ -622,3 +622,72 @@ Still owed, not claimed: device verification on Robert's device — real look: c
 - Verification: local :app:compileDebugKotlin -PappId=app.automap green in the VM (BUILD SUCCESSFUL in 3m 2s after one real failure fixed on the way — a missing CarToast import in RoutePreviewCarScreen.kt; remaining warnings pre-existing, none in this build's files). No unit test was added for the freshness gate: Compose/Android-graphics + car-screen code with no Robolectric harness in this tree, so behaviour is verified by code inspection + dex/resources presence, stated not claimed. A full local :app:assembleDebug was not run; the full APK was verified from CI, which is the GitHub-native model's authoritative build. Device verification is owed on Robert's device, not claimed here: park, drive 2+ km with NO route, phone locked / AutoSpace on the head unit, enter a destination mid-drive on the CAR screen (and on the phone) — the route must start on the current road, not the parked spot; repeat after a cold start at the parked spot, and with a ~30 s GPS gap (expect brief "Locating…" not a confident parked origin).
 - Publishing (GitHub-native, not a chat attachment): work commit 7605a910d9a091286fbb30960e8eaa50df29d094 on DocBobert6/AutoMap main. Workflow dispatch run 40616673295 (job 122580674784, build) completed success. Published prerelease https://github.com/DocBobert6/AutoMap/releases/tag/v0.3.0-alpha.6, asset AutoMap-0.3.0-alpha.6.apk, 143,794,084 bytes (exact match to the GitHub listing), sha256 45eb7d54aa4c4ca148db4e8a2a6fd4469a16a2fdebcf4f6a49d454c7a6fb8f7d (exact match to GitHub's asset digest AND to the sha256sum printed in the CI job log, so the published artifact is definitively this run's build). Verified by downloading it back through the authenticated API (asset API 302 to the signed URL followed explicitly). aapt2 package app.automap, versionCode 7, versionName 0.3.0-alpha.6, label AutoMap. Dex contains livePuckWithAgeMs, lastKnownWithTime, refreshLocationIfStarved, gateRouteOrigin, myLocationFixMs, AutoMapUpdater, CarAlwaysOn; resources.arsc contains car_waiting_gps, route_locating, route_stale_timeout and no "Altima" (any case). The old releases are untouched.
 - CERT CAVEAT: the CI APK is signed with the GitHub runner ephemeral debug keystore, cert DN "Android Debug", SHA-256 8714cf0700230944120a2cbff5be05e80817a3372024463f13d278ef5ec601ce (SHA-1 23bdeac12edf29527086880212dc91979876e3c3) — different from every previous CI and local debug cert. It will NOT install over any earlier build; uninstall first. CI debug builds cannot update over each other. No release keystore was created and the repo was NOT made public, both still-open decisions.
+
+## AutoMap GitHub-native build 8 — repo public + first signed alpha (alpha.7, 2026-10-28)
+- Eighth build under the GitHub-native model. Repo DocBobert6/AutoMap changed
+  private -> PUBLIC (verified by an unauthenticated read-back: private false,
+  visibility public) so the in-app updater's unauthenticated GitHub API check
+  no longer 404s on the repo itself.
+- RELEASE KEYSTORE (new, stable): generated 2026-10-28, RSA 2048, alias
+  automap, DN CN=AutoMap, OU=AutoMap, O=AutoMap, C=US, validity to 2054.
+  Cert SHA-256 05b94eb54c7a79bd7c2da295b77613c5149f30b682bab335c2245982ce47bde4,
+  SHA-1 e26604fba81b384e44269897552137a86ff3d76d. Stored at
+  ~/workspace/automap/automap-release.jks, backed up at
+  ~/workspace/automap-keystore-backup/automap-release.jks (paths only; the
+  keystore is NEVER in the repo and no password is recorded here). Password
+  and keystore material live only as GitHub secrets: AUTOMAP_KEYSTORE_BASE64
+  (base64 keystore), VELA_KEYSTORE_PASSWORD (store = key password),
+  VELA_KEY_ALIAS (automap).
+- WORKFLOW: new .github/workflows/automap-release.yml (manual dispatch only).
+  It restores the keystore from secrets, builds :app:assembleRelease
+  -PappId=app.automap using the existing releaseFromEnv signing config in
+  app/build.gradle.kts, verifies the APK is not debug-signed, and attaches
+  it to the versioned alpha prerelease. The debug workflow is left intact
+  and separate. Secret values never appear in the workflow or logs.
+- FIRST RUN FAILED, FIXED (build-line rule): run 40618273739 failed at
+  :app:lintVitalRelease with 145 ExtraTranslation errors — the 8 keys Build 0
+  removed from the default locale (settings_support, settings_support_hint,
+  settings_support_button, welcome_donate_title, welcome_donate_body,
+  welcome_donate_confirm, welcome_donate_dismiss, donate_no_browser) still
+  had translations in 20 locale files. Debug builds never run lintVital, so
+  this only surfaced on release. Fix commit 098efc07 deleted exactly those
+  145 orphaned entries (0 remaining); lint was NOT disabled, and no
+  default-locale or feature change was made.
+- PUBLISHING: work commit 65fc80ff (version bump + release workflow),
+  lint-fix commit 098efc07, workflow dispatch run 40619247995 (job
+  122588963846) completed success. Published prerelease
+  https://github.com/DocBobert6/AutoMap/releases/tag/v0.3.0-alpha.7, asset
+  AutoMap-0.3.0-alpha.7.apk, 117,327,049 bytes (smaller than debug builds:
+  release R8 minify + shrinkResources), sha256
+  db3c14b447919b85d326cc316af2dabdf5fde78a513d8b883a6ca1dd58383f29 (exact
+  match to GitHub's asset digest AND to the sha256sum in the CI job log, and
+  the CI log's signer cert matches the new release cert above). Verified by
+  downloading it back unauthenticated from the public release page: aapt2
+  package app.automap, versionCode 8, versionName 0.3.0-alpha.7, label
+  AutoMap. Old releases untouched.
+- UPDATER VERIFICATION (unauthenticated, public repo): GET
+  api.github.com/repos/DocBobert6/AutoMap/releases?per_page=20 now returns
+  200 with alpha.7 first, asset AutoMap-0.3.0-alpha.7.apk — the exact asset
+  AutoMapUpdater's Alpha channel picks (first AutoMap-*.apk, newest version
+  wins), and a release build has BuildConfig.DEBUG false, so the updater's
+  auto-check gate that was dormant on debug builds is now live. Note:
+  releases/latest still 404s, but that is GitHub's own rule (latest
+  excludes prereleases and AutoMap has no stable release) — it is only used
+  by the Stable channel, not Alpha. The updater's 404 error copy still says
+  the repo is private; that text is now stale and is a small follow-up, not
+  a functional block.
+- INSTALL CAVEAT (one last time): this signed alpha will STILL require
+  uninstalling any debug-signed build first, because Android will not
+  install a differently-signed APK over one. Every signed alpha after
+  alpha.7 uses this same key, so in-app updates should then work without
+  uninstalling. No release keystore was created before this build; none of
+  the previous debug certs can ever update to this one.
+- NOT CHANGED: no app feature code except the version bump, the release
+  workflow, and the orphaned-translation cleanup above. No routing,
+  traffic, places, search, voice, backup, palette, puck, Bluetooth,
+  SunShading, or updater-logic change; upstream SelfUpdater stays disabled.
+  No "Altima" in any user-visible string (unchanged).
+- STILL OWED, NOT CLAIMED: device verification — install alpha.7 after
+  uninstalling the debug build, then update to a subsequent signed build
+  in-app without uninstalling; that second step is what proves seamless
+  updates, and it cannot be proven from this build alone.
