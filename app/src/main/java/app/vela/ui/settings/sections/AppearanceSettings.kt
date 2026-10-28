@@ -202,7 +202,7 @@ internal fun AppearanceSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
             // The font's own name, not translated; open-licensed (OFL), so it ships in the app.
             // First because it is the default.
             SelectableRow(
-                label = "Google Sans Flex",
+                label = stringResource(R.string.settings_font_builtin),
                 selected = app.vela.ui.AppFont.builtin.value,
                 onClick = { app.vela.ui.AppFont.setBuiltin(context) },
             )

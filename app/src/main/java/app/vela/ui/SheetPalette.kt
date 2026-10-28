@@ -33,8 +33,6 @@ object SheetPalette {
 
     // Google's open/ETA green *text*: vivid on dark, deep on light. TrafficGreen
     // is the light-theme value; on a dark sheet it reads almost black.
-    fun statusGreen(dark: Boolean) = if (dark) Color(0xFF4CAF50) else TrafficGreen
-
     fun bg(dark: Boolean, amoled: Boolean = false) = when {
         amoled && dark -> Amoled
         dark -> Dark

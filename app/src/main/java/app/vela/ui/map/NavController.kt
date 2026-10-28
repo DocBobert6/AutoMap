@@ -1328,8 +1328,8 @@ internal class NavController(
     /** The point [meters] along [bearingDeg] from [from], flat-earth, good to a few meters at this range. */
     private fun aheadOf(from: app.vela.core.model.LatLng, bearingDeg: Double, meters: Double): app.vela.core.model.LatLng {
         val b = Math.toRadians(bearingDeg)
-        val dLat = meters * Math.cos(b) / 111_320.0
-        val dLng = meters * Math.sin(b) / (111_320.0 * Math.cos(Math.toRadians(from.lat)))
+        val dLat = meters * Math.cos(b) / app.vela.core.model.GeoConstants.M_PER_DEG
+        val dLng = meters * Math.sin(b) / (app.vela.core.model.GeoConstants.M_PER_DEG * Math.cos(Math.toRadians(from.lat)))
         return app.vela.core.model.LatLng(from.lat + dLat, from.lng + dLng)
     }
 

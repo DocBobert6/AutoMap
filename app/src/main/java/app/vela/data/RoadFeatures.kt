@@ -130,7 +130,7 @@ object RoadFeatures {
             if (!ok && !f.exists()) return@withLock false
         }
         val tp = System.nanoTime()
-        val parsed = withContext(Dispatchers.IO) { runCatching { f.inputStream().use(::parse) }.getOrNull() } ?: return@withLock false
+        val parsed = withContext(Dispatchers.IO) { runCatching { f.inputStream().use(::parse) }.getOrNull() } ?: run { android.util.Log.w("VelaControls", "road-features ${region.id}: parse failed — region treated as not covered"); return@withLock false }
         android.util.Log.i("VelaControls", "road-features ${region.id}: parsed ${parsed.lat.size} in ${(System.nanoTime() - tp) / 1_000_000} ms")
         loaded.remove(region.id)
         loaded[region.id] = parsed
@@ -269,7 +269,7 @@ object RoadFeatures {
     }
 
     private fun corridorBox(polyline: List<LatLng>, meters: Double): DoubleArray {
-        val pad = meters / 111_320.0 * 1.5 + 0.001
+        val pad = meters / app.vela.core.model.GeoConstants.M_PER_DEG * 1.5 + 0.001
         return doubleArrayOf(polyline.minOf { it.lat } - pad, polyline.minOf { it.lng } - pad, polyline.maxOf { it.lat } + pad, polyline.maxOf { it.lng } + pad)
     }
 
@@ -324,10 +324,10 @@ object RoadFeatures {
         private val poly: List<LatLng> = simplify(polyline, 3.0)
         val segments get() = poly.size - 1
         init {
-            val padLat = meters / 111_320.0
+            val padLat = meters / app.vela.core.model.GeoConstants.M_PER_DEG
             for (i in 0 until poly.size - 1) {
                 val a = poly[i]; val b = poly[i + 1]
-                val padLng = meters / (111_320.0 * Math.cos(Math.toRadians((a.lat + b.lat) / 2.0))).coerceAtLeast(1.0)
+                val padLng = meters / (app.vela.core.model.GeoConstants.M_PER_DEG * Math.cos(Math.toRadians((a.lat + b.lat) / 2.0))).coerceAtLeast(1.0)
                 val r0 = fine(minOf(a.lat, b.lat) - padLat); val r1 = fine(maxOf(a.lat, b.lat) + padLat)
                 val c0 = fine(minOf(a.lng, b.lng) - padLng); val c1 = fine(maxOf(a.lng, b.lng) + padLng)
                 var r = r0
@@ -378,8 +378,8 @@ object RoadFeatures {
 }
 
 private fun segDist(p: LatLng, a: LatLng, b: LatLng): Double {
-    val mPerLat = 111_320.0
-    val mPerLng = 111_320.0 * Math.cos(Math.toRadians((a.lat + b.lat) / 2.0))
+    val mPerLat = app.vela.core.model.GeoConstants.M_PER_DEG
+    val mPerLng = app.vela.core.model.GeoConstants.M_PER_DEG * Math.cos(Math.toRadians((a.lat + b.lat) / 2.0))
     val bx = (b.lng - a.lng) * mPerLng; val by = (b.lat - a.lat) * mPerLat
     val px = (p.lng - a.lng) * mPerLng; val py = (p.lat - a.lat) * mPerLat
     val len2 = bx * bx + by * by

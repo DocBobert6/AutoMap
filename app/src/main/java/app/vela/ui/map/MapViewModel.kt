@@ -370,7 +370,6 @@ data class MapUiState(
     val statusOpensTtsSettings: Boolean = false, // the pill opens the SYSTEM voice settings, not Vela's library
     val statusVoiceDownloadId: String? = null, // the pill downloads THIS voice (the language's recommended one)
     val statusAutoMs: Long? = null, // the card drains a bar over this and dismisses itself; null = stays until dismissed
-    val installingEngine: String? = null, // pkg of the voice engine currently downloading
     val voiceDownloadPct: Float? = null, // 0f..1f while the neural-voice model downloads; null = idle
     val installedVoiceIds: Set<String> = emptySet(), // Piper voices present on disk (the voice browser)
     val selectedVoiceId: String? = null, // the active Piper voice id (null = none installed)
@@ -410,11 +409,8 @@ data class MapUiState(
     val work: SavedPlace? = null,
     val assigningShortcut: ShortcutKind? = null, // picking a place to pin as Home/Work
     val notices: List<Notice> = emptyList(), // pushed via the signed calibration channel
-    val updateInfo: app.vela.update.SelfUpdater.UpdateInfo? = null, // newer release found (card on the bare map)
     /** A downloaded update held back because installing it would cost this phone its Android Auto
      *  listing (issue #179). The user chooses: save the file for AAEnabler, or install anyway. */
-    val updateApkPending: java.io.File? = null,
-    val updateDownloadPct: Int? = null, // non-null while the update APK downloads
     // Offline routing (downloadable per-region CH graphs — Settings → Offline routing)
     val routingRegions: List<app.vela.offline.RoutingRegion> = emptyList(),
     val routingInstalledIds: Set<String> = emptySet(), // region ids whose graphs are on disk
@@ -504,7 +500,6 @@ class MapViewModel @Inject constructor(
     private val cellStore: app.vela.offline.CellStore,
     private val routeEngine: app.vela.core.data.RouteEngine,
     private val http: okhttp3.OkHttpClient,
-    private val selfUpdater: app.vela.update.SelfUpdater,
     private val asrRecognizer: app.vela.voice.AsrRecognizer,
 ) : ViewModel() {
 
@@ -829,7 +824,6 @@ class MapViewModel @Inject constructor(
             app.vela.ui.RoutePicker.setRemoteDefault(calibration.current().classicRoutePicker)
             adoptKeywordTables()
         }
-        maybeCheckForUpdate()
 
         // Returning to the app mid-drive re-attaches the follow camera (Google's behavior). A
         // stray pan while backgrounding often left it detached, so the map sat wherever it was
@@ -1752,49 +1746,6 @@ class MapViewModel @Inject constructor(
         _state.update { st -> st.copy(notices = st.notices.filterNot { it.id == id }) }
     }
 
-    // --- Self-updater (GitHub releases) ------------------------------------------------------
-
-    /** Launch check, at most ~daily, gated by the Settings toggle. "Not now" on a version
-     *  silences that version (a NEWER release shows the card again).
-     *  NB called from init{}, which runs BEFORE the later-declared `settingsPrefs` field
-     *  initializer — resolve the prefs locally or this NPEs on launch (it did). */
-    private fun maybeCheckForUpdate() {
-        // AutoMap 2026-10-27: upstream Vela self-updater DISABLED. It points
-        // at PimpinPumpkin/Vela and offered "AutoMap 0.5.2621" — an upstream
-        // Vela build that would replace AutoMap. AutoMap updates come only
-        // from AutoMapUpdater (Settings > About > AutoMap updates). No
-        // upstream check, no banner, no download from this path.
-        return
-        val prefs = appContext.getSharedPreferences("vela_settings", Context.MODE_PRIVATE)
-        if (!prefs.getBoolean("self_update_check", true)) return
-        val now = System.currentTimeMillis()
-        if (now - prefs.getLong("last_update_check_ms", 0L) < 20 * 60 * 60_000L) return
-        prefs.edit().putLong("last_update_check_ms", now).apply()
-        val channel = app.vela.update.SelfUpdater.channel(prefs)
-        viewModelScope.launch {
-            val info = selfUpdater.check(app.vela.BuildConfig.VERSION_CODE, channel) ?: return@launch
-            if (info.versionCode <= prefs.getInt("update_dismissed_code", 0)) return@launch
-            _state.update { it.copy(updateInfo = info) }
-        }
-    }
-
-    /** Settings "Check for updates" button — unthrottled, reports back via [onResult]
-     *  (true = an update was found and the card is up; false = already current / check failed). */
-    fun checkForUpdateNow(onResult: (Boolean) -> Unit) {
-        // AutoMap 2026-10-27: upstream check disabled (see maybeCheckForUpdate).
-        // Report "none found" so the old Settings button can never offer an
-        // upstream Vela build; AutoMapUpdater is the only update path.
-        onResult(false)
-        return
-        val channel = app.vela.update.SelfUpdater.channel(settingsPrefs)
-        viewModelScope.launch {
-            val info = selfUpdater.check(app.vela.BuildConfig.VERSION_CODE, channel)
-            if (info != null) _state.update { it.copy(updateInfo = info) }
-            onResult(info != null)
-        }
-    }
-
-    /** Download the offered update and hand it to the system installer. */
     /** Launch a long download OUTSIDE viewModelScope so it survives the UI (issue #212): the work
      *  rides the app-lifetime [app.vela.download.DownloadWork] scope and [app.vela.download.DownloadService]
      *  holds a dataSync foreground service (quiet notification) for its duration - backgrounding or
@@ -1819,7 +1770,6 @@ class MapViewModel @Inject constructor(
     private val voiceCancel = java.util.concurrent.atomic.AtomicBoolean(false)
     private val asrCancel = java.util.concurrent.atomic.AtomicBoolean(false)
     private val regionCancel = java.util.concurrent.atomic.AtomicBoolean(false)
-    private val updateCancel = java.util.concurrent.atomic.AtomicBoolean(false)
 
     fun cancelVoiceDownload() = voiceCancel.set(true)
     fun cancelAsrDownload() = asrCancel.set(true)
@@ -1856,7 +1806,6 @@ class MapViewModel @Inject constructor(
         _state.update { it.copy(regionQueueLeft = regionQueue.size) }
         downloadRoutingGraph(next)
     }
-    fun cancelUpdateDownload() = updateCancel.set(true)
 
     // The map-area tile download is MapLibre's own machinery, so its cancel is region-based, not
     // flag-based: detach the observer (no stray onDone), stop, delete the partial region.
@@ -1877,57 +1826,6 @@ class MapViewModel @Inject constructor(
         _state.update { it.copy(areaDownloadPct = null) }
     }
 
-    fun downloadUpdate() {
-        val info = _state.value.updateInfo ?: return
-        if (_state.value.updateDownloadPct != null) return // already downloading
-        updateCancel.set(false)
-        _state.update { it.copy(updateDownloadPct = 0) }
-        downloadLaunch(appContext.getString(R.string.download_label_update)) {
-            val apk = selfUpdater.download(info, active = { !updateCancel.get() }) { pct ->
-                _state.update { it.copy(updateDownloadPct = pct) }
-            }
-            _state.update { it.copy(updateDownloadPct = null) }
-            if (apk != null) {
-                // Installing here takes over the install source, and on a phone set up for the car
-                // that is what the head unit keys on - so ask instead of quietly breaking it.
-                if (app.vela.update.InstallSource.setForCar(appContext)) {
-                    _state.update { it.copy(updateApkPending = apk) }
-                } else {
-                    selfUpdater.install(apk)
-                }
-            } else if (!updateCancel.get()) { // canceled = quiet
-                showStatus(appContext.getString(app.vela.R.string.update_download_failed))
-            }
-        }
-    }
-
-    /** Install the held-back update anyway; the car will stop listing Vela until it is installed
-     *  again the way it was the first time. */
-    fun installPendingUpdate() {
-        val apk = _state.value.updateApkPending ?: return
-        _state.update { it.copy(updateApkPending = null, updateInfo = null) }
-        selfUpdater.install(apk)
-    }
-
-    /** Hand the held-back APK out as a file, which is what AAEnabler and its siblings take. The
-     *  card stays: nothing is installed until the user comes back through that tool. */
-    fun sharePendingUpdate() {
-        val apk = _state.value.updateApkPending ?: return
-        _state.update { it.copy(updateApkPending = null) }
-        runCatching { app.vela.update.InstallSource.shareApk(appContext, apk) }
-    }
-
-    fun dismissPendingUpdate() {
-        _state.update { it.copy(updateApkPending = null) }
-    }
-
-    /** "Not now": hide the card and stay quiet about THIS version (a newer one re-offers). */
-    fun dismissUpdate() {
-        _state.value.updateInfo?.let {
-            settingsPrefs.edit().putInt("update_dismissed_code", it.versionCode).apply()
-        }
-        _state.update { it.copy(updateInfo = null, updateDownloadPct = null) }
-    }
 
     /** Record an opened place so the search page can offer one-tap return to it. */
     private fun rememberRecentPlace(sp: SavedPlace) {
@@ -7442,8 +7340,6 @@ class MapViewModel @Inject constructor(
         else -> setVoiceMode(muted = false, alertsOnly = false)
     }
 
-    /** Spoken directions on or off (the car's toggle). Off is the voice off entirely. */
-    fun setSpokenDirections(on: Boolean) = setVoiceMode(muted = !on, alertsOnly = false)
 
     /** The voice's mode, persisted: on; alerts only (muted, with the speeding and camera alerts
      *  as a chime); or off. Settings > Voice and the drive's speaker button share it. */
@@ -8008,9 +7904,6 @@ class MapViewModel @Inject constructor(
 
     fun testVoice() = voice.test()
 
-    /** Whether a Vela neural voice model is downloaded + usable. */
-    fun neuralVoiceInstalled(): Boolean = VelaPiper.isReady(appContext)
-    fun piperInstalled(): Boolean = VelaPiper.isReady(appContext)
 
     /** Voice playground: speak arbitrary text through the currently-selected voice. Bypasses the
      *  spoken-directions mute - tapping Speak IS the request for sound. */
@@ -8301,23 +8194,6 @@ class MapViewModel @Inject constructor(
      *  the REAL size (it used to hardcode the long-gone 126 MB Kokoro model). */
     fun defaultVoiceSizeMb(): Int = PiperCatalog.byId(defaultVoiceId())?.sizeMb ?: 67
 
-    /** null = still initializing, true = a voice is ready, false = no usable voice. */
-    fun voiceWorking(): Boolean? = voice.working
-
-    /** Open-source engines a phone with none can install in one tap (off F-Droid). */
-    fun installableEngines(): List<VoiceInstaller.Engine> =
-        voiceInstaller.engines.filterNot { voiceInstaller.isInstalled(it.pkg) }
-
-    fun installVoiceEngine(engine: VoiceInstaller.Engine) {
-        if (_state.value.installingEngine != null) return // one at a time
-        _state.update { it.copy(installingEngine = engine.pkg) }
-        viewModelScope.launch {
-            val result = voiceInstaller.installFromFDroid(engine.pkg)
-            _state.update { it.copy(installingEngine = null) }
-            // result == null → the system installer launched; else a status/error line.
-            flashStatus(result ?: appContext.getString(R.string.mapvm_opening_installer, engine.label))
-        }
-    }
 
     private var statusJob: Job? = null
 
@@ -8566,7 +8442,7 @@ class MapViewModel @Inject constructor(
         if (!caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED)) return
         prefetchJob?.cancel()
         prefetchJob = viewModelScope.launch {
-            val dLat = span * 0.9 / 111_320.0
+            val dLat = span * 0.9 / app.vela.core.model.GeoConstants.M_PER_DEG
             val dLng = dLat / kotlin.math.cos(Math.toRadians(center.lat)).coerceAtLeast(0.2)
             val neighbors = listOf(
                 LatLng(center.lat + dLat, center.lng), LatLng(center.lat - dLat, center.lng),

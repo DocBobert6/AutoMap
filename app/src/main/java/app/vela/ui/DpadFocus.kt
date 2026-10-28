@@ -112,10 +112,6 @@ private fun detectDpadFirst(context: android.content.Context): Boolean {
  * which devices are keypad-first. */
 fun isDpadFirstDevice(context: android.content.Context): Boolean = detectDpadFirst(context)
 
-/** Back-compat alias kept for call sites that mean "structural D-pad-first decisions". */
-@Composable
-fun rememberNoTouchDevice(): Boolean = rememberDpadFirstDevice()
-
 /** True while the user is driving the UI with keys - always true on a D-pad-first device,
  * and flips live from the input mode on a touch phone with an attached keyboard/remote
  * (affordances appear on the first key press, melt away on the next tap). */

@@ -21,7 +21,7 @@ import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
 
 /**
- * The painted-roads test layers (developer dial `debug.vela.tune.paintedRoads`, user 2026-10-03):
+ * The painted-roads layers (a real on-by-default setting since Build 11; the developer dial `debug.vela.tune.paintedRoads`, user 2026-10-03, now only picks the source):
  * median, road surface at the width its lanes need, crosswalks, stop lines, bike lanes, lane lines,
  * the center line and a turn arrow per lane, from [PaintedRoads]. Dial 1 streams the California bake
  * (`painted-roads` release, [BAKED_URL]); dial 2 builds them live for the view (Overpass, or

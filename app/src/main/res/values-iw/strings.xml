@@ -9,8 +9,6 @@
     <string name="settings_appearance_hint">חל על AutoMap בלבד.</string>
     <string name="settings_dynamic_color">צבעי Material You</string>
     <string name="settings_dynamic_color_hint">צובע כפתורים והדגשות לפי הטפט שלך. המפה נשארת ניטרלית.</string>
-    <string name="settings_map_style">סגנון מפה</string>
-    <string name="settings_map_style_hint">OpenFreeMap עובד ללא צורך במפתח API.</string>
     <string name="settings_units">יחידות</string>
     <string name="settings_units_imperial">בשיטה האימפריאלית (מיל, רגל)</string>
     <string name="settings_units_metric">בשיטה המטרית (קילומטר, מטר)</string>
@@ -76,7 +74,6 @@
     <string name="settings_region_updates_off">אף פעם באופן אוטומטי</string>
     <string name="settings_region_updates_wifi">בחיבור לרשת אלחוטית (Wi-Fi)</string>
     <string name="settings_region_updates_mobile">בחיבור לרשת אלחוטית ונתונים ניידים</string>
-    <string name="settings_offline_no_areas">עדיין לא נשמרו אזורים.</string>
     <string name="settings_offline_addresses_missing">אזורים ששמרת לפני העדכון הזה אינם כוללים נתוני כתובות. עדכן אותם כדי לחפש ולנתב לכתובות ללא חיבור.</string>
     <string name="settings_offline_addresses_update">עדכן אזורים שמורים</string>
     <string name="settings_offline_delete_area">מחק את האזור הלא מקוון הזה</string>
@@ -91,7 +88,6 @@
     <string name="settings_routing_installed_places">מותקן · מקומות ניתנים לחיפוש לא מקוון</string>
     <string name="settings_routing_places_downloading">שומר מקומות · %1$d%%</string>
     <string name="settings_get_places">קבל מקומות</string>
-    <string name="settings_update_places">עדכן מקומות</string>
     <string name="settings_routing_update_available">מותקן · עדכון מקומות זמין</string>
     <string name="settings_routing_remove">הסר ניתוב לא מקוון</string>
     <string name="settings_download">הורדה</string>
@@ -99,7 +95,6 @@
     <string name="settings_downloaded_title">הורדו</string>
     <string name="settings_downloaded_none">עדיין לא הורדת כלום. אפשר לשמור למעלה את האזור שרואים על המסך, או לבחור מחוזות ומדינות אחרים למטה.</string>
     <string name="settings_downloaded_area">אזור שמור</string>
-    <string name="settings_region_group_title">כל %1$s</string>
     <string name="settings_region_group_size">%1$d חלקים, כ-%2$s לאחר ההתקנה</string>
     <string name="settings_region_group_partial">%1$d מתוך %2$d חלקים מותקנים, כ-%3$s לכולם</string>
     <string name="settings_region_group_installed">כל %1$d החלקים מותקנים</string>
@@ -169,10 +164,8 @@
     <string name="settings_voice_row_use">השתמש</string>
     <string name="settings_voice_row_remove">הסר את %1$s</string>
     <string name="place_photo_number">תמונה %1$d</string>
-    <string name="place_photo_category_all">הכל</string>
     <string name="place_saved">נשמר</string>
     <string name="place_save">שמור</string>
-    <string name="place_more_options">אפשרויות נוספות</string>
     <string name="place_set_as_home">הגדר כבית</string>
     <string name="place_set_as_work">הגדר כעבודה</string>
     <string name="place_close">סגור</string>
@@ -277,7 +270,6 @@
     <string name="place_open_web">פתיחה באינטרנט</string>
     <string name="place_copy_link">העתקת קישור</string>
     <string name="place_link_copied">הקישור הועתק</string>
-    <string name="place_share_gmaps_link">קישור Google Maps</string>
     <string name="place_share_map_pin">סימון מפה (geo:)</string>
     <string name="place_open_other_app">פתיחה באפליקציית מפות אחרת</string>
     <string name="place_share_coordinates">קואורדינטות</string>
@@ -393,7 +385,6 @@
     <string name="mapvm_offline_no_match">אין תוצאות לא מקוונות עבור \"%1$s\" באזור השמור שלך. חיפוש לא מקוון מכסה מקומות של OpenStreetMap שהורדת.</string>
     <string name="mapvm_no_results">אין תוצאות עבור \"%1$s\".</string>
     <!-- format -->
-    <string name="mapvm_offline_results">תוצאות לא מקוונות (ללא חיבור)</string>
     <string name="mapvm_search_failed_reason">החיפוש נכשל: %1$s</string>
     <string name="mapvm_none_found_along_route">לא נמצא \"%1$s\" לאורך המסלול שלך</string>
     <string name="mapvm_search_failed">החיפוש נכשל</string>
@@ -426,8 +417,6 @@
     <string name="mapvm_voice_download_failed">הורדת %1$s נכשלה</string>
     <string name="mapvm_vela_voice_removed">AutoMap Voice הוסר</string>
     <string name="mapvm_opening_installer">פותח מתקין עבור %1$s…</string>
-    <string name="mapvm_pan_to_area_first">פתח את המפה וגלול לאזור קודם</string>
-    <string name="mapvm_offline_routing_ready">ניתוב לא מקוון מוכן: %1$s</string>
     <string name="mapvm_offline_routing_failed">הורדת ניתוב לא מקוון נכשלה</string>
     <string name="mapvm_offline_routing_removed">ניתוב לא מקוון הוסר</string>
     <string name="mapvm_graphs_retired">הניתוב הלא מקוון עבר לפורמט קטן יותר. הורד שוב את האזורים שלך בהגדרות, מפות לא מקוונות.</string>
@@ -456,20 +445,6 @@
     <string name="mapscreen_your_destination">היעד שלך</string>
     <string name="mapvm_resume_waiting_gps">ממתין ל-GPS כדי לחדש ניווט…</string>
     <string name="mapvm_resume_failed">לא ניתן לחדש ניווט</string>
-    <string name="update_available_title">AutoMap %1$s זמין</string>
-    <string name="update_downloading">מוריד… %1$d%%</string>
-    <string name="update_later">לא עכשיו</string>
-    <string name="update_install">עדכן</string>
-    <string name="update_download_failed">הורדת העדכון נכשלה. נסה שוב מאוחר יותר.</string>
-    <string name="update_car_title">העדכון הזה יסיר את AutoMap מ-Android Auto</string>
-    <string name="update_car_body">AutoMap הותקן בדרך ש-Android Auto מקבל. התקנת העדכון הזה כאן מבטלת את זה, והרכב יפסיק להציג את AutoMap עד שתתקין את הקובץ עם הכלי שבו השתמשת בפעם הראשונה (AAEnabler, King Installer).\n\nשמור את הקובץ והתקן אותו באותה דרך כדי שהרכב ימשיך לעבוד.</string>
-    <string name="update_car_save">שמור את הקובץ</string>
-    <string name="update_car_anyway">עדכן בכל זאת</string>
-    <string name="settings_update_auto">בדוק עדכונים בהפעלה</string>
-    <string name="settings_update_auto_hint">בודק ב־GitHub בערך פעם ביום ומציע גרסאות חדשות יותר. אפשר לכבות אם משתמשים ביישום מעדכן.</string>
-    <string name="settings_update_check_now">בדוק עדכונים</string>
-    <string name="settings_update_checking">בודק…</string>
-    <string name="settings_update_none">נעשה שימוש בגרסה העדכנית.</string>
     <string name="settings_place_pages">עמודי מקומות</string>
     <plurals name="place_transit_stops">
         <!-- format -->
@@ -506,12 +481,7 @@
     <string name="car_search">חיפוש</string>
     <string name="car_search_hint">יש להקליד כדי לחפש יעד</string>
     <string name="car_go">התחלת המסלול</string>
-    <string name="car_end">סיום המסלול</string>
-    <string name="car_mute">השתקה</string>
-    <string name="car_unmute">ביטול השתקה</string>
     <string name="car_faster_route">מהיר יותר −%1$d דק׳</string>
-    <string name="car_pause">השהה</string>
-    <string name="car_resume">המשך</string>
     <string name="car_paused">מושהה</string>
     <string name="car_along_route">חפש לאורך המסלול</string>
     <string name="car_along_none">לא נמצא דבר בקרבת מקום</string>
@@ -552,8 +522,6 @@
         <item quantity="other">שמירת הרשימה · %1$d מקומות</item>
     </plurals>
     <string name="map_list_saved">\"%1$s\" נשמרה לרשימות שלך</string>
-    <string name="settings_update_nightly">כלול גרסאות nightly</string>
-    <string name="settings_update_nightly_hint">עדכן ל-nightly החדש ביותר (טרום-שחרור) במקום רק לגרסאות יציבות. גרסאות nightly טריות יותר אך פחות נבדקו.</string>
     <string name="settings_lists_export_hint">גבה את הרשימות שלך לקובץ, או שחזר אותן במכשיר אחר.</string>
     <string name="settings_lists_imported">יובאו %1$d רשימות</string>
     <string name="settings_places_imported">יובאו %1$d מקומות</string>
@@ -567,12 +535,6 @@
         <item quantity="other">%1$d מקומות</item>
     </plurals>
     <string name="navservice_notif_eta">הגעה %1$s</string>
-    <string name="settings_advanced">מתקדם</string>
-    <string name="settings_advanced_hint">אפשרויות שרוב האנשים לעולם לא צריכים.</string>
-    <string name="settings_developer">מפתח</string>
-    <string name="settings_developer_hint">כלים להדגמות, צילומי מסך ובדיקות. כבה כל אחד לשימוש אמיתי.</string>
-    <string name="settings_browse_voices">עיין בקולות</string>
-    <string name="settings_browse_voices_hint">הורד והחלף בין הקולות של AutoMap שפועלים במכשיר.</string>
     <string name="voice_capture_listening">מקשיב…</string>
     <string name="voice_capture_starting">מתכונן…</string>
     <string name="voice_capture_done">סיום</string>
@@ -581,7 +543,6 @@
     <string name="mapvm_closing_soon">‏הסגירה של %1$s תהיה בשעה %2$s וההגעה תהיה בסביבות %3$s</string>
     <string name="mapvm_closing_before_arrival">%1$s נסגר ב-%2$s, לפני שתגיע בסביבות %3$s</string>
     <string name="settings_voice_search_model">חיפוש קולי של AutoMap</string>
-    <string name="settings_voice_search_model_hint">AutoMap Voice הופך דיבור לחיפוש ישירות בטלפון שלך: לא צריך אפליקציה אחרת ושום דבר לא מועלה. הורדה חד־פעמית בגודל %1$d מ״ב.</string>
     <string name="settings_voice_search_download">הורד (%1$d מ\"ב)</string>
     <string name="settings_voice_search_remove">הסר</string>
     <string name="settings_voice_search_downloading">מוריד… %1$d%%</string>
@@ -589,7 +550,6 @@
     <string name="settings_voice_search_engine_title">בעת הקשה על המיקרופון</string>
     <string name="settings_voice_search_engine_auto">AutoMap Voice</string>
     <string name="settings_voice_search_engine_default">ברירת המחדל של Android</string>
-    <string name="settings_voice_search_engine_system">אפליקציית קול אחרת</string>
     <string name="map_asr_offer_title">חיפוש קולי</string>
     <string name="map_asr_offer_body">הורד את AutoMap Voice כדי לחפש בדיבור. הוא פועל כולו בטלפון שלך ולא מעלה דבר.</string>
     <string name="nav_precise_title">נדרש מיקום מדויק</string>
@@ -623,9 +583,6 @@
     <string name="map_import_needs_google">לא ניתן לפתוח רשימה משותפת של Google Maps כאשר AutoMap פועל מבלי להשתמש ב־Google.</string>
     <string name="map_link_needs_google">\"פתח קישורי Google Maps משותפים\" כבוי בהגדרות &gt; פרטיות.</string>
     <string name="map_link_unreadable">לא ניתן לפתוח את הקישור הזה.</string>
-    <string name="settings_performance">ביצועים</string>
-    <string name="settings_hub_performance_sub">מה נטען מראש, ציור המפה</string>
-    <string name="settings_performance_intro">טעינת דברים מראש מסייעת לחסוך זמן בעת פתיחתם, אך צורכת זיכרון עד אז. הגדרות ברירת המחדל נקבעות לפי כמות הזיכרון שיש בטלפון זה.</string>
     <string name="settings_full_place_load">טען את כל התמונות והביקורות</string>
     <string name="settings_full_place_load_hint">כשכבוי, מקום טוען את התמונות הראשונות ואת עמוד הביקורות הראשון, ו\"תמונות נוספות\" או \"כל הביקורות\" מביאים את השאר. כשדלוק, כל מקום שאתה פותח עובר על כל גלריית התמונות שלו ועד 50 ביקורות, מה שאיטי יותר ושולח ל-Google הרבה יותר בקשות.</string>
     <string name="settings_speech_preload">טען חיפוש קולי בהפעלה</string>
@@ -649,16 +606,12 @@
     <string name="settings_places">מקומות</string>
     <string name="settings_privacy">פרטיות</string>
     <string name="settings_cameras_group">מצלמות</string>
-    <string name="settings_experiments">ניסויים</string>
     <string name="settings_hub_places_sub">מקור המקומות, מה מוצג, דפי מקום</string>
     <string name="settings_hub_appearance_sub">ערכת נושא, סגנון מפה, יחידות, שפה</string>
     <string name="settings_hub_map_sub">תנועה, תחבורה ציבורית, שכבות, מבנים בתלת-ממד</string>
-    <string name="settings_hub_navigation_sub">הנחיה, מצלמות, בדיקות חיות</string>
     <string name="settings_hub_voice_sub">הוראות מדוברות וקולות</string>
     <string name="settings_hub_search_sub">חיפוש קולי ומודלים של דיבור</string>
     <string name="settings_hub_offline_sub">מפות לא מקוונות, ניווט, מקומות</string>
-    <string name="settings_hub_saved_sub">הרשימות שלך, ייצוא, היסטוריית חניה</string>
-    <string name="settings_hub_privacy_sub">מה Google מקבלת, ניקוי היסטוריה</string>
     <string name="settings_hub_diagnostics_sub">דוחות קריסה, נסיעות, מצב הדגמה, ניסויים</string>
     <string name="settings_hub_about_sub">גרסה, עדכונים, תמיכה</string>
     <string name="settings_theme_amoled">שחור AMOLED</string>
@@ -666,17 +619,9 @@
     <string name="place_review_less">פחות</string>
     <string name="settings_traffic_lights">הנחיה לפי רמזורים</string>
     <string name="settings_traffic_lights_hint">רמזים קוליים: עברו את הרמזור ואז פנו. אנגלית בלבד, כבוי כברירת מחדל.</string>
-    <string name="map_asr_downloading">מוריד את מיקרופון AutoMap Voice · %1$d%%</string>
-    <string name="map_asr_installing">מתקין את מיקרופון AutoMap Voice…</string>
     <string name="map_asr_waiting">מיקרופון AutoMap Voice · ממתין לקול AutoMap</string>
-    <string name="root_voice_tts_title">הקראת הוראות בקול</string>
-    <string name="root_voice_tts_desc">הנחיות מדוברות לכל פנייה. מומלץ. הורדה חד־פעמית בגודל %1$d מ״ב.</string>
     <!-- format -->
-    <string name="root_voice_mic_title">חיפוש בדיבור</string>
-    <string name="root_voice_mic_desc">הכתבה של חיפושים ללא הקלדה. בלי זה, המיקרופון ישתמש ב־Google. הורדה חד־פעמית בגודל %1$d מ״ב.</string>
     <!-- format -->
-    <string name="root_voice_none_picked">סמן אפשרות אחת או בחר לא עכשיו.</string>
-    <string name="mapvm_stop_added">תחנה נוספה</string>
     <string name="settings_asr_engines_hint">דיבור הופך לחיפוש בטלפון. שום דבר לא מועלה. בחרו מנוע למיקרופון.</string>
     <string name="settings_asr_engine_meta">%1$s · %2$d מ\"ב</string>
     <string name="settings_asr_langs_whisper">כל השפות שנתמכות ב־AutoMap</string>
@@ -684,30 +629,10 @@
     <string name="settings_asr_langs_moonshine">אנגלית בלבד</string>
     <string name="settings_asr_active">פעיל</string>
     <string name="settings_asr_use">השתמש</string>
-    <string name="mapscreen_filter_top_rated">4.0★</string>
-    <string name="mapscreen_section_recent_searches">חיפושים אחרונים</string>
-    <string name="mapscreen_clear_recent_searches">ניקוי חיפושים אחרונים</string>
-    <string name="root_diag_title">לעזור לשפר את AutoMap?</string>
-    <string name="root_diag_body">שניהם נשארים בטלפון שלך. שום דבר לא נשלח אלא אם תייצא אותו. ניתן לשנות כל אחד בכל עת בהגדרות.</string>
-    <string name="root_diag_share_title">שיתוף אבחון</string>
-    <string name="root_diag_share_desc">יומן מקומי קצר של חיפושים, מסלולים ושגיאות.</string>
-    <string name="root_diag_trips_title">שמירת הנסיעות שלי</string>
-    <string name="root_diag_trips_desc">מקליט את עקבות ה-GPS של הניווט כדי שניתן יהיה לשחזר נסיעות לצורך בדיקה. חושפני יותר: המסלולים המדויקים שלך.</string>
-    <string name="root_diag_save">שמירת הבחירות</string>
-    <string name="root_offline_title">מפות לא מקוונות</string>
-    <string name="root_offline_body">AutoMap מקבל מקומות, חיפוש והוראות הגעה מ-Google, כך שללא קליטה יפעלו רק אזורים שהורדת. הגדר אזור עכשיו כדי להיות מכוסה כשאין קליטה.</string>
-    <string name="root_offline_setup">הגדרת מצב לא מקוון</string>
     <string name="no_browser_installed">במכשיר שלך אין דפדפן</string>
     <string name="street_view_move">מעבר לכאן</string>
     <string name="street_view_dates">צפייה בתאריכים אחרים</string>
     <string name="street_view_fullscreen">הפעלת מסך מלא</string>
-    <string name="softkey_options">אפשרויות</string>
-    <string name="softkey_search">חיפוש</string>
-    <string name="softkey_recenter">מרכוז</string>
-    <string name="softkey_mute">השתקה</string>
-    <string name="softkey_unmute">ביטול השתקה</string>
-    <string name="softkey_move_map">הזז מפה</string>
-    <string name="softkey_stop_zoom">הפסק זום</string>
     <string name="voice_error_title">חיפוש קולי לא התחיל</string>
     <string name="voice_error_retry">נסה שוב</string>
     <string name="voice_error_model">מודל הקול לא מוכן. הורד אותו שוב בהגדרות \u2192 חיפוש.</string>
@@ -763,7 +688,6 @@
     <string name="settings_nav_trace_hint">מקליט איך מצלמת המפה זזה בזמן ניווט, כדי שאפשר יהיה לאבחן מפה רועדת או שוחה. לא מכיל נתוני מיקום, רק כיוונים, מהירויות ותזמונים, ולכן בטוח לצרף אותו לדוח תקלה.</string>
     <string name="settings_nav_trace_export">שתף מעקב ניווט</string>
     <string name="settings_nav_trace_empty">עדיין לא הוקלט מעקב. נווט קודם לאנשהו.</string>
-    <string name="settings_voice_vela_name">AutoMap Voice (%1$s)</string>
     <string name="settings_voice_install_vela">התקן את AutoMap Voice (%1$d מ\"ב)</string>
     <string name="settings_voice_install_vela_hint">הקול המומלץ לניווט. התקן אותו כאן מחדש בכל פעם שהוא נעלם או שהורדה נכשלה.</string>
     <string name="settings_texture_render">עיבוד תאימות</string>
@@ -909,7 +833,6 @@
     <string name="navservice_channel_turns_name">התראות פנייה מדוברות</string>
     <string name="download_notif_channel">הורדות</string>
     <string name="download_notif_title">מוריד %1$s</string>
-    <string name="download_label_update">עדכון AutoMap</string>
     <string name="download_label_map_data">נתוני מפה</string>
     <string name="download_label_offline_places">מקומות לא מקוונים</string>
     <string name="map_area_downloading">שומר את האזור הזה לשימוש לא מקוון · %1$d%%</string>
@@ -926,11 +849,6 @@
     <string name="place_transit_tram">חשמלית</string>
     <string name="settings_parking_history_empty">עדיין לא נשמרו מקומות חניה. הקש על כפתור P במפה כדי לשמור היכן חנית.</string>
     <string name="list_emoji_label">הקלד אימוג׳י כלשהו</string>
-    <string name="settings_update_channel">ערוץ עדכונים</string>
-    <string name="settings_update_channel_stable">יציב (שבועי)</string>
-    <string name="settings_update_channel_nightly">Nightly (יומי)</string>
-    <string name="settings_update_channel_canary">Canary (גרסאות פיתוח)</string>
-    <string name="settings_update_channel_hint">יציב מקבל גרסה נבדקת אחת בשבוע. Nightly מקבל גרסה בכל יום שיש בו שינויים. Canary עוקב אחרי עבודה בתהליך ועלול להישבר בכל רגע.</string>
     <string name="settings_voice_volume">עוצמת ההנחיה</string>
     <string name="settings_voice_volume_softer">שקט יותר</string>
     <string name="settings_voice_volume_normal">רגיל</string>
@@ -1039,11 +957,6 @@
     <string name="settings_puck_shape">סמל ניווט</string>
     <string name="settings_puck_shape_arrow">חץ</string>
     <string name="settings_puck_shape_car">מכונית</string>
-    <string name="settings_car_red">אדום</string>
-    <string name="settings_car_blue">כחול</string>
-    <string name="settings_car_white">לבן</string>
-    <string name="settings_car_green">ירוק</string>
-    <string name="settings_car_yellow">צהוב</string>
     <string name="settings_puck_shape_ufo">עב\"ם</string>
     <string name="settings_puck_shape_ship">ספינת פיראטים</string>
     <string name="settings_puck_shape_duck">ברווז גומי</string>
@@ -1128,7 +1041,6 @@
     <string name="place_icon_title">סמל במפה עבור %1$s</string>
     <string name="place_icon_default">השתמש בסמל של הרשימה</string>
     <string name="settings_map_theme_title">מפה</string>
-    <string name="settings_map_theme_follow">לפי הגדרות היישום</string>
     <string name="settings_map_theme_hint">המפה בנפרד: הצגת הרחובות בעיצוב בהיר כאשר היישום בעיצוב כהה, או להפך. יום ולילה בזמן נהיגה עדיין יחולו על המפה.</string>
     <string name="route_saved_label">המסלול שלך: %1$s</string>
     <string name="route_save">שמור את המסלול הזה</string>
@@ -1242,7 +1154,6 @@
     <string name="mapscreen_other_locations">הצג סניפים אחרים</string>
     <string name="settings_other_locations_auto">מצא סניפים אחרים אוטומטית</string>
     <string name="settings_other_locations_auto_hint">כשחיפוש לפי שם מגיע למקום אחד, היישום מבקש מ־Google גם את הסניפים האחרים שלו. אלה כמה בקשות נוספות ל־Google בכל חיפוש כזה. כשכבוי, כפתור \"הצגת סניפים אחרים\" עושה זאת כשמקישים עליו.</string>
-    <string name="mapscreen_view_map">הצג מפה</string>
     <string name="whatsnew_show_after_updates">הצג מה חדש אחרי עדכונים</string>
     <string name="replay_play">נגן</string>
     <string name="replay_pause">השהה</string>
@@ -1292,13 +1203,6 @@
     <string name="search_offline_recheck">לא מקוון. הקש כדי לבדוק שוב</string>
     <string name="settings_turn_declutter">פשט את המפה בפניות</string>
     <string name="settings_turn_declutter_hint">בזמן שהמפה מסתובבת בפנייה, נשארים עליה רק שמות הרחובות. מקומות, שלטים ומצלמות חוזרים ברגע שהיא מתייצבת. שומר על פניות חלקות בטלפונים איטיים.</string>
-    <string name="settings_softkeys">מקשי בחירה פיזיים</string>
-    <string name="settings_softkeys_hint">שנה את הזום במפה עם שני מקשי הבחירה של הטלפון. לטלפוני מקשים בלבד.</string>
-    <string name="settings_softkeys_calibrate">כייל מקשי בחירה</string>
-    <string name="settings_softkeys_calibrate_hint">אם מקשי הבחירה לא משנים את הזום, הקש כאן ולחץ על מקש הבחירה השמאלי ואז על הימני, כדי ש-AutoMap ילמד את הקודים שלהם.</string>
-    <string name="map_zoom_mode_hint">זום:  ◀ התרחק   ·   התקרב ▶      חזרה ליציאה</string>
-    <string name="map_move_mode_hint">הזזת מפה:  ◀ ▲ ▼ ▶      חזרה ליציאה</string>
-    <string name="softkey_zoom_menu">זום (◀ − ▶ +)</string>
     <string name="exp_chooser_alts_same">בערך אותו זמן</string>
     <string name="exp_chooser_fewest_cams">הכי מעט מצלמות</string>
     <string name="trip_shortcut_add">הוסף למסך הבית</string>

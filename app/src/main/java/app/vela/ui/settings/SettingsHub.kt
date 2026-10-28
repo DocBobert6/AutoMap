@@ -96,13 +96,18 @@ internal fun SettingsHub(
         if (searchQuery.isNotBlank()) {
             // Picker values as well as labels (2026-10-28): Alpha/Beta/Stable, Internal/SD,
             // Town/Region/Far, Car/UFO/Ship/Duck, and the other short choices.
-            val valueMatches = SEARCH_VALUE_INDEX.map { (res, section) -> stringResource(res) to section }
+            val valueMatches = SEARCH_VALUE_INDEX.map { (res, section) -> Triple(stringResource(res), section, null as String?) }
                 .filter { it.first.contains(searchQuery.trim(), ignoreCase = true) }
             // Labels first, then hint text (2026-10-28): a hint match shows its row's label.
-            val labelMatches = SEARCH_INDEX.map { (res, section) -> stringResource(res) to section }
-                .filter { it.first.contains(searchQuery.trim(), ignoreCase = true) }
+            // Audit 2026-10-28 (A-02): each result also shows its sub-page path ("Section ->
+            // Sub-page") from SEARCH_SUBPAGE, so a searcher lands on the right sub-page
+            // instead of guessing from the sub-hub. Rows with no mapped sub-page show the
+            // section only, as before.
+            val labelMatches = SEARCH_INDEX.map { (res, section) ->
+                Triple(stringResource(res), section, SEARCH_SUBPAGE[res]?.let { stringResource(it) })
+            }.filter { it.first.contains(searchQuery.trim(), ignoreCase = true) }
             val hintMatches = SEARCH_HINT_INDEX.map { (hintRes, labelRes, section) ->
-                stringResource(hintRes) to (stringResource(labelRes) to section)
+                stringResource(hintRes) to Triple(stringResource(labelRes), section, SEARCH_SUBPAGE[labelRes]?.let { stringResource(it) })
             }.filter { it.first.contains(searchQuery.trim(), ignoreCase = true) }.map { it.second }
             val matches = (labelMatches + valueMatches + hintMatches).distinct().take(10)
             if (matches.isEmpty()) {
@@ -113,7 +118,7 @@ internal fun SettingsHub(
                     modifier = Modifier.padding(12.dp),
                 )
             }
-            matches.forEach { (label, section) ->
+            matches.forEach { (label, section, subPage) ->
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -128,7 +133,7 @@ internal fun SettingsHub(
                     Column(Modifier.weight(1f)) {
                         Text(label, style = MaterialTheme.typography.titleMedium)
                         Text(
-                            sectionTitles[section] ?: "",
+                            (sectionTitles[section] ?: "") + (subPage?.let { " → $it" } ?: ""),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -274,6 +279,133 @@ private fun HubRow(
  * A match opens the spoke (the hub-and-spoke replacement for the old measured scroll-to-Y).
  * When a section gains a row, add its label here - the search only knows what's listed.
  */
+/** Sub-page path for a search label (audit 2026-10-28, A-02): label resource ->
+ *  category-page title resource. Only rows whose owning sub-page is certain are
+ *  mapped; unmapped rows show the section only, as before. Threading the highlight
+ *  through every sub-hub page was rejected as the larger change — the path under
+ *  each result is the audit's stated alternative, and it tells the user exactly
+ *  which category row to tap after the spoke opens. */
+private val SEARCH_SUBPAGE: Map<Int, Int> = mapOf(
+    // Appearance: Theme / Display / Map style / Locale
+    R.string.settings_follow_system to R.string.settings_cat_theme,
+    R.string.settings_theme_light to R.string.settings_cat_theme,
+    R.string.settings_theme_dark to R.string.settings_cat_theme,
+    R.string.settings_theme_amoled to R.string.settings_cat_theme,
+    R.string.settings_theme_auto to R.string.settings_cat_theme,
+    R.string.settings_map_theme_title to R.string.settings_cat_theme,
+    R.string.settings_map_scheme_title to R.string.settings_cat_theme,
+    R.string.settings_map_detail_title to R.string.settings_cat_theme,
+    R.string.settings_nav_day_night to R.string.settings_cat_theme,
+    R.string.settings_ui_scale to R.string.settings_cat_display,
+    R.string.settings_page_transitions to R.string.settings_cat_display,
+    R.string.settings_clock to R.string.settings_cat_display,
+    R.string.settings_app_name_title to R.string.settings_cat_display,
+    R.string.settings_app_name_generic to R.string.settings_cat_display,
+    R.string.settings_font to R.string.settings_cat_display,
+    R.string.settings_map_look to R.string.settings_cat_map_style,
+    R.string.settings_map_colors to R.string.settings_cat_map_style,
+    R.string.settings_map_buttons to R.string.settings_cat_map_style,
+    R.string.settings_dynamic_color to R.string.settings_cat_map_style,
+    R.string.settings_units to R.string.settings_cat_locale,
+    R.string.settings_units_imperial to R.string.settings_cat_locale,
+    R.string.settings_units_metric to R.string.settings_cat_locale,
+    R.string.settings_language to R.string.settings_cat_locale,
+    R.string.settings_follow_system_language to R.string.settings_cat_locale,
+    R.string.settings_directions_language to R.string.settings_cat_locale,
+    // Map: Layers and buttons / Map behaviour / Addresses
+    R.string.settings_live_traffic to R.string.settings_cat_layers,
+    R.string.settings_transit_layer to R.string.settings_cat_layers,
+    R.string.settings_topography to R.string.settings_cat_layers,
+    R.string.settings_sun_shading to R.string.settings_cat_layers,
+    R.string.settings_layers_button to R.string.settings_cat_layers,
+    R.string.settings_transit_lines_metro to R.string.settings_cat_layers,
+    R.string.settings_transit_lines_trains to R.string.settings_cat_layers,
+    R.string.settings_parking_button to R.string.settings_cat_layers,
+    R.string.settings_buildings_3d to R.string.settings_cat_layers,
+    R.string.settings_building_overlay to R.string.settings_cat_layers,
+    R.string.settings_two_finger_tilt to R.string.settings_cat_map_behaviour,
+    R.string.settings_keep_north_up to R.string.settings_cat_map_behaviour,
+    R.string.settings_start_view to R.string.settings_cat_map_behaviour,
+    R.string.settings_start_view_drive to R.string.settings_cat_map_behaviour,
+    R.string.settings_house_numbers to R.string.settings_cat_addresses,
+    R.string.settings_map_names to R.string.settings_cat_addresses,
+    // Places: Places on the map / Place pages
+    R.string.settings_map_places to R.string.settings_cat_places_map,
+    R.string.settings_show_pois to R.string.settings_cat_places_map,
+    R.string.settings_places_source_open to R.string.settings_cat_places_map,
+    R.string.settings_places_source_google to R.string.settings_cat_places_map,
+    R.string.settings_places_source_both to R.string.settings_cat_places_map,
+    R.string.settings_places_lookup to R.string.settings_cat_places_map,
+    R.string.settings_show_civic to R.string.settings_cat_places_map,
+    R.string.settings_show_transit_stops to R.string.settings_cat_places_map,
+    R.string.settings_poi_icon_size to R.string.settings_cat_places_map,
+    R.string.settings_place_pages to R.string.settings_cat_place_pages,
+    R.string.settings_show_reviews to R.string.settings_cat_place_pages,
+    R.string.settings_reviews_on_tap to R.string.settings_cat_place_pages,
+    R.string.settings_photos_on_tap to R.string.settings_cat_place_pages,
+    R.string.settings_details_retry to R.string.settings_cat_place_pages,
+    R.string.settings_read_all_reviews to R.string.settings_cat_place_pages,
+    R.string.settings_load_photos to R.string.settings_cat_place_pages,
+    R.string.settings_hide_adult to R.string.settings_cat_place_pages,
+    R.string.settings_hide_external_links to R.string.settings_cat_place_pages,
+    // Navigation: Guidance / Vehicle and road display / Cameras / Route options / Links
+    R.string.settings_keep_screen_on to R.string.settings_cat_guidance,
+    R.string.settings_route_picker to R.string.settings_cat_guidance,
+    R.string.settings_turn_arrows to R.string.settings_cat_guidance,
+    R.string.settings_route_bar to R.string.settings_cat_guidance,
+    R.string.settings_route_trail to R.string.settings_cat_guidance,
+    R.string.settings_turn_declutter to R.string.settings_cat_guidance,
+    R.string.settings_nav_north_up to R.string.settings_cat_guidance,
+    R.string.settings_zoom_to_turn to R.string.settings_cat_guidance,
+    R.string.settings_zoom_to_turn_floor to R.string.settings_cat_guidance,
+    R.string.settings_pip_turn_card to R.string.settings_cat_guidance,
+    R.string.settings_faster_auto to R.string.settings_cat_guidance,
+    R.string.settings_pause_in_bar to R.string.settings_cat_guidance,
+    R.string.settings_traffic_lights to R.string.settings_cat_guidance,
+    R.string.settings_nav_tap_places to R.string.settings_cat_guidance,
+    R.string.settings_vibrate_on_turns to R.string.settings_cat_guidance,
+    R.string.settings_bike_safe to R.string.settings_cat_guidance,
+    R.string.settings_confirm_end_nav to R.string.settings_cat_guidance,
+    R.string.settings_road_label to R.string.settings_cat_vehicle,
+    R.string.settings_prefer_buttons to R.string.settings_cat_vehicle,
+    R.string.settings_zoom_key_in to R.string.settings_cat_vehicle,
+    R.string.settings_zoom_key_out to R.string.settings_cat_vehicle,
+    R.string.settings_speed_display to R.string.settings_cat_vehicle,
+    R.string.settings_car_speed to R.string.settings_cat_vehicle,
+    R.string.settings_speeding_alert to R.string.settings_cat_vehicle,
+    R.string.settings_puck_size to R.string.settings_cat_vehicle,
+    R.string.settings_puck_style to R.string.settings_cat_vehicle,
+    R.string.settings_puck_shape to R.string.settings_cat_vehicle,
+    R.string.settings_cat_vehicle_colour to R.string.settings_cat_vehicle,
+    R.string.settings_flock to R.string.settings_cat_cameras,
+    R.string.settings_speed_cams to R.string.settings_cat_cameras,
+    R.string.settings_speed_cam_warn to R.string.settings_cat_cameras,
+    R.string.settings_bridge_openings to R.string.settings_cat_cameras,
+    R.string.settings_flock_route_alert to R.string.settings_cat_cameras,
+    R.string.settings_flock_detour to R.string.settings_cat_cameras,
+    R.string.settings_flock_nav_card to R.string.settings_cat_cameras,
+    R.string.settings_flock_nav_voice to R.string.settings_cat_cameras,
+    R.string.settings_route_traffic_on_tap to R.string.settings_cat_route_options,
+    R.string.settings_link_action to R.string.settings_cat_links,
+    // Search: Search behaviour / Speech recognition / Quick search buttons
+    R.string.settings_category_chips to R.string.settings_cat_quick_search,
+    // Voice: Guidance voice
+    R.string.settings_spoken_directions to R.string.settings_cat_guidance_voice,
+    // Offline: Offline areas / Storage and cleanup / Routing downloads
+    R.string.settings_region_updates to R.string.settings_cat_routing_downloads,
+    // Saved: Saved places and lists / Saved routes and parking
+    R.string.settings_parking_history to R.string.settings_cat_saved_routes,
+    R.string.settings_saved_routes to R.string.settings_cat_saved_routes,
+    // Privacy: Google-free and data / What Google is used for / History
+    R.string.settings_google_free to R.string.settings_cat_google_free,
+    // Diagnostics: Diagnostics / Demo modes / Recorded trips
+    R.string.settings_demo_drive to R.string.settings_cat_demo,
+    R.string.settings_sim_location to R.string.settings_cat_demo,
+    // About: About / AutoMap updates
+    R.string.settings_cat_updates to R.string.settings_cat_updates,
+    R.string.whatsnew_show_after_updates to R.string.settings_cat_updates,
+)
+
 private val SEARCH_INDEX: List<Pair<Int, SettingsSection>> = listOf(
     // Appearance
     R.string.settings_follow_system to SettingsSection.APPEARANCE,
@@ -362,7 +494,10 @@ private val SEARCH_INDEX: List<Pair<Int, SettingsSection>> = listOf(
     R.string.settings_route_bar to SettingsSection.NAVIGATION,
     R.string.settings_route_trail to SettingsSection.NAVIGATION,
     R.string.settings_turn_declutter to SettingsSection.NAVIGATION,
-    R.string.settings_category_chips to SettingsSection.MAP,
+    // Audit 2026-10-28 (U-16): the chips themselves are edited under Search -> Quick search
+    // buttons; the Map -> Behaviour row is only the mode switch. The index must send the
+    // searcher to the editor, not the mode control.
+    R.string.settings_category_chips to SettingsSection.SEARCH,
     R.string.settings_road_label to SettingsSection.NAVIGATION,
     R.string.settings_prefer_buttons to SettingsSection.NAVIGATION,
     R.string.settings_zoom_key_in to SettingsSection.NAVIGATION,

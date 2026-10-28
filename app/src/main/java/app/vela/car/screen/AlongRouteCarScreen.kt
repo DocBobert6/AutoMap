@@ -104,9 +104,13 @@ class AlongRouteCarScreen(carContext: CarContext, private val deps: CarDeps) : S
 
 /** Short distance text for a list row, in the user's units. */
 internal object ManeuverMapperDistance {
+    /** Same Google-style steps as [app.vela.ui.formatDistance] and the car nav card
+     *  (audit 2026-10-28): 50 ft steps at/above 100 ft, 10 ft below — the old version
+     *  always used 10 ft, so along-route rows rounded differently from both. */
     fun text(meters: Double, imperial: Boolean): String = if (imperial) {
+        val feet = meters * 3.28084
         val mi = meters / 1609.344
-        if (mi < 0.1) "${(meters * 3.28084 / 10).toInt() * 10} ft" else String.format(java.util.Locale.getDefault(), "%.1f mi", mi)
+        if (mi < 0.1) "${if (feet < 100) maxOf(10, (feet / 10).toInt() * 10) else (feet / 50).toInt() * 50} ft" else String.format(java.util.Locale.getDefault(), "%.1f mi", mi)
     } else {
         if (meters < 1000) "${(meters / 10).toInt() * 10} m" else String.format(java.util.Locale.getDefault(), "%.1f km", meters / 1000)
     }

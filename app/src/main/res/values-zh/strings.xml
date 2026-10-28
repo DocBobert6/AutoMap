@@ -20,8 +20,6 @@
     <string name="settings_appearance_hint">仅对 AutoMap 生效。</string>
     <string name="settings_dynamic_color">Material You 配色</string>
     <string name="settings_dynamic_color_hint">根据您的壁纸为按钮和强调元素着色。地图保持中性配色。</string>
-    <string name="settings_map_style">地图样式</string>
-    <string name="settings_map_style_hint">OpenFreeMap 无需任何 API 密钥即可使用。</string>
     <string name="settings_units">单位</string>
     <string name="settings_units_imperial">英制（英里、英尺）</string>
     <string name="settings_units_metric">公制（公里、米）</string>
@@ -102,7 +100,6 @@
     <string name="settings_offline_map_area">本地区域</string>
     <string name="settings_offline_download_viewport">下载当前查看的区域</string>
     <string name="settings_offline_download_viewport_hint">保存您正在查看的地图及其道路和地址，没有信号时该区域也能正常使用。</string>
-    <string name="settings_offline_no_areas">尚未保存任何区域。</string>
     <string name="settings_offline_addresses_missing">本次更新之前保存的区域不包含地址数据。更新后即可离线搜索地址并规划路线。</string>
     <string name="settings_offline_addresses_update">更新已保存的区域</string>
     <string name="settings_offline_delete_area">删除此离线区域</string>
@@ -120,7 +117,6 @@
     <string name="settings_routing_places_downloading">正在保存地点 · %1$d%%</string>
     <!-- format -->
     <string name="settings_get_places">获取地点</string>
-    <string name="settings_update_places">更新地点</string>
     <string name="settings_routing_update_available">已安装 · 有地点数据更新</string>
     <string name="settings_routing_remove">移除离线路线数据</string>
     <string name="settings_download">下载</string>
@@ -193,10 +189,8 @@
     <!-- place: PlaceSheet.kt -->
     <string name="place_photo_number">照片 %1$d</string>
     <!-- format -->
-    <string name="place_photo_category_all">全部</string>
     <string name="place_saved">已保存</string>
     <string name="place_save">保存</string>
-    <string name="place_more_options">更多选项</string>
     <string name="place_set_as_home">设为家</string>
     <string name="place_set_as_work">设为公司</string>
     <string name="place_close">关闭</string>
@@ -286,7 +280,6 @@
     <string name="place_open_web">在网页中打开</string>
     <string name="place_copy_link">复制链接</string>
     <string name="place_link_copied">已复制链接</string>
-    <string name="place_share_gmaps_link">Google 地图链接</string>
     <string name="place_share_map_pin">地图图钉 (geo:)</string>
     <string name="place_open_other_app">在其他地图应用中打开</string>
     <string name="place_share_coordinates">坐标</string>
@@ -415,7 +408,6 @@
     <string name="mapvm_offline_no_match">您保存的区域内没有与“%1$s”相关的离线结果。离线搜索涵盖您已下载的 OpenStreetMap 地点。</string>
     <string name="mapvm_no_results">找不到“%1$s”的结果。</string>
     <!-- format -->
-    <string name="mapvm_offline_results">离线结果（无网络连接）</string>
     <string name="mapvm_search_failed_reason">搜索失败：%1$s</string>
     <!-- format -->
     <string name="mapvm_none_found_along_route">沿途未找到“%1$s”</string>
@@ -455,8 +447,6 @@
     <string name="mapvm_vela_voice_removed">已移除 AutoMap 语音</string>
     <string name="mapvm_opening_installer">正在打开 %1$s 的安装程序…</string>
     <!-- format -->
-    <string name="mapvm_pan_to_area_first">请先打开地图并平移到目标区域</string>
-    <string name="mapvm_offline_routing_ready">离线路线规划已就绪：%1$s</string>
     <!-- format -->
     <string name="mapvm_offline_routing_failed">离线路线数据下载失败</string>
     <string name="mapvm_offline_routing_removed">已移除离线路线数据</string>
@@ -477,16 +467,6 @@
     <string name="navservice_notif_text_faster_available"> · 有更快路线</string>
     <string name="navservice_notif_action_end">结束</string>
     <string name="navservice_channel_name">导航</string>
-    <string name="update_available_title">AutoMap %1$s 已发布</string>
-    <string name="update_downloading">正在下载… %1$d%%</string>
-    <string name="update_later">暂不</string>
-    <string name="update_install">更新</string>
-    <string name="update_download_failed">更新下载失败。请稍后重试。</string>
-    <string name="settings_update_auto">启动时检查更新</string>
-    <string name="settings_update_auto_hint">大约每天检查一次 GitHub 并提示较新的版本。若您通过 Obtainium 更新，请关闭。</string>
-    <string name="settings_update_check_now">检查更新</string>
-    <string name="settings_update_checking">正在检查…</string>
-    <string name="settings_update_none">已是最新版本。</string>
     <string name="settings_place_pages">地点页面</string>
     <plurals name="place_transit_stops">
         <!-- format -->
@@ -527,9 +507,6 @@
     <string name="car_search">搜索</string>
     <string name="car_search_hint">输入以搜索目的地</string>
     <string name="car_go">出发</string>
-    <string name="car_end">结束</string>
-    <string name="car_mute">静音</string>
-    <string name="car_unmute">取消静音</string>
     <string name="car_faster_route">更快 −%1$d 分钟</string>
     <string name="car_no_route">无可用路线，请检查您的位置</string>
     <string name="map_parking_saved">已保存停车位置</string>
@@ -564,8 +541,6 @@
         <item quantity="other">保存列表 · %1$d 个地点</item>
     </plurals>
     <string name="map_list_saved">已将“%1$s”保存到您的列表</string>
-    <string name="settings_update_nightly">包含每夜构建版</string>
-    <string name="settings_update_nightly_hint">更新到最新的每夜版（预发布版本），而不仅限于稳定版。每夜版更新更快，但测试较少。</string>
     <string name="settings_lists_export_hint">将您的列表备份到文件，或在其他设备上恢复。</string>
     <string name="settings_lists_imported">已导入 %1$d 个列表</string>
     <string name="settings_places_imported">已导入 %1$d 个地点</string>
@@ -578,12 +553,6 @@
         <item quantity="other">%1$d 个地点</item>
     </plurals>
     <string name="navservice_notif_eta">%1$s 到达</string>
-    <string name="settings_advanced">高级</string>
-    <string name="settings_advanced_hint">大多数人用不到的选项。</string>
-    <string name="settings_developer">开发者</string>
-    <string name="settings_developer_hint">用于演示、截图和测试的工具。正常使用时请逐项关闭。</string>
-    <string name="settings_browse_voices">浏览语音</string>
-    <string name="settings_browse_voices_hint">下载并切换 AutoMap 的设备端语音。</string>
     <string name="voice_capture_listening">正在聆听…</string>
     <string name="voice_capture_starting">正在准备…</string>
     <string name="voice_capture_done">完成</string>
@@ -594,7 +563,6 @@
     <string name="mapvm_closing_before_arrival">%1$s 将于 %2$s 打烊，早于您 %3$s 左右的预计到达时间</string>
     <!-- format -->
     <string name="settings_voice_search_model">AutoMap 语音</string>
-    <string name="settings_voice_search_model_hint">AutoMap 语音直接在您的手机上将语音转为搜索：无需其他应用，也不会上传任何内容。一次性下载 %1$d MB。</string>
     <!-- format -->
     <string name="settings_voice_search_download">下载（%1$d MB）</string>
     <!-- format -->
@@ -605,7 +573,6 @@
     <string name="settings_voice_search_engine_title">点按麦克风时</string>
     <string name="settings_voice_search_engine_auto">AutoMap 语音</string>
     <string name="settings_voice_search_engine_default">Android 默认</string>
-    <string name="settings_voice_search_engine_system">其他语音应用</string>
     <string name="map_asr_offer_title">语音搜索</string>
     <string name="map_asr_offer_body">下载 AutoMap 语音即可用语音进行搜索。它完全在您的手机上运行，不会上传任何内容。</string>
     <string name="nav_precise_title">需要精确位置</string>
@@ -648,35 +615,23 @@
     <string name="settings_places">地点</string>
     <string name="settings_privacy">隐私</string>
     <string name="settings_cameras_group">摄像头</string>
-    <string name="settings_experiments">实验功能</string>
     <string name="settings_hub_places_sub">地点来源、显示内容、地点页面</string>
     <string name="settings_hub_appearance_sub">主题、地图样式、单位、语言</string>
     <string name="settings_hub_map_sub">路况、公交、图层、3D 建筑</string>
-    <string name="settings_hub_navigation_sub">导航指引、摄像头、实时复查</string>
     <string name="settings_hub_voice_sub">语音播报与语音</string>
     <string name="settings_hub_search_sub">语音搜索与语音模型</string>
     <string name="settings_hub_offline_sub">离线地图、路线、地点</string>
-    <string name="settings_hub_saved_sub">你的列表、导出、停车记录</string>
-    <string name="settings_hub_privacy_sub">Google 收到的信息、清除历史记录</string>
     <string name="settings_hub_diagnostics_sub">崩溃报告、行程、演示模式、实验功能</string>
     <string name="settings_hub_about_sub">版本、更新、支持</string>
     <string name="settings_theme_amoled">AMOLED纯黑</string>
     <string name="settings_traffic_lights">红绿灯提示</string>
     <string name="settings_traffic_lights_hint">语音地标提示:过红绿灯后转弯。仅英语,默认关闭。</string>
-    <string name="map_asr_downloading">正在下载 AutoMap Voice 麦克风 · %1$d%%</string>
-    <string name="map_asr_installing">正在安装 AutoMap Voice 麦克风…</string>
     <string name="map_asr_waiting">AutoMap Voice 麦克风 · 等待 AutoMap 语音</string>
     <!-- format -->
     <string name="place_review_more">更多</string>
     <string name="place_review_less">收起</string>
-    <string name="root_voice_tts_title">语音播报路线指引</string>
-    <string name="root_voice_tts_desc">语音逐向导航。推荐使用。一次性下载 %1$d MB。</string>
     <!-- format -->
-    <string name="root_voice_mic_title">说话搜索</string>
-    <string name="root_voice_mic_desc">不用打字，说话就能搜索。不下载时，麦克风将使用 Google。一次性下载 %1$d MB。</string>
     <!-- format -->
-    <string name="root_voice_none_picked">请先勾选一项，或选择“暂不”。</string>
-    <string name="mapvm_stop_added">已添加途经点</string>
     <string name="shortcut_home">家</string>
     <string name="shortcut_work">公司</string>
     <string name="settings_asr_engines_hint">语音在手机上变成搜索。不上传任何内容。选择麦克风使用的引擎。</string>
@@ -688,31 +643,11 @@
     <string name="settings_asr_active">使用中</string>
     <string name="settings_asr_use">使用</string>
     <!-- format -->
-    <string name="mapscreen_filter_top_rated">4.0★</string>
-    <string name="mapscreen_section_recent_searches">最近搜索</string>
-    <string name="mapscreen_clear_recent_searches">清除最近搜索</string>
-    <string name="root_diag_title">帮助改进 AutoMap？</string>
-    <string name="root_diag_body">两者都保留在您的手机上。除非您导出，否则不会发送任何内容。可随时在设置中更改。</string>
-    <string name="root_diag_share_title">共享诊断信息</string>
-    <string name="root_diag_share_desc">搜索、路线和错误的简短本地日志。</string>
-    <string name="root_diag_trips_title">保存我的行程</string>
-    <string name="root_diag_trips_desc">记录您的导航 GPS 轨迹，以便回放行程进行测试。更敏感：您的精确路线。</string>
-    <string name="root_diag_save">保存选择</string>
-    <string name="root_offline_title">离线地图</string>
-    <string name="root_offline_body">AutoMap 从 Google 获取地点、搜索和路线，因此在无信号时只有您已下载的区域可用。立即设置一个区域，以便在失去信号时仍有保障。</string>
-    <string name="root_offline_setup">设置离线</string>
     <string name="no_browser_installed">您的设备没有浏览器</string>
     <string name="street_view_none">No Street View imagery here</string>
     <string name="street_view_move">Move here</string>
     <string name="street_view_dates">See other dates</string>
     <string name="street_view_fullscreen">Toggle full screen</string>
-    <string name="softkey_options">选项</string>
-    <string name="softkey_search">搜索</string>
-    <string name="softkey_recenter">居中</string>
-    <string name="softkey_mute">静音</string>
-    <string name="softkey_unmute">取消静音</string>
-    <string name="softkey_move_map">移动地图</string>
-    <string name="softkey_stop_zoom">停止缩放</string>
     <string name="voice_error_title">语音搜索未能启动</string>
     <string name="voice_error_retry">重试</string>
     <string name="voice_error_model">语音模型尚未就绪。请在设置 \u2192 搜索 中重新下载。</string>
@@ -762,7 +697,6 @@
     <string name="settings_nav_trace_hint">记录导航时地图镜头的移动方式，以便诊断画面抖动或漂移。不含位置数据，只有朝向、速度和时间信息，可放心附在问题反馈中。</string>
     <string name="settings_nav_trace_export">分享导航记录</string>
     <string name="settings_nav_trace_empty">尚未记录任何内容。请先导航一次。</string>
-    <string name="settings_voice_vela_name">AutoMap 语音（%1$s）</string>
     <!-- format -->
     <string name="settings_voice_install_vela">安装 AutoMap 语音（%1$d MB）</string>
     <!-- format -->
@@ -895,7 +829,6 @@
     <string name="download_notif_channel">下载</string>
     <string name="download_notif_title">正在下载%1$s</string>
     <!-- format -->
-    <string name="download_label_update">AutoMap 更新</string>
     <string name="download_label_map_data">地图数据</string>
     <string name="download_label_offline_places">离线地点</string>
     <string name="map_area_downloading">正在保存此区域供离线使用 · %1$d%%</string>
@@ -913,11 +846,6 @@
     <string name="place_transit_tram">有轨电车</string>
     <string name="settings_parking_history_empty">尚未保存任何停车位置。点按地图上的 P 按钮即可保存停车位置。</string>
     <string name="list_emoji_label">输入任意表情符号</string>
-    <string name="settings_update_channel">更新通道</string>
-    <string name="settings_update_channel_stable">稳定版（每周）</string>
-    <string name="settings_update_channel_nightly">每夜版（每天）</string>
-    <string name="settings_update_channel_canary">金丝雀版（开发构建）</string>
-    <string name="settings_update_channel_hint">稳定版每周发布一个经过测试的版本。每夜版在有改动的日子每天构建一次。金丝雀版跟随开发进度，随时可能出问题。</string>
     <string name="settings_voice_volume">播报音量</string>
     <string name="settings_voice_volume_softer">更轻</string>
     <string name="settings_voice_volume_normal">正常</string>
@@ -1007,7 +935,6 @@
     <string name="settings_downloaded_title">已下载</string>
     <string name="settings_downloaded_none">尚未下载任何内容。可在上方保存当前查看的区域，或在下方选择州或国家。</string>
     <string name="settings_downloaded_area">已保存的区域</string>
-    <string name="settings_region_group_title">%1$s 全境</string>
     <string name="settings_region_group_size">%1$d 个分块，安装后约 %2$s</string>
     <string name="settings_region_group_partial">已安装 %1$d/%2$d 个分块，全部约 %3$s</string>
     <string name="settings_region_group_installed">全部 %1$d 个分块已安装</string>
@@ -1068,13 +995,7 @@
     <string name="mapvm_graphs_retired">离线路线已改用更小的格式。请在设置 ▸ 离线地图中重新下载您的区域。</string>
     <string name="navservice_notif_action_pause">暂停</string>
     <string name="navservice_notif_action_resume">继续</string>
-    <string name="update_car_title">此更新会让 AutoMap 从 Android Auto 中消失</string>
-    <string name="update_car_body">AutoMap 当前是以 Android Auto 认可的方式安装的。在这里安装此更新会覆盖这一点，在您用第一次使用的工具（AAEnabler、King Installer）安装该文件之前，车机将不再列出 AutoMap。\n\n请保存文件并用该方式安装，以保证车机正常使用。</string>
-    <string name="update_car_save">保存文件</string>
-    <string name="update_car_anyway">仍然更新</string>
     <string name="place_transit_cached">%1$s更新。当前无网络连接，时间可能已有变化。</string>
-    <string name="car_pause">暂停</string>
-    <string name="car_resume">继续</string>
     <string name="car_paused">已暂停</string>
     <string name="car_along_route">沿途搜索</string>
     <string name="car_along_none">附近没有找到结果</string>
@@ -1083,9 +1004,6 @@
     <string name="map_import_needs_google">AutoMap 不使用 Google 时无法打开共享的 Google 地图列表。</string>
     <string name="map_link_needs_google">“打开分享的 Google 地图链接”已在设置 ▸ 隐私中关闭。</string>
     <string name="map_link_unreadable">无法打开该链接。</string>
-    <string name="settings_performance">性能</string>
-    <string name="settings_hub_performance_sub">预先加载的内容、地图绘制</string>
-    <string name="settings_performance_intro">预先加载的内容在需要时可立即使用，但在此之前会占用内存。默认设置取决于这部手机的内存大小。</string>
     <string name="settings_full_place_load">加载全部照片和评价</string>
     <string name="settings_full_place_load_hint">关闭时，地点只加载前几张照片和第一页评价，点按“更多照片”或“全部评价”再获取其余内容。开启后，您打开的每个地点都会加载整个相册和最多 50 条评价，速度更慢，并会向 Google 发送多得多的请求。</string>
     <string name="settings_speech_preload">启动时加载语音搜索</string>
@@ -1133,11 +1051,6 @@
     <string name="settings_puck_shape">导航图标</string>
     <string name="settings_puck_shape_arrow">箭头</string>
     <string name="settings_puck_shape_car">汽车</string>
-    <string name="settings_car_red">红色</string>
-    <string name="settings_car_blue">蓝色</string>
-    <string name="settings_car_white">白色</string>
-    <string name="settings_car_green">绿色</string>
-    <string name="settings_car_yellow">黄色</string>
     <string name="settings_puck_shape_ufo">飞碟</string>
     <string name="settings_puck_shape_ship">海盗船</string>
     <string name="settings_puck_shape_duck">小黄鸭</string>
@@ -1216,7 +1129,6 @@
     <string name="place_icon_title">%1$s 的地图图标</string>
     <string name="place_icon_default">使用列表的图标</string>
     <string name="settings_map_theme_title">地图</string>
-    <string name="settings_map_theme_follow">与应用相同</string>
     <string name="settings_map_theme_hint">单独设置地图：深色应用配浅色街道，或浅色应用配深色街道。驾驶时的日夜切换仍会作用于地图。</string>
     <string name="route_saved_label">您的路线：%1$s</string>
     <string name="route_save">保存此路线</string>
@@ -1323,7 +1235,6 @@
     <string name="mapscreen_other_locations">显示其他分店</string>
     <string name="settings_other_locations_auto">自动查找其他分店</string>
     <string name="settings_other_locations_auto_hint">按名称搜索只找到一个地点时，同时向 Google 查询它的其他分店。每次这样的搜索会向 Google 多发几次请求。关闭后，点按“显示其他分店”按钮时才会查询。</string>
-    <string name="mapscreen_view_map">查看地图</string>
     <string name="whatsnew_show_after_updates">更新后显示新变化</string>
     <string name="replay_play">播放</string>
     <string name="replay_pause">暂停</string>
@@ -1373,13 +1284,6 @@
     <string name="search_offline_recheck">离线，点按重新检查</string>
     <string name="settings_turn_declutter">转弯时简化地图</string>
     <string name="settings_turn_declutter_hint">地图随转弯转动时，只保留街道名称。地图稳定后，地点、标志和摄像头会立即恢复显示。可让较慢的手机在转弯时保持流畅。</string>
-    <string name="settings_softkeys">实体软键</string>
-    <string name="settings_softkeys_hint">用手机的两个软键缩放地图。仅适用于按键手机。</string>
-    <string name="settings_softkeys_calibrate">校准软键</string>
-    <string name="settings_softkeys_calibrate_hint">如果软键无法缩放，请点按此处，然后依次按下左软键和右软键，让 AutoMap 记住它们的键码。</string>
-    <string name="map_zoom_mode_hint">缩放：  ◀ 缩小   ·   放大 ▶      按返回键退出</string>
-    <string name="map_move_mode_hint">移动地图：  ◀ ▲ ▼ ▶      按返回键退出</string>
-    <string name="softkey_zoom_menu">缩放（◀ − ▶ +）</string>
     <string name="exp_chooser_alts_same">用时相近</string>
     <string name="exp_chooser_fewest_cams">摄像头最少</string>
     <string name="trip_shortcut_add">添加到主屏幕</string>

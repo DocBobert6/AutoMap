@@ -9,8 +9,6 @@
     <string name="settings_appearance_hint">Aplica-se apenas à AutoMap.</string>
     <string name="settings_dynamic_color">Cores Material You</string>
     <string name="settings_dynamic_color_hint">Colore botões e detalhes conforme o fundo. O mapa continua neutro.</string>
-    <string name="settings_map_style">Estilo do mapa</string>
-    <string name="settings_map_style_hint">O OpenFreeMap funciona sem chave de API.</string>
     <string name="settings_units">Unidades</string>
     <string name="settings_units_imperial">Imperial (milhas, pés)</string>
     <string name="settings_units_metric">Métrico (quilómetros, metros)</string>
@@ -77,7 +75,6 @@
     <string name="settings_region_updates_wifi">Por Wi-Fi</string>
     <string name="settings_region_updates_mobile">Por Wi-Fi e dados móveis</string>
     <string name="settings_offline_download_viewport_hint">Guarda o mapa que estás a ver, com as estradas e moradas, para que esta zona continue a funcionar sem rede.</string>
-    <string name="settings_offline_no_areas">Ainda sem áreas guardadas.</string>
     <string name="settings_offline_addresses_missing">As áreas guardadas antes desta atualização não incluem dados de moradas. Atualize-as para pesquisar moradas e traçar rotas offline.</string>
     <string name="settings_offline_addresses_update">Atualizar áreas guardadas</string>
     <string name="settings_offline_delete_area">Eliminar esta área offline</string>
@@ -93,7 +90,6 @@
     <string name="settings_routing_places_downloading">A guardar locais · %1$d%%</string>
     <!-- format -->
     <string name="settings_get_places">Obter locais</string>
-    <string name="settings_update_places">Atualizar locais</string>
     <string name="settings_routing_update_available">Instalado · atualização de locais disponível</string>
     <string name="settings_routing_remove">Remover percursos offline</string>
     <string name="settings_download">Transferir</string>
@@ -101,7 +97,6 @@
     <string name="settings_downloaded_title">Transferidos</string>
     <string name="settings_downloaded_none">Ainda nada transferido. Guarde acima a área que está a ver, ou escolha um estado ou país abaixo.</string>
     <string name="settings_downloaded_area">Área guardada</string>
-    <string name="settings_region_group_title">%1$s por inteiro</string>
     <string name="settings_region_group_size">%1$d partes, cerca de %2$s depois da instalação</string>
     <string name="settings_region_group_partial">%1$d de %2$d partes instaladas, cerca de %3$s no total</string>
     <string name="settings_region_group_installed">Todas as %1$d partes instaladas</string>
@@ -173,10 +168,8 @@
     <string name="settings_voice_row_use">Usar</string>
     <string name="settings_voice_row_remove">Remover %1$s</string>
     <string name="place_photo_number">Foto %1$d</string>
-    <string name="place_photo_category_all">Todas</string>
     <string name="place_saved">Guardado</string>
     <string name="place_save">Guardar</string>
-    <string name="place_more_options">Mais opções</string>
     <string name="place_set_as_home">Definir como Casa</string>
     <string name="place_set_as_work">Definir como Trabalho</string>
     <string name="place_close">Fechar</string>
@@ -284,7 +277,6 @@
     <string name="place_open_web">Abrir na web</string>
     <string name="place_copy_link">Copiar link</string>
     <string name="place_link_copied">Link copiado</string>
-    <string name="place_share_gmaps_link">Ligação do Google Maps</string>
     <string name="place_share_map_pin">Marcador de mapa (geo:)</string>
     <string name="place_open_other_app">Abrir em outro app de mapas</string>
     <string name="place_share_coordinates">Coordenadas</string>
@@ -400,7 +392,6 @@
     <string name="mapvm_offline_no_match">Sem resultados offline para \"%1$s\" na sua área guardada. A pesquisa offline abrange os locais do OpenStreetMap que transferiu.</string>
     <string name="mapvm_no_results">Nenhum resultado para \"%1$s\".</string>
     <!-- format -->
-    <string name="mapvm_offline_results">Resultados offline (sem ligação)</string>
     <string name="mapvm_search_failed_reason">Falha na pesquisa: %1$s</string>
     <string name="mapvm_none_found_along_route">Nenhum \"%1$s\" encontrado ao longo do seu percurso</string>
     <string name="mapvm_search_failed">Falha na pesquisa</string>
@@ -433,8 +424,6 @@
     <string name="mapvm_voice_download_failed">Falha na transferência de %1$s</string>
     <string name="mapvm_vela_voice_removed">Voz AutoMap removida</string>
     <string name="mapvm_opening_installer">A abrir o instalador de %1$s…</string>
-    <string name="mapvm_pan_to_area_first">Abra o mapa e desloque-se primeiro para uma área</string>
-    <string name="mapvm_offline_routing_ready">Percursos offline prontos: %1$s</string>
     <string name="mapvm_offline_routing_failed">Falha na transferência de percursos offline</string>
     <string name="mapvm_offline_routing_removed">Percursos offline removidos</string>
     <string name="mapvm_graphs_retired">Os percursos offline passaram para um formato mais pequeno. Transfira de novo as suas regiões em Definições, Mapas offline.</string>
@@ -466,20 +455,6 @@
     <string name="mapscreen_your_destination">o seu destino</string>
     <string name="mapvm_resume_waiting_gps">A aguardar o GPS para retomar a navegação…</string>
     <string name="mapvm_resume_failed">Não foi possível retomar a navegação</string>
-    <string name="update_available_title">O AutoMap %1$s está disponível</string>
-    <string name="update_downloading">Transferindo… %1$d%%</string>
-    <string name="update_later">Agora não</string>
-    <string name="update_install">Atualizar</string>
-    <string name="update_download_failed">A transferência da atualização falhou. Tente de novo mais tarde.</string>
-    <string name="update_car_title">Esta atualização vai retirar a AutoMap do Android Auto</string>
-    <string name="update_car_body">A AutoMap foi instalada da forma que o Android Auto aceita. Instalar esta atualização aqui substitui isso, e o carro deixa de mostrar a AutoMap até instalar o ficheiro com a ferramenta que usou da primeira vez (AAEnabler, King Installer).\n\nGuarde o ficheiro e instale-o dessa forma para o carro continuar a funcionar.</string>
-    <string name="update_car_save">Guardar o ficheiro</string>
-    <string name="update_car_anyway">Atualizar mesmo assim</string>
-    <string name="settings_update_auto">Procurar atualizações ao iniciar</string>
-    <string name="settings_update_auto_hint">Verifica o GitHub cerca de uma vez por dia e propõe versões mais recentes. Desliga se atualizas pelo Obtainium.</string>
-    <string name="settings_update_check_now">Procurar atualizações</string>
-    <string name="settings_update_checking">Verificando…</string>
-    <string name="settings_update_none">Você está na versão mais recente.</string>
     <string name="settings_place_pages">Páginas de locais</string>
     <plurals name="place_transit_stops">
         <item quantity="one">%1$d paragem</item>
@@ -522,12 +497,7 @@
     <string name="car_search">Pesquisar</string>
     <string name="car_search_hint">Digite para pesquisar um destino</string>
     <string name="car_go">Ir</string>
-    <string name="car_end">Terminar</string>
-    <string name="car_mute">Silenciar</string>
-    <string name="car_unmute">Ativar som</string>
     <string name="car_faster_route">Mais rápido −%1$d min</string>
-    <string name="car_pause">Pausar</string>
-    <string name="car_resume">Retomar</string>
     <string name="car_paused">Em pausa</string>
     <string name="car_along_route">Pesquisar ao longo da rota</string>
     <string name="car_along_none">Nada encontrado por perto</string>
@@ -568,8 +538,6 @@
         <item quantity="other">Guardar lista · %1$d locais</item>
     </plurals>
     <string name="map_list_saved">“%1$s” guardada nas suas listas</string>
-    <string name="settings_update_nightly">Incluir compilações nightly</string>
-    <string name="settings_update_nightly_hint">Atualizar para a nightly mais recente (pré-lançamento) em vez de apenas versões estáveis. As nightly são mais recentes mas menos testadas.</string>
     <string name="settings_lists_export_hint">Faça uma cópia das suas listas num ficheiro ou restaure-as noutro dispositivo. A opção de importação também aceita listas da pasta \"Salvos\" do Google Takeout (um ficheiro CSV por lista); cada local nela é pesquisado, pelo que é necessária uma ligação.</string>
     <string name="settings_lists_imported">%1$d lista(s) importada(s)</string>
     <string name="settings_places_imported">%1$d local(is) importado(s)</string>
@@ -584,12 +552,6 @@
         <item quantity="other">%1$d locais</item>
     </plurals>
     <string name="navservice_notif_eta">Chegada %1$s</string>
-    <string name="settings_advanced">Avançado</string>
-    <string name="settings_advanced_hint">Opções de que quase ninguém precisa.</string>
-    <string name="settings_developer">Programador</string>
-    <string name="settings_developer_hint">Ferramentas para demos, capturas de ecrã e testes. Desative-as para uso real.</string>
-    <string name="settings_browse_voices">Explorar vozes</string>
-    <string name="settings_browse_voices_hint">Transfira e alterne entre as vozes da AutoMap no dispositivo.</string>
     <string name="voice_capture_listening">A ouvir…</string>
     <string name="voice_capture_starting">A preparar…</string>
     <string name="voice_capture_done">Concluído</string>
@@ -600,7 +562,6 @@
     <string name="mapvm_closing_before_arrival">%1$s fecha às %2$s, antes de você chegar por volta das %3$s</string>
     <!-- format -->
     <string name="settings_voice_search_model">Voz AutoMap</string>
-    <string name="settings_voice_search_model_hint">A voz AutoMap transforma a fala numa pesquisa diretamente no telemóvel: sem outra app e sem enviar nada. Transferência única de %1$d MB.</string>
     <!-- format -->
     <string name="settings_voice_search_download">Transferir (%1$d MB)</string>
     <!-- format -->
@@ -611,7 +572,6 @@
     <string name="settings_voice_search_engine_title">Ao tocar no microfone</string>
     <string name="settings_voice_search_engine_auto">Voz AutoMap</string>
     <string name="settings_voice_search_engine_default">Padrão do Android</string>
-    <string name="settings_voice_search_engine_system">Outra app de voz</string>
     <string name="map_asr_offer_title">Pesquisa por voz</string>
     <string name="map_asr_offer_body">Transfere a voz AutoMap para ditar as tuas pesquisas. Corre inteiramente no telemóvel e não envia nada.</string>
     <string name="nav_precise_title">Localização precisa necessária</string>
@@ -643,9 +603,6 @@
     <string name="map_import_needs_google">Uma lista partilhada do Google Maps não pode ser aberta enquanto a AutoMap funciona sem a Google.</string>
     <string name="map_link_needs_google">\"Abrir ligações partilhadas do Google Maps\" está desligado em Definições &gt; Privacidade.</string>
     <string name="map_link_unreadable">Não foi possível abrir essa ligação.</string>
-    <string name="settings_performance">Desempenho</string>
-    <string name="settings_hub_performance_sub">O que carrega antecipadamente, desenho do mapa</string>
-    <string name="settings_performance_intro">Carregar as coisas antecipadamente torna-as instantâneas quando precisa delas, e até lá ocupa memória. As predefinições dependem de quanta memória este telemóvel tem.</string>
     <string name="settings_full_place_load">Carregar todas as fotos e avaliações</string>
     <string name="settings_full_place_load_hint">Desligado, um local carrega as primeiras fotos e a primeira página de avaliações, e Mais fotos ou Todas as avaliações vão buscar o resto. Ligado, cada local que abre percorre toda a galeria de fotos e até 50 avaliações, o que é mais lento e envia muitos mais pedidos à Google.</string>
     <string name="settings_speech_preload">Carregar a pesquisa por voz ao iniciar</string>
@@ -667,16 +624,12 @@
     <string name="settings_places">Locais</string>
     <string name="settings_privacy">Privacidade</string>
     <string name="settings_cameras_group">Câmaras</string>
-    <string name="settings_experiments">Experiências</string>
     <string name="settings_hub_places_sub">Origem dos locais, o que mostrar, páginas</string>
     <string name="settings_hub_appearance_sub">Tema, estilo do mapa, unidades, idioma</string>
     <string name="settings_hub_map_sub">Trânsito, transportes, camadas, edifícios 3D</string>
-    <string name="settings_hub_navigation_sub">Orientação, câmaras, verificações ao vivo</string>
     <string name="settings_hub_voice_sub">Instruções faladas e vozes</string>
     <string name="settings_hub_search_sub">Pesquisa por voz e modelos de fala</string>
     <string name="settings_hub_offline_sub">Mapas offline, rotas, lugares</string>
-    <string name="settings_hub_saved_sub">As suas listas, exportar, histórico de estacionamento</string>
-    <string name="settings_hub_privacy_sub">O que a Google recebe, limpar histórico</string>
     <string name="settings_hub_diagnostics_sub">Relatórios de falhas, viagens, modo demo, experiências</string>
     <string name="settings_hub_about_sub">Versão, atualizações, apoio</string>
     <string name="settings_theme_amoled">Preto AMOLED</string>
@@ -684,30 +637,9 @@
     <string name="place_review_less">Menos</string>
     <string name="settings_traffic_lights">Orientação por semáforos</string>
     <string name="settings_traffic_lights_hint">Referencias faladas: passe o semaforo e vire. So ingles, desligado por padrao.</string>
-    <string name="map_asr_downloading">Baixando o micro AutoMap Voice · %1$d %%</string>
-    <string name="map_asr_installing">Instalando o micro AutoMap Voice…</string>
     <string name="map_asr_waiting">Micro AutoMap Voice · aguardando a voz AutoMap</string>
-    <string name="mapscreen_filter_top_rated">4,0★</string>
-    <string name="mapscreen_section_recent_searches">Pesquisas recentes</string>
-    <string name="mapscreen_clear_recent_searches">Limpar pesquisas recentes</string>
-    <string name="root_diag_title">Ajudar a melhorar o AutoMap?</string>
-    <string name="root_diag_body">Ambos permanecem no seu telemóvel - nada é enviado a menos que o exporte. Altere qualquer um a qualquer momento nas Definições.</string>
-    <string name="root_diag_share_title">Partilhar diagnóstico</string>
-    <string name="root_diag_share_desc">Um breve registo local de pesquisas, percursos e erros.</string>
-    <string name="root_diag_trips_title">Guardar as minhas viagens</string>
-    <string name="root_diag_trips_desc">Regista os traços GPS de navegação para que as viagens possam ser reproduzidas para testes. Mais revelador - os seus percursos exatos.</string>
-    <string name="root_diag_save">Guardar escolhas</string>
-    <string name="root_voice_tts_title">Dizer as indicações em voz alta</string>
-    <string name="root_voice_tts_desc">Indicações faladas a cada curva. Recomendada. Transferência única de %1$d MB.</string>
     <!-- format -->
-    <string name="root_voice_mic_title">Pesquisar por voz</string>
-    <string name="root_voice_mic_desc">Dite as pesquisas sem escrever. Sem isto, o microfone usa o Google. Transferência única de %1$d MB.</string>
     <!-- format -->
-    <string name="root_voice_none_picked">Selecione uma opção ou escolha Agora não.</string>
-    <string name="root_offline_title">Mapas offline</string>
-    <string name="root_offline_body">O AutoMap obtém locais, pesquisa e direções do Google, por isso sem sinal só funcionam as áreas que transferiu. Configure uma área agora para ficar coberto quando perder a rede.</string>
-    <string name="root_offline_setup">Configurar offline</string>
-    <string name="mapvm_stop_added">Parada adicionada</string>
     <string name="shortcut_home">Casa</string>
     <string name="shortcut_work">Trabalho</string>
     <string name="settings_asr_engines_hint">A fala vira pesquisa no telefone. Nada e enviado. Escolha o motor do microfone.</string>
@@ -724,13 +656,6 @@
     <string name="street_view_move">Mover para aqui</string>
     <string name="street_view_dates">Ver outras datas</string>
     <string name="street_view_fullscreen">Alterar ecrã inteiro</string>
-    <string name="softkey_options">Opções</string>
-    <string name="softkey_search">Pesquisar</string>
-    <string name="softkey_recenter">Recentrar</string>
-    <string name="softkey_mute">Silenciar</string>
-    <string name="softkey_unmute">Ativar som</string>
-    <string name="softkey_move_map">Mover mapa</string>
-    <string name="softkey_stop_zoom">Parar zoom</string>
     <string name="voice_error_title">A pesquisa por voz não iniciou</string>
     <string name="voice_error_retry">Tentar novamente</string>
     <string name="voice_error_model">O modelo de voz não está pronto. Transfere-o novamente em Definições \u2192 Pesquisa.</string>
@@ -787,7 +712,6 @@
     <string name="settings_nav_trace_hint">Regista como a câmara do mapa se move durante a navegação, para poder diagnosticar um mapa trémulo ou instável. Não contém dados de localização, apenas direções, velocidades e tempos, por isso é seguro juntá-lo a um relatório de erro.</string>
     <string name="settings_nav_trace_export">Partilhar registo de navegação</string>
     <string name="settings_nav_trace_empty">Ainda sem registo. Navegue primeiro para algum lado.</string>
-    <string name="settings_voice_vela_name">Voz AutoMap (%1$s)</string>
     <string name="settings_voice_install_vela">Instalar a voz AutoMap (%1$d MB)</string>
     <string name="settings_voice_install_vela_hint">A voz de navegação recomendada. Reinstale-a aqui sempre que desaparecer ou uma transferência falhar.</string>
     <string name="settings_texture_render">Renderização de compatibilidade</string>
@@ -931,7 +855,6 @@
     <string name="navservice_channel_turns_name">Alertas de curva falados</string>
     <string name="download_notif_channel">Transferências</string>
     <string name="download_notif_title">A transferir %1$s</string>
-    <string name="download_label_update">atualização da AutoMap</string>
     <string name="download_label_map_data">dados do mapa</string>
     <string name="download_label_offline_places">locais offline</string>
     <string name="map_area_downloading">A guardar esta área para offline · %1$d%%</string>
@@ -948,11 +871,6 @@
     <string name="place_transit_tram">Elétrico</string>
     <string name="settings_parking_history_empty">Ainda sem estacionamentos guardados. Toque no botão P no mapa para guardar onde estacionou.</string>
     <string name="list_emoji_label">Escreva qualquer emoji</string>
-    <string name="settings_update_channel">Canal de atualizações</string>
-    <string name="settings_update_channel_stable">Estável (semanal)</string>
-    <string name="settings_update_channel_nightly">Nightly (diária)</string>
-    <string name="settings_update_channel_canary">Canary (versões em desenvolvimento)</string>
-    <string name="settings_update_channel_hint">O canal estável recebe uma versão testada por semana. A nightly recebe uma compilação em cada dia com alterações. A canary segue o trabalho em curso e pode falhar a qualquer momento.</string>
     <string name="settings_voice_volume">Volume das indicações</string>
     <string name="settings_voice_volume_softer">Mais baixo</string>
     <string name="settings_voice_volume_normal">Normal</string>
@@ -1062,11 +980,6 @@
     <string name="settings_puck_shape">Ícone de navegação</string>
     <string name="settings_puck_shape_arrow">Seta</string>
     <string name="settings_puck_shape_car">Carro</string>
-    <string name="settings_car_red">Vermelho</string>
-    <string name="settings_car_blue">Azul</string>
-    <string name="settings_car_white">Branco</string>
-    <string name="settings_car_green">Verde</string>
-    <string name="settings_car_yellow">Amarelo</string>
     <string name="settings_puck_shape_ufo">Óvni</string>
     <string name="settings_puck_shape_ship">Navio pirata</string>
     <string name="settings_puck_shape_duck">Patinho de borracha</string>
@@ -1151,7 +1064,6 @@
     <string name="place_icon_title">Ícone no mapa para %1$s</string>
     <string name="place_icon_default">Usar o ícone da lista</string>
     <string name="settings_map_theme_title">Mapa</string>
-    <string name="settings_map_theme_follow">Igual à aplicação</string>
     <string name="settings_map_theme_hint">O mapa à parte: ruas claras com a aplicação escura, ou ruas escuras com a aplicação clara. O modo de dia e de noite durante a condução continua a aplicar-se ao mapa.</string>
     <string name="route_saved_label">A sua rota: %1$s</string>
     <string name="route_save">Guardar esta rota</string>
@@ -1264,7 +1176,6 @@
     <string name="mapscreen_other_locations">Mostrar outras localizações</string>
     <string name="settings_other_locations_auto">Procurar outras localizações automaticamente</string>
     <string name="settings_other_locations_auto_hint">Quando uma pesquisa por nome dá um só local, pede também à Google as outras localizações. São mais alguns pedidos à Google em cada pesquisa desse tipo. Desligado, um botão \"Mostrar outras localizações\" faz isso quando lhe toca.</string>
-    <string name="mapscreen_view_map">Ver mapa</string>
     <string name="whatsnew_show_after_updates">Mostrar as novidades após as atualizações</string>
     <string name="replay_play">Reproduzir</string>
     <string name="replay_pause">Pausar</string>
@@ -1314,13 +1225,6 @@
     <string name="search_offline_recheck">Offline. Toque para verificar de novo</string>
     <string name="settings_turn_declutter">Simplificar o mapa nas curvas</string>
     <string name="settings_turn_declutter_hint">Enquanto o mapa roda numa curva, só ficam os nomes das ruas. Os locais, os sinais e as câmaras voltam assim que ele estabiliza. Mantém as curvas fluidas em telemóveis mais lentos.</string>
-    <string name="settings_softkeys">Teclas de função físicas</string>
-    <string name="settings_softkeys_hint">Faz zoom no mapa com as duas teclas de função do telemóvel. Só em telemóveis com teclado.</string>
-    <string name="settings_softkeys_calibrate">Calibrar teclas de função</string>
-    <string name="settings_softkeys_calibrate_hint">Se as teclas de função não fizerem zoom, toque aqui e prima a tecla de função esquerda e depois a direita, para a AutoMap aprender os códigos delas.</string>
-    <string name="map_zoom_mode_hint">Zoom:  ◀ afastar   ·   aproximar ▶      VOLTAR para sair</string>
-    <string name="map_move_mode_hint">Mover mapa:  ◀ ▲ ▼ ▶      VOLTAR para sair</string>
-    <string name="softkey_zoom_menu">Zoom (◀ − ▶ +)</string>
     <string name="exp_chooser_alts_same">Quase o mesmo tempo</string>
     <string name="exp_chooser_fewest_cams">menos câmaras</string>
     <string name="trip_shortcut_add">Adicionar ao ecrã inicial</string>
@@ -1443,7 +1347,6 @@
         <item quantity="many">%1$d locais não encontrados</item>
         <item quantity="other">%1$d locais não encontrados</item>
     </plurals>
-    <string name="settings_road_alerts_group">Alertas na estrada</string>
     <string name="settings_bridge_openings">Abertura de pontes</string>
     <string name="settings_bridge_openings_hint">Nos Países Baixos, o sistema indica quando uma ponte móvel no seu percurso está aberta ou com previsão de abertura, à medida que se aproxima da mesma. As informações sobre as aberturas planeadas e em curso são obtidas a partir dos dados de estradas abertas da NDW, consultados apenas quando a sua rota entra nos Países Baixos.</string>
     <string name="nav_bridge_open_ahead">Ponte à frente está aberta</string>

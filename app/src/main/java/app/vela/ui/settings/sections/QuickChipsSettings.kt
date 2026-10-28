@@ -42,30 +42,7 @@ import app.vela.ui.settings.SettingsGroup
 import app.vela.ui.settings.SettingsScaffold
 import app.vela.ui.settings.settingsAnchor
 
-/** The row on the Search page that opens [QuickChipsSettingsScreen]. */
-@Composable
-internal fun QuickChipsRow(onOpen: () -> Unit) {
-    val label = stringResource(R.string.settings_quick_chips)
-    Row(
-        Modifier.fillMaxWidth().settingsAnchor(label).dpadHighlight(DpadShape(10.dp)).dpadClickable(onClick = onOpen)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f).padding(end = 12.dp)) {
-            Text(label, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                stringResource(R.string.settings_quick_chips_sub),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 2.dp),
-            )
-        }
-        Icon(Sym.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-/**
- * Settings > Search > Quick search buttons (issue #779): one row per chip in the user's order,
+/** Settings > Search > Quick search buttons (issue #779): one row per chip in the user's order,
  * a switch that takes it off the rows and a handle that moves it. Hidden chips keep their place
  * in the list, so switching one back on puts it where it was. Reset puts the default back.
  */

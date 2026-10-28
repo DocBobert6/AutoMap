@@ -58,7 +58,7 @@ object StreamedSpeedLimit {
     }
 
     private fun nearest(lines: List<MvtLines.Line>, lat: Double, lng: Double): Double? {
-        val k = 111_320.0 * cos(Math.toRadians(lat))
+        val k = app.vela.core.model.GeoConstants.M_PER_DEG * cos(Math.toRadians(lat))
         // Local time on the phone: a timed limit ("130 @ (19:00-06:00)") is read at each lookup,
         // so the badge changes at 19:00 without the tile being read again.
         val now = java.time.LocalDateTime.now()
@@ -71,8 +71,8 @@ object StreamedSpeedLimit {
             ) ?: continue
             val pts = l.points
             for (i in 0 until pts.size - 1) {
-                val ax = (pts[i].lng - lng) * k; val ay = (pts[i].lat - lat) * 111_320.0
-                val bx = (pts[i + 1].lng - lng) * k; val by = (pts[i + 1].lat - lat) * 111_320.0
+                val ax = (pts[i].lng - lng) * k; val ay = (pts[i].lat - lat) * app.vela.core.model.GeoConstants.M_PER_DEG
+                val bx = (pts[i + 1].lng - lng) * k; val by = (pts[i + 1].lat - lat) * app.vela.core.model.GeoConstants.M_PER_DEG
                 val dx = bx - ax; val dy = by - ay
                 val len = dx * dx + dy * dy
                 val t = if (len == 0.0) 0.0 else (-(ax * dx + ay * dy) / len).coerceIn(0.0, 1.0)

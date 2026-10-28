@@ -19,7 +19,7 @@ import app.vela.ui.settings.SettingsGroup
 import app.vela.ui.settings.ToggleRow
 
 // The switches that decide what Google is asked. Each is one row here, drawn on its own page
-// and again in [GoogleUsesSection] (Settings > Privacy, and the first run). The state lives in
+// and again in the former GoogleUsesSection (Settings > Privacy, and the first run, removed 2026-10-28). The state lives in
 // process-wide holders, so the two copies stay in step.
 
 /** Whether a tapped open place is looked up on Google. Only meaningful while open places draw. */
@@ -145,36 +145,3 @@ internal fun LiveRechecksRow(vm: app.vela.ui.map.MapViewModel, compact: Boolean 
     )
 }
 
-/**
- * Every switch that decides what Google is asked, in one list: where the map's places come from,
- * what a place page loads, and what a route and a drive ask. Shown in Settings > Privacy while
- * Google is on, and on the first run behind "Choose what Google is used for". Labels only: each
- * row's explanation is on its own page, and here it would bury the list.
- */
-@Composable
-internal fun GoogleUsesSection(vm: app.vela.ui.map.MapViewModel, topRow: Modifier = Modifier, title: Boolean = true) {
-    if (title) SectionTitle(stringResource(R.string.settings_google_uses))
-    Hint(stringResource(R.string.settings_google_uses_hint))
-    Spacer(Modifier.height(4.dp))
-    PlacesSourceGroup(topRow, compact = true)
-    Spacer(Modifier.height(8.dp))
-    SettingsGroup(title = stringResource(R.string.settings_place_pages)) {
-        if (app.vela.ui.MapPoiPrefs.showPois.value && app.vela.ui.MapPoiPrefs.openPlaces) {
-            TappedLookupRow(compact = true)
-            GroupDivider()
-        }
-        ReviewAndPhotoRows(compact = true)
-        GroupDivider()
-        FullPlaceLoadRow(compact = true)
-        GroupDivider()
-        OtherLocationsRow(compact = true)
-    }
-    Spacer(Modifier.height(8.dp))
-    SettingsGroup(title = stringResource(R.string.settings_google_uses_traffic)) {
-        RouteTrafficOnTapRow(vm, compact = true)
-        GroupDivider()
-        LiveRechecksRow(vm, compact = true)
-        GroupDivider()
-        LiveTrafficRow(compact = true)
-    }
-}

@@ -11,6 +11,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import app.vela.core.model.Place
+import app.vela.ui.QuickCategories
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
@@ -45,6 +46,8 @@ class SearchCarScreen(
     private var contacts: List<ContactAddresses.Entry> = emptyList()
     private var searching = false
     private var searchJob: Job? = null
+    /** The last query text, blank until the driver has searched at all. */
+    private var lastQuery: String? = null
 
     init {
         // Searched once the screen exists, so the first invalidate reaches the host.
@@ -70,7 +73,22 @@ class SearchCarScreen(
         } else {
             val list = ItemList.Builder()
             if (results.isEmpty() && contacts.isEmpty() && queries.isEmpty()) {
-                list.setNoItemsMessage(carContext.getString(app.vela.R.string.car_search_hint))
+                if (lastQuery.isNullOrBlank()) {
+                    // No search yet: the quick-category chips, so a driver taps a need
+                    // instead of typing (audit A-11). A searched-but-empty query keeps
+                    // the hint, so "nothing found" never looks like "not searched".
+                    QuickCategories.all().take(6).forEach { chip ->
+                        list.addItem(
+                            Row.Builder()
+                                .setTitle(carContext.getString(chip.label))
+                                .addText(carContext.getString(app.vela.R.string.car_search))
+                                .setOnClickListener { runSearch(chip.query, submit = true) }
+                                .build(),
+                        )
+                    }
+                } else {
+                    list.setNoItemsMessage(carContext.getString(app.vela.R.string.car_search_hint))
+                }
             } else {
                 contacts.forEach { e ->
                     list.addItem(
@@ -113,6 +131,7 @@ class SearchCarScreen(
     }
 
     private fun runSearch(text: String, submit: Boolean) {
+        lastQuery = text
         searchJob?.cancel()
         if (text.isBlank()) {
             results = emptyList(); queries = emptyList(); contacts = emptyList(); searching = false; invalidate(); return

@@ -149,14 +149,6 @@ class TripStore @Inject constructor(
         }
     }.getOrDefault(emptyList())
 
-    /**
-     * Re-read the route saved alongside a trip (the same blue line the user drove), or null if it
-     * wasn't recorded — e.g. an older trip from before route-saving, in which case the caller
-     * re-routes. Reconstructs a [Route] with a single leg holding all the maneuvers; enough for
-     * [app.vela.core.nav.NavEngine] to replay turn-by-turn identically.
-     */
-    fun loadRoute(id: String): Route? =
-        runCatching { TripLog.parseRoute(File(dir, "$id.csv").readLines()) }.getOrNull()
 
     /** The raw CSV for a saved trip, for export/share (or null if missing). */
     fun rawCsv(id: String): String? = runCatching { File(dir, "$id.csv").readText() }.getOrNull()

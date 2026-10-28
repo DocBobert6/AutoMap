@@ -64,6 +64,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.background
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import org.maplibre.android.geometry.LatLng as MLLatLng
 import org.maplibre.android.geometry.LatLngBounds as MLLatLngBounds
@@ -772,7 +773,7 @@ private fun flightCb() = object : org.maplibre.android.maps.MapLibreMap.Cancelab
     override fun onCancel() { if (flightDepth[0] > 0) flightDepth[0]-- }
 }
 
-// The painted-roads test dial's own client (Overpass or `debug.vela.paintUrl`, never Google). One
+// The painted-roads dial's own client (Overpass or `debug.vela.paintUrl`, never Google). One
 // per process, built on the first fetch: a client per style load sets up TLS on the main thread at
 // every theme flip, for a dial that is off outside a developer's phone.
 private val paintedRoadsHttp by lazy { okhttp3.OkHttpClient() }
@@ -2831,8 +2832,8 @@ fun VelaMapView(
                 // A target past FOLLOW_JUMP_M (a stale last-known spot replaced by a fresh fix, a
                 // relaunch far from where the app last was) is a jump, not motion: easing across it
                 // dragged the map through every tile in between.
-                val farLat = (tgtLat - browseCam[0]) * 111_320.0
-                val farLng = (tgtLng - browseCam[1]) * 111_320.0 * kotlin.math.cos(Math.toRadians(tgtLat))
+                val farLat = (tgtLat - browseCam[0]) * app.vela.core.model.GeoConstants.M_PER_DEG
+                val farLng = (tgtLng - browseCam[1]) * app.vela.core.model.GeoConstants.M_PER_DEG * kotlin.math.cos(Math.toRadians(tgtLat))
                 val far2 = farLat * farLat + farLng * farLng
                 if (far2 > FOLLOW_JUMP_M * FOLLOW_JUMP_M) {
                     browseCam[0] = tgtLat; browseCam[1] = tgtLng
@@ -2884,9 +2885,9 @@ fun VelaMapView(
                     val kLook = (1f - kotlin.math.exp(-dt / FREE_LOOKAHEAD_TAU_S)).toDouble()
                     browseDrive[3] += ((browseDrive[0] * 5.0).coerceAtMost(250.0) - browseDrive[3]) * kLook
                     val lr = Math.toRadians(crs)
-                    lookLat = camLat + browseDrive[3] * kotlin.math.cos(lr) / 111_320.0
+                    lookLat = camLat + browseDrive[3] * kotlin.math.cos(lr) / app.vela.core.model.GeoConstants.M_PER_DEG
                     lookLng = camLng + browseDrive[3] * kotlin.math.sin(lr) /
-                        (111_320.0 * kotlin.math.cos(Math.toRadians(camLat)).coerceAtLeast(0.1))
+                        (app.vela.core.model.GeoConstants.M_PER_DEG * kotlin.math.cos(Math.toRadians(camLat)).coerceAtLeast(0.1))
                     // Settling while any of the three still moves visibly. It was simply true here,
                     // so a car parked after a drive with no route kept the loop (and the map) at
                     // 60 fps for as long as the app stayed open.
@@ -3114,7 +3115,7 @@ fun VelaMapView(
     // Re-keyed on routePolyline too: a mid-nav reroute swaps the route geometry, so the
     // ticker relaunches with the fresh route + cum and re-acquires the puck onto it at the
     // next fix (engaged=false) instead of gliding along stale geometry.
-    // PAINTED ROADS TEST (developer dial `debug.vela.tune.paintedRoads`, user 2026-10-03): lane lines,
+    // PAINTED ROADS (on by default since Build 11; developer dial `debug.vela.tune.paintedRoads`, user 2026-10-03, only picks the source): lane lines,
     // center lines, bike lanes, crosswalks, stop lines, turn arrows and medians from OpenStreetMap,
     // drawn at real scale from z16.5 (PaintedRoads, PaintedRoadsLayer). 1 = the California bake,
     // streamed; 2 = built on the phone for a ~650 m box (Overpass, or `debug.vela.paintUrl`).
@@ -3124,6 +3125,7 @@ fun VelaMapView(
         var marks: List<app.vela.core.data.PaintedRoads.Mark> = emptyList()
         var mode = 0
         while (true) {
+            ensureActive() // audit 2026-10-28: cancellation must propagate, not become a silent null inside runCatching
             val dial = if (app.vela.ui.PaintedRoadsPref.on.value) app.vela.ui.AppTune.local("paintedRoads")?.toInt() ?: 0 else 0
             if (dial != mode) { runCatching { PaintedRoadsLayer.clear(style) }; box = null; marks = emptyList(); mode = dial }
             when (dial) {
@@ -3453,7 +3455,7 @@ fun VelaMapView(
                         !navUserTilt[0].isNaN() -> navUserTilt[0]
                         else -> 55.0
                     }
-                    val speedZoom = NavFraming.zoom(18.5 - (navZoomSpeed[0] / 30f) * (18.5 - 15.8), navPuck.framer.zoomOffset) // even closer default (user 2026-07-15, was 18.0-15.5); speed still zooms out
+                    val speedZoom = NavFraming.speedZoom(navZoomSpeed[0], navPuck.framer.zoomOffset)
                     // MapLibre holds the pitch under a ceiling set by the top padding (SPEC 4.7, Tilt):
                     // the camera then sits below the eased target. The turn framing takes the tilt
                     // the camera really holds, or it zooms in for ground the rows never reach.
@@ -5451,7 +5453,7 @@ fun VelaMapView(
                             val density = mapView.resources.displayMetrics.density
                             val screenDp = (mapView.width / density).coerceAtLeast(1f)
                             val mpd = (acc.toDouble() * 2 / 0.7) / screenDp
-                            (Math.log((78271.517 * Math.cos(Math.toRadians(t.lat))) / mpd) / Math.log(2.0)).coerceIn(3.0, 15.0)
+                            (Math.log((app.vela.core.model.GeoConstants.M_PER_PX_Z0 * Math.cos(Math.toRadians(t.lat))) / mpd) / Math.log(2.0)).coerceIn(3.0, 15.0)
                         }
                         cameraBottomInsetPx > 0 || cameraLeftInsetPx > 0 -> app.vela.core.config.CalibrationStore.latest.tune("browseZoomFocus", 16.5)
                         // 15.5 (~1000ft), matching the launch-center and search flies - the tap
@@ -5520,7 +5522,7 @@ fun VelaMapView(
                         lastNavBearing = brg
                         val rawSp = (mySpeed ?: 0f).coerceIn(0f, 30f)
                         navZoomSpeed[0] += (rawSp - navZoomSpeed[0]) * 0.3f
-                        val speedZoom = NavFraming.zoom(18.5 - (navZoomSpeed[0] / 30f) * (18.5 - 15.8), navPuck.framer.zoomOffset) // even closer default (user 2026-07-15, was 18.0-15.5); speed still zooms out
+                        val speedZoom = NavFraming.speedZoom(navZoomSpeed[0], navPuck.framer.zoomOffset)
                         // The same zoom to the next turn as the ticker's, so a reroute does not
                         // zoom in while the car is off the line and back out when it is on the new one.
                         val zoom = when {
@@ -6899,8 +6901,8 @@ private fun osmFillIn(map: MapLibreMap, style: Style) {
     val tgt = cam.target
     if (tgt != null && !fillLast[0].isNaN()) {
         val movedPx = kotlin.math.hypot(
-            (tgt.latitude - fillLast[0]) * 111_320.0,
-            (tgt.longitude - fillLast[1]) * 111_320.0 * kotlin.math.cos(Math.toRadians(tgt.latitude)),
+            (tgt.latitude - fillLast[0]) * app.vela.core.model.GeoConstants.M_PER_DEG,
+            (tgt.longitude - fillLast[1]) * app.vela.core.model.GeoConstants.M_PER_DEG * kotlin.math.cos(Math.toRadians(tgt.latitude)),
         ) / map.projection.getMetersPerPixelAtLatitude(tgt.latitude)
         val dz = kotlin.math.abs(cam.zoom - fillLast[2])
         if (now - fillLastAt[0] < 2_500L || (movedPx < map.width / 5f && dz < 0.4)) return
@@ -7127,8 +7129,8 @@ private val NAV_LABEL_SLOW_CLASSES = arrayOf("tertiary", "minor")
  *  Planar maths at the window's latitude: at a few hundred meters the error is centimeters. */
 private fun crossLabelPoint(line: List<Pair<Double, Double>>, window: List<LatLng>, touchM: Double = 25.0, avoid: List<LatLng> = emptyList()): Pair<Double, Double>? {
     if (line.size < 2 || window.size < 2) return null
-    val k = Math.cos(Math.toRadians(window[0].lat)) * 111_320.0 // meters per degree of longitude
-    val m = 111_320.0 // per degree of latitude
+    val k = Math.cos(Math.toRadians(window[0].lat)) * app.vela.core.model.GeoConstants.M_PER_DEG // meters per degree of longitude
+    val m = app.vela.core.model.GeoConstants.M_PER_DEG // per degree of latitude
     fun x(lng: Double) = lng * k
     fun y(lat: Double) = lat * m
     // Street as meters, with cumulative length.
@@ -8672,7 +8674,7 @@ private fun expInterp(stops: FloatArray, z: Double, base: Double = 1.2): Double 
 }
 
 /** Meters per dp at zoom 0 and 40 degrees latitude (MapLibre's 512 px tiles), see [widenStreets]. */
-private val M_PER_DP_Z0 = 78271.517 * Math.cos(Math.toRadians(40.0))
+private val M_PER_DP_Z0 = app.vela.core.model.GeoConstants.M_PER_PX_Z0 * Math.cos(Math.toRadians(40.0))
 
 private fun roadWidthScale(): Double = (app.vela.ui.AppTune.local("roadWidthScale")
     ?: app.vela.core.config.CalibrationStore.latest.tune("roadWidthScale", 1.0)).coerceIn(0.0, 3.0)
@@ -9736,8 +9738,8 @@ private fun setMeSource(style: Style, p: LatLng, bearing: Float) {
  *  geometry (drawn in real meters, so it grows and shrinks with the zoom like the world does). */
 private fun accuracyCircle(center: LatLng, radiusM: Double): org.maplibre.geojson.Polygon {
     val latR = Math.toRadians(center.lat)
-    val dLat = radiusM / 111_320.0
-    val dLng = radiusM / (111_320.0 * Math.cos(latR)).coerceAtLeast(1.0)
+    val dLat = radiusM / app.vela.core.model.GeoConstants.M_PER_DEG
+    val dLng = radiusM / (app.vela.core.model.GeoConstants.M_PER_DEG * Math.cos(latR)).coerceAtLeast(1.0)
     val pts = (0..64).map { i ->
         val a = 2.0 * Math.PI * i / 64
         Point.fromLngLat(center.lng + dLng * Math.sin(a), center.lat + dLat * Math.cos(a))
@@ -9752,8 +9754,8 @@ private fun accuracyCircle(center: LatLng, radiusM: Double): org.maplibre.geojso
 private fun nearestStreetName(map: MapLibreMap, lat: Double, lng: Double): String? {
     val src = map.style?.let { st -> basemapSrc(st)?.let { st.getSourceAs<org.maplibre.android.style.sources.VectorSource>(it) } } ?: return null
     val feats = runCatching { src.querySourceFeatures(arrayOf("transportation_name"), null) }.getOrNull() ?: return null
-    val mLat = 111_320.0
-    val mLng = 111_320.0 * kotlin.math.cos(Math.toRadians(lat))
+    val mLat = app.vela.core.model.GeoConstants.M_PER_DEG
+    val mLng = app.vela.core.model.GeoConstants.M_PER_DEG * kotlin.math.cos(Math.toRadians(lat))
     fun segDist2(ax: Double, ay: Double, bx: Double, by: Double): Double {
         // meters^2 from the tap to segment a-b (equirectangular-scaled)
         val px = 0.0; val py = 0.0

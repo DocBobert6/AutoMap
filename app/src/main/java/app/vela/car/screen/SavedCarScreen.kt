@@ -12,7 +12,9 @@ import app.vela.core.model.LatLng
 import app.vela.core.model.ShortcutKind
 
 /**
- * Every saved place, Home and Work first. The landing screen shows only six destinations mixed
+ * Every saved place, Home and Work first, then recent places (audit A-04; saved ROUTES stay
+ * phone-only — wiring them into the car needs CarAppService changes, which are out of scope
+ * for the audit fix build). The landing screen shows only six destinations mixed
  * with recents; this is the whole list. A row previews a route to the place.
  */
 class SavedCarScreen(carContext: CarContext, private val deps: CarDeps) : Screen(carContext) {
@@ -26,6 +28,7 @@ class SavedCarScreen(carContext: CarContext, private val deps: CarDeps) : Screen
                 add(Triple(carContext.getString(app.vela.R.string.car_work), it.address, it.location))
             }
             deps.savedPlaces.saved().forEach { add(Triple(it.name, it.address, it.location)) }
+            deps.recentPlaces.recent().forEach { add(Triple(it.place.name, it.place.address, it.place.location)) }
         }.distinctBy { it.third.lat to it.third.lng }
 
         // The host says how many rows a list may hold; rows past it are not shown.

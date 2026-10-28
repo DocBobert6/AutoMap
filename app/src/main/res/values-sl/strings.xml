@@ -30,8 +30,6 @@
     <string name="settings_app_name_generic_hint">Namesto imena AutoMap bo pod ikono prikazano samo Zemljevidi. Po spremembi bo morda treba znova dodati bližnjico na začetni zaslon.</string>
     <string name="settings_dynamic_color">Barve Material You</string>
     <string name="settings_dynamic_color_hint">Barve gumbov in poudarkov prilagodi ozadju telefona. Barve zemljevida ostanejo nespremenjene.</string>
-    <string name="settings_map_style">Slog zemljevida</string>
-    <string name="settings_map_style_hint">OpenFreeMap deluje brez ključa API.</string>
     <string name="settings_units">Merske enote</string>
     <string name="settings_clock">Ura</string>
     <string name="settings_clock_system">Enako kot na telefonu</string>
@@ -155,7 +153,6 @@
     <string name="settings_nav_trace_hint">Beleži premikanje kamere zemljevida med navigacijo za odkrivanje zatikanja. Ne vsebuje lokacijskih podatkov, temveč le smeri, hitrosti in časovne podatke.</string>
     <string name="settings_nav_trace_export">Deli dnevnik navigacije</string>
     <string name="settings_nav_trace_empty">Dnevnik je še prazen. Najprej zaženite navigacijo.</string>
-    <string name="settings_voice_vela_name">Glas AutoMap (%1$s)</string>
     <string name="settings_voice_install_vela">Namesti glas AutoMap (%1$d MB)</string>
     <string name="settings_voice_install_vela_hint">Priporočeni glas za navigacijo. Če izgine ali prenos ne uspe, ga lahko tukaj znova namestite.</string>
     <string name="settings_texture_render">Združljivostni način izrisovanja</string>
@@ -188,7 +185,6 @@
     <string name="area_pick_too_large_plain">Območje je preveliko za en prenos. Zemljevid nekoliko povečajte.</string>
     <string name="settings_offline_delete_cells">Izbriši te dele</string>
     <string name="settings_area_confirm_region_have">Navodila za pot in kraji za %1$s so že preneseni.</string>
-    <string name="settings_offline_no_areas">Ni še shranjenih območij.</string>
     <string name="settings_offline_addresses_missing">Območja, shranjena pred to posodobitvijo, ne vsebujejo naslovov. Posodobite jih za iskanje in navigacijo do naslovov brez povezave.</string>
     <string name="settings_offline_addresses_update">Posodobi shranjena območja</string>
     <string name="settings_offline_delete_area">Izbriši to območje brez povezave</string>
@@ -236,7 +232,6 @@
     <string name="settings_places_shared_pack">Kraji pokrivajo celotno regijo %1$s (%2$s)</string>
     <string name="settings_routing_places_downloading">Shranjevanje krajev · %1$d%%</string>
     <string name="settings_get_places">Prenesi kraje</string>
-    <string name="settings_update_places">Posodobi kraje</string>
     <string name="settings_routing_update_available">Nameščeno · na voljo je posodobitev krajev</string>
     <string name="settings_routing_size_installed_here">Po namestitvi približno %1$s · vključuje vašo lokacijo</string>
     <string name="settings_routing_size_installed">Po namestitvi približno %1$s</string>
@@ -259,7 +254,6 @@
     <string name="settings_downloaded_title">Preneseno</string>
     <string name="settings_downloaded_none">Nič še ni preneseno. Shranite trenutno območje ali spodaj izberite državo oziroma regijo.</string>
     <string name="settings_downloaded_area">Shranjeno območje</string>
-    <string name="settings_region_group_title">Celotna regija %1$s</string>
     <string name="settings_region_group_size">%1$d delov, po namestitvi približno %2$s</string>
     <string name="settings_region_group_partial">Nameščenih %1$d od %2$d delov, skupaj približno %3$s</string>
     <string name="settings_region_group_installed">Nameščenih vseh %1$d delov</string>
@@ -369,10 +363,8 @@
     <string name="settings_voice_row_use">Uporabi</string>
     <string name="settings_voice_row_remove">Odstrani %1$s</string>
     <string name="place_photo_number">Fotografija %1$d</string>
-    <string name="place_photo_category_all">Vse</string>
     <string name="place_saved">Shranjeno</string>
     <string name="place_save">Shrani</string>
-    <string name="place_more_options">Več možnosti</string>
     <string name="place_set_as_home">Nastavi kot dom</string>
     <string name="place_set_as_work">Nastavi kot službo</string>
     <string name="place_close">Zapri</string>
@@ -515,7 +507,6 @@
     <string name="update_notes_hide">Skrij novosti</string>
     <string name="place_name_copied">Ime kopirano</string>
     <string name="place_link_copied">Povezava kopirana</string>
-    <string name="place_share_gmaps_link">Povezava Google Zemljevidov</string>
     <string name="place_share_map_pin">Oznaka na zemljevidu (geo:)</string>
     <string name="place_open_other_app">Odpri v drugi aplikaciji za zemljevide</string>
     <string name="place_share_coordinates">Koordinate</string>
@@ -561,7 +552,6 @@
     <string name="mapscreen_more_results">Več rezultatov</string>
     <string name="mapscreen_other_locations">Prikaži druge lokacije</string>
     <string name="settings_other_locations_auto">Samodejno poišči druge lokacije</string>
-    <string name="mapscreen_view_map">Prikaži zemljevid</string>
     <string name="intent_home_unset">Najprej nastavi dom (na strani za iskanje pod iskalno vrstico)</string>
     <string name="intent_work_unset">Najprej nastavi službo (na strani za iskanje pod iskalno vrstico)</string>
     <string name="intent_eta_not_navigating">Najprej začni vožnjo in nato vprašaj znova</string>
@@ -654,7 +644,6 @@
     <string name="search_offline">Brez povezave</string>
     <string name="search_clear_cd">Počisti iskanje</string>
     <string name="search_settings_cd">Nastavitve</string>
-    <string name="mapvm_offline_results">Rezultati brez povezave</string>
     <string name="mapvm_search_failed">Iskanje ni uspelo</string>
     <string name="mapvm_dropped_pin">Označena točka</string>
     <string name="mapvm_no_transit_routes">Ni najdenih povezav javnega prevoza</string>
@@ -679,7 +668,6 @@
     <string name="mapvm_share_trip_chooser">Deli potovanje</string>
     <string name="mapvm_voice_sample">Čez približno štiristo metrov zavij desno na Glavno ulico.</string>
     <string name="mapvm_vela_voice_removed">Glas AutoMap je odstranjen</string>
-    <string name="mapvm_pan_to_area_first">Najprej odpri zemljevid in ga premakni na želeno območje</string>
     <string name="mapvm_offline_routing_failed">Prenos podatkov za navigacijo brez povezave ni uspel</string>
     <string name="mapvm_offline_routing_removed">Podatki za navigacijo brez povezave so odstranjeni</string>
     <string name="navservice_notif_title_arrived">Prispeli ste</string>
@@ -690,22 +678,12 @@
     <string name="navservice_notif_action_end">Končaj</string>
     <string name="navservice_channel_name">Navigacija</string>
     <string name="navservice_channel_turns_name">Govorna opozorila za zavoje</string>
-    <string name="update_later">Ne zdaj</string>
-    <string name="update_install">Posodobi</string>
-    <string name="update_download_failed">Prenos posodobitve ni uspel. Poskusi znova pozneje.</string>
-    <string name="update_car_title">Ta posodobitev bo odstranila Velo iz Android Auto</string>
-    <string name="update_car_save">Shrani datoteko</string>
-    <string name="update_car_anyway">Vseeno posodobi</string>
     <string name="download_notif_channel">Prenosi</string>
-    <string name="download_label_update">Posodobitev Vele</string>
     <string name="download_label_map_data">podatki zemljevida</string>
     <string name="download_label_offline_places">kraji brez povezave</string>
     <string name="offline_area_saved">To območje je shranjeno za uporabo brez povezave</string>
     <string name="offline_area_failed">Prenos za uporabo brez povezave ni uspel. Poskusi znova pozneje.</string>
     <string name="offline_area_too_large">Območje je preveliko. Povečaj zemljevid in shrani manjše območje.</string>
-    <string name="settings_update_auto">Ob zagonu preveri posodobitve</string>
-    <string name="settings_update_check_now">Preveri posodobitve</string>
-    <string name="settings_update_checking">Preverjanje …</string>
     <string name="settings_place_pages">Strani krajev</string>
     <string name="place_transit_tickets">Vozovnice in informacije</string>
     <string name="route_detail_unavailable">Podrobnosti poti niso na voljo</string>
@@ -729,11 +707,6 @@
     <string name="car_search">Išči</string>
     <string name="car_search_hint">Vnesi cilj za iskanje</string>
     <string name="car_go">Začni</string>
-    <string name="car_end">Končaj</string>
-    <string name="car_mute">Utišaj</string>
-    <string name="car_unmute">Vklopi zvok</string>
-    <string name="car_pause">Začasno ustavi</string>
-    <string name="car_resume">Nadaljuj</string>
     <string name="car_paused">Začasno ustavljeno</string>
     <string name="car_along_route">Išči ob poti</string>
     <string name="car_along_none">V bližini ni rezultatov</string>
@@ -762,8 +735,6 @@
     <string name="map_parking_earlier">Prejšnja parkirna mesta</string>
     <string name="map_parking_clear">Odstrani parkirno mesto</string>
     <string name="map_parking_moved">Parkirno mesto je premaknjeno sem</string>
-    <string name="settings_performance">Zmogljivost</string>
-    <string name="settings_hub_performance_sub">Vnaprejšnje nalaganje in izris zemljevida</string>
     <string name="settings_full_place_load">Naloži vse fotografije in ocene</string>
     <string name="settings_speech_preload">Ob zagonu naloži glasovno iskanje</string>
     <string name="settings_google_uses">Za kaj se uporablja Google</string>

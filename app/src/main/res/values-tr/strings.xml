@@ -30,8 +30,6 @@
     <string name="settings_app_name_generic_hint">Varsayılan görünüm için launcher simgesini AutoMap Haritalar yerine düz Haritalar olarak gösterir. Değişiklikten sonra ana ekran kısayolunu yeniden eklemeniz gerekebilir.</string>
     <string name="settings_dynamic_color">Material You renkleri</string>
     <string name="settings_dynamic_color_hint">Duvar kağıdınızdaki düğmeleri ve vurguları renklendirir. Harita nötr kalır.</string>
-    <string name="settings_map_style">Harita stili</string>
-    <string name="settings_map_style_hint">OpenFreeMap, API anahtarına gerek duymadan çalışır.</string>
     <string name="settings_units">Birimler</string>
     <string name="settings_clock">Saat</string>
     <string name="settings_clock_system">Telefonla aynı</string>

@@ -670,7 +670,7 @@ class CarMapRenderer(
         visible?.takeIf { !it.isEmpty && it.width() > 0 && it.height() > 0 } ?: Rect(0, 0, width, height)
 
     /** Ground meters per surface pixel at [lat] for the current zoom (MapLibre's 512 px tiles). */
-    private fun metersPerPixel(lat: Double): Double = 78271.517 * cos(Math.toRadians(lat)) / Math.pow(2.0, zoom)
+    private fun metersPerPixel(lat: Double): Double = app.vela.core.model.GeoConstants.M_PER_PX_Z0 * cos(Math.toRadians(lat)) / Math.pow(2.0, zoom)
 
     /** Moves [center] by a screen offset in surface pixels: right is east, down is south. A pan
      *  always draws north-up (following is off), so no heading needs rotating in. */
@@ -742,8 +742,8 @@ class CarMapRenderer(
     }
 
     /** AutoMap (Build 9, shared with Build 14): the next non-quiet maneuver and the
-     *  car's distance to it, or null with no route / no fix. Mirrors
-     *  NavTurnTarget.pointFor's quiet-skip so the scored maneuver is the one the
+     *  car's distance to it, or null with no route / no fix. Uses
+     *  NavTurnTarget.isQuiet, the same quiet-skip as pointFor so the scored maneuver is the one the
      *  banner and the turn framing are about. */
     private fun nextNonQuietManeuver(): Pair<app.vela.core.model.Maneuver, Double>? {
         val st = navSession.state.value
@@ -752,10 +752,7 @@ class CarMapRenderer(
         var i = st.nav.stepIndex
         while (i < route.maneuvers.size) {
             val m = route.maneuvers[i]
-            val quiet = (m.type == app.vela.core.model.ManeuverType.CONTINUE ||
-                m.type == app.vela.core.model.ManeuverType.STRAIGHT) &&
-                !app.vela.core.model.continueHasGenuineFork(m.lanes)
-            if (!quiet) break
+            if (!app.vela.ui.map.NavTurnTarget.isQuiet(m)) break
             i++
         }
         val m = route.maneuvers.getOrNull(i) ?: return null
@@ -1638,7 +1635,7 @@ class CarMapRenderer(
             val d = hypot(px - projx, py - projy)
             if (d < best) { best = d; bx = projx; by = projy }
         }
-        if (best * 111_320.0 > SNAP_MAX_M) return null // too far from the route → keep the raw fix
+        if (best * app.vela.core.model.GeoConstants.M_PER_DEG > SNAP_MAX_M) return null // too far from the route → keep the raw fix
         return LatLng(by, bx / cosLat) // unproject the equirectangular point back to lat/lng
     }
 

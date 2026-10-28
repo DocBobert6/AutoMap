@@ -52,8 +52,8 @@ internal class FollowEstimator {
         if (lat.isNaN() || !moving || nowMs - fixAtMs > FRESH_MS) return
         val m = speed * dtSec
         val br = Math.toRadians(course)
-        lat += m * cos(br) / 111_320.0
-        lng += m * sin(br) / (111_320.0 * cos(Math.toRadians(lat)).coerceAtLeast(0.1))
+        lat += m * cos(br) / app.vela.core.model.GeoConstants.M_PER_DEG
+        lng += m * sin(br) / (app.vela.core.model.GeoConstants.M_PER_DEG * cos(Math.toRadians(lat)).coerceAtLeast(0.1))
         if (pendLeftS > 0.0) {
             val f = (dtSec / pendLeftS).coerceAtMost(1.0)
             lat += pendLat * f; lng += pendLng * f

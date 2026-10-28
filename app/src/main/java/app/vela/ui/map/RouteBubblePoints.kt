@@ -40,8 +40,8 @@ internal object RouteBubblePoints {
     }
 
     internal fun distM(a: LatLng, b: LatLng): Double {
-        val dy = (a.lat - b.lat) * 111_320.0
-        val dx = (a.lng - b.lng) * 111_320.0 * kotlin.math.cos(Math.toRadians(a.lat))
+        val dy = (a.lat - b.lat) * app.vela.core.model.GeoConstants.M_PER_DEG
+        val dx = (a.lng - b.lng) * app.vela.core.model.GeoConstants.M_PER_DEG * kotlin.math.cos(Math.toRadians(a.lat))
         return kotlin.math.sqrt(dx * dx + dy * dy)
     }
 

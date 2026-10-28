@@ -64,7 +64,9 @@ internal fun NavigationSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
             Spacer(Modifier.height(4.dp))
             CategoryRow(stringResource(R.string.settings_cat_guidance), stringResource(R.string.settings_cat_guidance_sub)) { page = "guidance" }
             CategoryRow(stringResource(R.string.settings_cat_vehicle), stringResource(R.string.settings_cat_vehicle_sub)) { page = "vehicle" }
-            CategoryRow(stringResource(R.string.settings_cat_vehicle_colour), stringResource(R.string.settings_cat_vehicle_colour_sub)) { page = "vehiclecolour" }
+            // Audit 2026-10-28 (R-04): the Vehicle-colour page has exactly one entry point,
+            // the link on the Vehicle page itself (below, gated on the car shape). The
+            // Navigation sub-hub row that duplicated it with a different subtitle is gone.
             CategoryRow(stringResource(R.string.settings_cat_cameras), stringResource(R.string.settings_cat_cameras_sub)) { page = "cameras" }
             CategoryRow(stringResource(R.string.settings_cat_route_options), stringResource(R.string.settings_cat_route_options_sub)) { page = "routeoptions" }
             CategoryRow(stringResource(R.string.settings_cat_links), stringResource(R.string.settings_cat_links_sub)) { page = "links" }
@@ -269,8 +271,7 @@ internal fun NavigationSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
                 onClick = { app.vela.ui.PuckStyle.setSize(context, id) },
             )
         }
-        Hint("Sizes the arrow, car, UFO, ship and duck icons alike.")
-        if (app.vela.ui.PuckStyle.shape.value == app.vela.ui.PuckStyle.SHAPE_ARROW) {
+        Hint(stringResource(R.string.settings_puck_size_hint))
         GroupDivider()
         Text(
             stringResource(R.string.settings_puck_style),
@@ -285,8 +286,8 @@ internal fun NavigationSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
                 label = label,
                 selected = app.vela.ui.PuckStyle.style.value == id,
                 onClick = { app.vela.ui.PuckStyle.setStyle(context, id) },
+                enabled = app.vela.ui.PuckStyle.shape.value == app.vela.ui.PuckStyle.SHAPE_ARROW,
             )
-        }
         }
 
         // The nav icon (discussion #611): the arrow above, or a car in one of a few colors.
@@ -329,11 +330,14 @@ internal fun NavigationSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
         }
         // The colour picker itself lives on its own page (2026-10-28): this row links
         // there while the icon is the car, so the Vehicle page stays short.
+        GroupDivider()
         if (app.vela.ui.PuckStyle.isCar()) {
-            GroupDivider()
             CategoryRow(stringResource(R.string.settings_cat_vehicle_colour), stringResource(R.string.settings_cat_vehicle_colour_link_hint)) { page = "vehiclecolour" }
         } else {
-            Hint(stringResource(R.string.settings_cat_vehicle_colour_link_hint))
+            // Audit 2026-10-28 (U-24/A-08): a disabled row with the reason as its subtitle,
+            // not a hint-only dead end. The shape picker above is on this same page, so
+            // switching to the car re-enables this row.
+            CategoryRow(stringResource(R.string.settings_cat_vehicle_colour), stringResource(R.string.settings_cat_vehicle_colour_link_hint), onClick = {}, enabled = false)
         }
 
         // AutoMap 2026-10-27, Bluetooth-gated location puck (Robert, final

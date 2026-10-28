@@ -9,8 +9,6 @@
     <string name="settings_appearance_hint">Geldt alleen voor AutoMap.</string>
     <string name="settings_dynamic_color">Material You-kleuren</string>
     <string name="settings_dynamic_color_hint">Kleurt knoppen en accenten naar je achtergrond. De kaart blijft neutraal.</string>
-    <string name="settings_map_style">Kaartstijl</string>
-    <string name="settings_map_style_hint">OpenFreeMap werkt zonder API-sleutel.</string>
     <string name="settings_units">Eenheden</string>
     <string name="settings_units_imperial">Imperiaal (mijl, voet)</string>
     <string name="settings_units_metric">Metrisch (kilometers, meters)</string>
@@ -77,7 +75,6 @@
     <string name="settings_region_updates_wifi">Via wifi</string>
     <string name="settings_region_updates_mobile">Via wifi en mobiele data</string>
     <string name="settings_offline_download_viewport_hint">Bewaart de kaart die je bekijkt, met wegen en adressen, zodat dit gebied zonder bereik blijft werken.</string>
-    <string name="settings_offline_no_areas">Nog geen gebieden opgeslagen.</string>
     <string name="settings_offline_addresses_missing">Gebieden die je vóór deze update hebt opgeslagen, bevatten geen adresgegevens. Werk ze bij om offline naar adressen te zoeken en ernaartoe te navigeren.</string>
     <string name="settings_offline_addresses_update">Opgeslagen gebieden bijwerken</string>
     <string name="settings_offline_delete_area">Dit offline gebied verwijderen</string>
@@ -93,7 +90,6 @@
     <string name="settings_routing_places_downloading">Plaatsen opslaan · %1$d%%</string>
     <!-- format -->
     <string name="settings_get_places">Plaatsen ophalen</string>
-    <string name="settings_update_places">Plaatsen bijwerken</string>
     <string name="settings_routing_update_available">Geïnstalleerd · update voor plaatsen beschikbaar</string>
     <string name="settings_routing_remove">Offline routering verwijderen</string>
     <string name="settings_download">Downloaden</string>
@@ -101,7 +97,6 @@
     <string name="settings_downloaded_title">Gedownload</string>
     <string name="settings_downloaded_none">Nog niets gedownload. Bewaar hierboven het gebied dat je bekijkt, of kies hieronder een staat of land.</string>
     <string name="settings_downloaded_area">Opgeslagen gebied</string>
-    <string name="settings_region_group_title">Heel %1$s</string>
     <string name="settings_region_group_size">%1$d delen, ongeveer %2$s na installatie</string>
     <string name="settings_region_group_partial">%1$d van %2$d delen geïnstalleerd, ongeveer %3$s voor alles</string>
     <string name="settings_region_group_installed">Alle %1$d delen geïnstalleerd</string>
@@ -173,10 +168,8 @@
     <string name="settings_voice_row_use">Gebruiken</string>
     <string name="settings_voice_row_remove">%1$s verwijderen</string>
     <string name="place_photo_number">Foto %1$d</string>
-    <string name="place_photo_category_all">Alle</string>
     <string name="place_saved">Opgeslagen</string>
     <string name="place_save">Opslaan</string>
-    <string name="place_more_options">Meer opties</string>
     <string name="place_set_as_home">Instellen als Thuis</string>
     <string name="place_set_as_work">Instellen als Werk</string>
     <string name="place_close">Sluiten</string>
@@ -284,7 +277,6 @@
     <string name="place_open_web">Openen op internet</string>
     <string name="place_copy_link">Link kopiëren</string>
     <string name="place_link_copied">Link gekopieerd</string>
-    <string name="place_share_gmaps_link">Google Maps-link</string>
     <string name="place_share_map_pin">Kaartspeld (geo:)</string>
     <string name="place_open_other_app">Openen in een andere kaarten-app</string>
     <string name="place_share_coordinates">Coördinaten</string>
@@ -400,7 +392,6 @@
     <string name="mapvm_offline_no_match">Geen offlineresultaten voor \"%1$s\" in je opgeslagen gebied. Offline zoeken omvat de OpenStreetMap-plaatsen die je hebt gedownload.</string>
     <string name="mapvm_no_results">Geen resultaten voor \"%1$s\".</string>
     <!-- format -->
-    <string name="mapvm_offline_results">Offline resultaten (geen verbinding)</string>
     <string name="mapvm_search_failed_reason">Zoeken mislukt: %1$s</string>
     <string name="mapvm_none_found_along_route">Geen \"%1$s\" gevonden langs uw route</string>
     <string name="mapvm_search_failed">Zoeken mislukt</string>
@@ -433,8 +424,6 @@
     <string name="mapvm_voice_download_failed">%1$s downloaden mislukt</string>
     <string name="mapvm_vela_voice_removed">AutoMap-stem verwijderd</string>
     <string name="mapvm_opening_installer">Installatieprogramma openen voor %1$s…</string>
-    <string name="mapvm_pan_to_area_first">Open eerst de kaart en verschuif naar een gebied</string>
-    <string name="mapvm_offline_routing_ready">Offline routering gereed: %1$s</string>
     <string name="mapvm_offline_routing_failed">Downloaden offline routering mislukt</string>
     <string name="mapvm_offline_routing_removed">Offline routering verwijderd</string>
     <string name="mapvm_graphs_retired">Offline routering is overgestapt op een kleiner formaat. Download je regio\'s opnieuw in Instellingen, Offlinekaarten.</string>
@@ -466,20 +455,6 @@
     <string name="mapscreen_your_destination">uw bestemming</string>
     <string name="mapvm_resume_waiting_gps">Wachten op GPS om de navigatie te hervatten…</string>
     <string name="mapvm_resume_failed">Kon navigatie niet hervatten</string>
-    <string name="update_available_title">AutoMap %1$s is beschikbaar</string>
-    <string name="update_downloading">Downloaden… %1$d%%</string>
-    <string name="update_later">Niet nu</string>
-    <string name="update_install">Bijwerken</string>
-    <string name="update_download_failed">Downloaden van de update is mislukt. Probeer het later opnieuw.</string>
-    <string name="update_car_title">Deze update haalt AutoMap uit Android Auto</string>
-    <string name="update_car_body">AutoMap is geïnstalleerd op de manier die Android Auto accepteert. Deze update hier installeren vervangt dat, en de auto toont AutoMap niet meer totdat je het bestand installeert met de tool die je de eerste keer gebruikte (AAEnabler, King Installer).\n\nBewaar het bestand en installeer het op die manier, dan blijft AutoMap in de auto werken.</string>
-    <string name="update_car_save">Bestand opslaan</string>
-    <string name="update_car_anyway">Toch bijwerken</string>
-    <string name="settings_update_auto">Bij het starten op updates controleren</string>
-    <string name="settings_update_auto_hint">Controleert GitHub ongeveer eens per dag en biedt nieuwere versies aan. Zet uit als je via Obtainium bijwerkt.</string>
-    <string name="settings_update_check_now">Op updates controleren</string>
-    <string name="settings_update_checking">Controleren…</string>
-    <string name="settings_update_none">Je hebt de nieuwste versie.</string>
     <string name="settings_place_pages">Plaatspagina\'s</string>
     <plurals name="place_transit_stops">
         <!-- format -->
@@ -522,12 +497,7 @@
     <string name="car_search">Zoeken</string>
     <string name="car_search_hint">Typ om een bestemming te zoeken</string>
     <string name="car_go">Ga</string>
-    <string name="car_end">Beëindigen</string>
-    <string name="car_mute">Dempen</string>
-    <string name="car_unmute">Geluid aan</string>
     <string name="car_faster_route">Sneller −%1$d min</string>
-    <string name="car_pause">Pauzeren</string>
-    <string name="car_resume">Hervatten</string>
     <string name="car_paused">Gepauzeerd</string>
     <string name="car_along_route">Zoeken langs route</string>
     <string name="car_along_none">Niets gevonden in de buurt</string>
@@ -567,8 +537,6 @@
         <item quantity="other">Lijst opslaan · %1$d plaatsen</item>
     </plurals>
     <string name="map_list_saved">“%1$s” opgeslagen in je lijsten</string>
-    <string name="settings_update_nightly">Nightly-builds meenemen</string>
-    <string name="settings_update_nightly_hint">Werk bij naar de nieuwste nightly (voorlopige versie) in plaats van alleen stabiele versies. Nightlies zijn verser maar minder getest.</string>
     <string name="settings_lists_export_hint">Maak een back-up van je lijsten naar een bestand of herstel ze op een ander apparaat.</string>
     <string name="settings_lists_imported">%1$d lijst(en) geïmporteerd</string>
     <string name="settings_places_imported">%1$d plaats(en) geïmporteerd</string>
@@ -582,12 +550,6 @@
         <item quantity="other">%1$d plaatsen</item>
     </plurals>
     <string name="navservice_notif_eta">Aankomst %1$s</string>
-    <string name="settings_advanced">Geavanceerd</string>
-    <string name="settings_advanced_hint">Opties die de meesten nooit nodig hebben.</string>
-    <string name="settings_developer">Ontwikkelaar</string>
-    <string name="settings_developer_hint">Hulpmiddelen voor demo\'s, schermafbeeldingen en tests. Zet ze uit voor echt gebruik.</string>
-    <string name="settings_browse_voices">Stemmen bekijken</string>
-    <string name="settings_browse_voices_hint">Download en wissel tussen AutoMap\'s stemmen op het apparaat.</string>
     <string name="voice_capture_listening">Luisteren…</string>
     <string name="voice_capture_starting">Voorbereiden…</string>
     <string name="voice_capture_done">Klaar</string>
@@ -598,7 +560,6 @@
     <string name="mapvm_closing_before_arrival">%1$s sluit om %2$s, voordat je rond %3$s aankomt</string>
     <!-- format -->
     <string name="settings_voice_search_model">AutoMap-stem</string>
-    <string name="settings_voice_search_model_hint">De AutoMap-stem zet spraak direct op je telefoon om in een zoekopdracht: geen andere app nodig en er wordt niets geüpload. Eenmalige download van %1$d MB.</string>
     <!-- format -->
     <string name="settings_voice_search_download">Downloaden (%1$d MB)</string>
     <!-- format -->
@@ -609,7 +570,6 @@
     <string name="settings_voice_search_engine_title">Als je op de microfoon tikt</string>
     <string name="settings_voice_search_engine_auto">AutoMap-stem</string>
     <string name="settings_voice_search_engine_default">Android-standaard</string>
-    <string name="settings_voice_search_engine_system">Andere spraak-app</string>
     <string name="map_asr_offer_title">Spraakzoeken</string>
     <string name="map_asr_offer_body">Download de AutoMap-stem om je zoekopdrachten in te spreken. Hij draait volledig op je telefoon en uploadt niets.</string>
     <string name="nav_precise_title">Precieze locatie nodig</string>
@@ -641,9 +601,6 @@
     <string name="map_import_needs_google">Een gedeelde Google Maps-lijst kan niet worden geopend zolang AutoMap zonder Google draait.</string>
     <string name="map_link_needs_google">\"Gedeelde Google Maps-links openen\" staat uit in Instellingen &gt; Privacy.</string>
     <string name="map_link_unreadable">Kon die link niet openen.</string>
-    <string name="settings_performance">Prestaties</string>
-    <string name="settings_hub_performance_sub">Wat vooraf laadt, kaartweergave</string>
-    <string name="settings_performance_intro">Dingen vooraf laden maakt ze direct beschikbaar wanneer je ze nodig hebt, en kost tot dan geheugen. De standaardinstellingen hangen af van hoeveel geheugen deze telefoon heeft.</string>
     <string name="settings_full_place_load">Alle foto\'s en recensies laden</string>
     <string name="settings_full_place_load_hint">Uit: een plaats laadt de eerste paar foto\'s en de eerste pagina recensies, en Meer foto\'s of Alle recensies haalt de rest op. Aan: elke plaats die je opent laadt de hele fotogalerij en tot 50 recensies, wat trager is en Google veel meer verzoeken stuurt.</string>
     <string name="settings_speech_preload">Spraakzoeken laden bij opstarten</string>
@@ -664,16 +621,12 @@
     <string name="settings_places">Plaatsen</string>
     <string name="settings_privacy">Privacy</string>
     <string name="settings_cameras_group">Camera\'s</string>
-    <string name="settings_experiments">Experimenten</string>
     <string name="settings_hub_places_sub">Bron van plaatsen, wat je ziet, plaatspagina\'s</string>
     <string name="settings_hub_appearance_sub">Thema, kaartstijl, eenheden, taal</string>
     <string name="settings_hub_map_sub">Verkeer, ov, lagen, 3D-gebouwen</string>
-    <string name="settings_hub_navigation_sub">Begeleiding, camera\'s, live controles</string>
     <string name="settings_hub_voice_sub">Gesproken aanwijzingen en stemmen</string>
     <string name="settings_hub_search_sub">Spraakzoeken en spraakmodellen</string>
     <string name="settings_hub_offline_sub">Offline kaarten, routes, plaatsen</string>
-    <string name="settings_hub_saved_sub">Je lijsten, exporteren, parkeergeschiedenis</string>
-    <string name="settings_hub_privacy_sub">Wat Google ontvangt, geschiedenis wissen</string>
     <string name="settings_hub_diagnostics_sub">Crashrapporten, ritten, demomodus, experimenten</string>
     <string name="settings_hub_about_sub">Versie, updates, steun</string>
     <string name="settings_theme_amoled">AMOLED-zwart</string>
@@ -681,30 +634,9 @@
     <string name="place_review_less">Minder</string>
     <string name="settings_traffic_lights">Stoplicht-aanwijzingen</string>
     <string name="settings_traffic_lights_hint">Gesproken herkenningspunten: na het stoplicht afslaan. Alleen Engels, standaard uit.</string>
-    <string name="map_asr_downloading">AutoMap Voice-micro wordt gedownload · %1$d %%</string>
-    <string name="map_asr_installing">AutoMap Voice-micro wordt geïnstalleerd…</string>
     <string name="map_asr_waiting">AutoMap Voice-micro · wacht op de AutoMap-stem</string>
-    <string name="mapscreen_filter_top_rated">4,0★</string>
-    <string name="mapscreen_section_recent_searches">Recente zoekopdrachten</string>
-    <string name="mapscreen_clear_recent_searches">Recente zoekopdrachten wissen</string>
-    <string name="root_diag_title">Helpt u AutoMap verbeteren?</string>
-    <string name="root_diag_body">Beide blijven op uw telefoon - er wordt niets verzonden tenzij u het exporteert. U kunt beide op elk moment wijzigen in Instellingen.</string>
-    <string name="root_diag_share_title">Diagnostiek delen</string>
-    <string name="root_diag_share_desc">Een kort lokaal logboek van zoekopdrachten, routes en fouten.</string>
-    <string name="root_diag_trips_title">Mijn ritten opslaan</string>
-    <string name="root_diag_trips_desc">Legt uw GPS-navigatiesporen vast zodat ritten voor testen kunnen worden herhaald. Onthullender - uw exacte routes.</string>
-    <string name="root_diag_save">Keuzes opslaan</string>
-    <string name="root_voice_tts_title">Aanwijzingen hardop uitspreken</string>
-    <string name="root_voice_tts_desc">Gesproken navigatie per afslag. Aanbevolen. Eenmalige download van %1$d MB.</string>
     <!-- format -->
-    <string name="root_voice_mic_title">Zoeken met je stem</string>
-    <string name="root_voice_mic_desc">Dicteer zoekopdrachten zonder typen. Zonder dit gebruikt de microfoon Google. Eenmalige download van %1$d MB.</string>
     <!-- format -->
-    <string name="root_voice_none_picked">Vink een optie aan of kies Niet nu.</string>
-    <string name="root_offline_title">Offlinekaarten</string>
-    <string name="root_offline_body">AutoMap haalt plaatsen, zoekopdrachten en routes van Google, dus zonder signaal werken alleen gebieden die je hebt gedownload. Stel nu een gebied in zodat je gedekt bent als je bereik verliest.</string>
-    <string name="root_offline_setup">Offline instellen</string>
-    <string name="mapvm_stop_added">Tussenstop toegevoegd</string>
     <string name="shortcut_home">Thuis</string>
     <string name="shortcut_work">Werk</string>
     <string name="settings_asr_engines_hint">Spraak wordt een zoekopdracht op de telefoon. Niets wordt geupload. Kies de engine voor de mic.</string>
@@ -721,13 +653,6 @@
     <string name="street_view_move">Move here</string>
     <string name="street_view_dates">See other dates</string>
     <string name="street_view_fullscreen">Toggle full screen</string>
-    <string name="softkey_options">Opties</string>
-    <string name="softkey_search">Zoeken</string>
-    <string name="softkey_recenter">Centreren</string>
-    <string name="softkey_mute">Dempen</string>
-    <string name="softkey_unmute">Dempen opheffen</string>
-    <string name="softkey_move_map">Kaart verplaatsen</string>
-    <string name="softkey_stop_zoom">Stop zoomen</string>
     <string name="voice_error_title">Zoeken met spraak startte niet</string>
     <string name="voice_error_retry">Opnieuw proberen</string>
     <string name="voice_error_model">Het spraakmodel is niet gereed. Download het opnieuw via Instellingen \u2192 Zoeken.</string>
@@ -783,7 +708,6 @@
     <string name="settings_nav_trace_hint">Legt vast hoe de kaartcamera beweegt terwijl je navigeert, zodat een schokkende of zwevende kaart onderzocht kan worden. Bevat geen locatiegegevens, alleen richtingen, snelheden en tijden, dus je kunt het veilig aan een bugrapport toevoegen.</string>
     <string name="settings_nav_trace_export">Navigatietrace delen</string>
     <string name="settings_nav_trace_empty">Nog geen trace opgenomen. Navigeer eerst ergens naartoe.</string>
-    <string name="settings_voice_vela_name">AutoMap-stem (%1$s)</string>
     <string name="settings_voice_install_vela">AutoMap-stem installeren (%1$d MB)</string>
     <string name="settings_voice_install_vela_hint">De aanbevolen navigatiestem. Installeer hem hier opnieuw als hij ontbreekt of een download is mislukt.</string>
     <string name="settings_texture_render">Compatibiliteitsweergave</string>
@@ -929,7 +853,6 @@
     <string name="navservice_channel_turns_name">Gesproken afslagmeldingen</string>
     <string name="download_notif_channel">Downloads</string>
     <string name="download_notif_title">%1$s downloaden</string>
-    <string name="download_label_update">AutoMap-update</string>
     <string name="download_label_map_data">kaartgegevens</string>
     <string name="download_label_offline_places">offline plaatsen</string>
     <string name="map_area_downloading">Dit gebied offline opslaan · %1$d%%</string>
@@ -946,11 +869,6 @@
     <string name="place_transit_tram">Tram</string>
     <string name="settings_parking_history_empty">Nog geen parkeerplekken opgeslagen. Tik op de P-knop op de kaart om op te slaan waar je hebt geparkeerd.</string>
     <string name="list_emoji_label">Typ een emoji</string>
-    <string name="settings_update_channel">Updatekanaal</string>
-    <string name="settings_update_channel_stable">Stabiel (wekelijks)</string>
-    <string name="settings_update_channel_nightly">Nightly (dagelijks)</string>
-    <string name="settings_update_channel_canary">Canary (ontwikkelbuilds)</string>
-    <string name="settings_update_channel_hint">Stabiel krijgt één geteste release per week. Nightly krijgt een build op elke dag dat er wijzigingen zijn. Canary volgt werk in uitvoering en kan op elk moment stukgaan.</string>
     <string name="settings_voice_volume">Volume van de aanwijzingen</string>
     <string name="settings_voice_volume_softer">Zachter</string>
     <string name="settings_voice_volume_normal">Normaal</string>
@@ -1057,11 +975,6 @@
     <string name="settings_puck_shape">Navigatiepictogram</string>
     <string name="settings_puck_shape_arrow">Pijl</string>
     <string name="settings_puck_shape_car">Auto</string>
-    <string name="settings_car_red">Rood</string>
-    <string name="settings_car_blue">Blauw</string>
-    <string name="settings_car_white">Wit</string>
-    <string name="settings_car_green">Groen</string>
-    <string name="settings_car_yellow">Geel</string>
     <string name="settings_puck_shape_ufo">Ufo</string>
     <string name="settings_puck_shape_ship">Piratenschip</string>
     <string name="settings_puck_shape_duck">Badeendje</string>
@@ -1143,7 +1056,6 @@
     <string name="place_icon_title">Kaartpictogram voor %1$s</string>
     <string name="place_icon_default">Pictogram van de lijst gebruiken</string>
     <string name="settings_map_theme_title">Kaart</string>
-    <string name="settings_map_theme_follow">Zelfde als de app</string>
     <string name="settings_map_theme_hint">De kaart apart: lichte straten onder een donkere app, of donkere straten onder een lichte. Dag en nacht tijdens het rijden geldt nog steeds voor de kaart.</string>
     <string name="route_saved_label">Je route: %1$s</string>
     <string name="route_save">Deze route opslaan</string>
@@ -1253,7 +1165,6 @@
     <string name="mapscreen_other_locations">Andere locaties tonen</string>
     <string name="settings_other_locations_auto">Andere locaties automatisch zoeken</string>
     <string name="settings_other_locations_auto_hint">Als een zoekopdracht op naam bij één plaats uitkomt, vraagt AutoMap Google ook naar de andere locaties. Dat zijn bij elke zoekopdracht van dit soort een paar extra verzoeken aan Google. Uit: een knop \"Andere locaties tonen\" doet dit wanneer je erop tikt.</string>
-    <string name="mapscreen_view_map">Kaart bekijken</string>
     <string name="whatsnew_show_after_updates">Na updates tonen wat er nieuw is</string>
     <string name="replay_play">Afspelen</string>
     <string name="replay_pause">Pauzeren</string>
@@ -1303,13 +1214,6 @@
     <string name="search_offline_recheck">Offline. Tik om opnieuw te controleren</string>
     <string name="settings_turn_declutter">Kaart vereenvoudigen in bochten</string>
     <string name="settings_turn_declutter_hint">Terwijl de kaart door een bocht draait, blijven alleen straatnamen zichtbaar. Plaatsen, borden en camera\'s komen terug zodra de kaart tot rust komt. Houdt bochten vloeiend op tragere telefoons.</string>
-    <string name="settings_softkeys">Fysieke softkeys</string>
-    <string name="settings_softkeys_hint">Zoom de kaart met de twee softkeys van de telefoon. Alleen voor telefoons met toetsen.</string>
-    <string name="settings_softkeys_calibrate">Softkeys kalibreren</string>
-    <string name="settings_softkeys_calibrate_hint">Zoomen de softkeys niet? Tik hier en druk eerst op je linker- en dan op je rechtersoftkey, zodat AutoMap hun codes leert.</string>
-    <string name="map_zoom_mode_hint">Zoom:  ◀ uit   ·   in ▶      TERUG om te sluiten</string>
-    <string name="map_move_mode_hint">Kaart verplaatsen:  ◀ ▲ ▼ ▶      TERUG om te sluiten</string>
-    <string name="softkey_zoom_menu">Zoom (◀ − ▶ +)</string>
     <string name="exp_chooser_alts_same">Ongeveer even lang</string>
     <string name="exp_chooser_fewest_cams">minste camera\'s</string>
     <string name="trip_shortcut_add">Toevoegen aan startscherm</string>

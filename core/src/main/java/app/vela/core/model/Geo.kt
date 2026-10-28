@@ -70,3 +70,12 @@ fun LatLng.destinationPoint(meters: Double, bearingDeg: Double): LatLng {
     val lng2 = lng1 + atan2(sin(brng) * sin(d) * cos(lat1), cos(d) - sin(lat1) * sin(lat2))
     return LatLng(Math.toDegrees(lat2), Math.toDegrees(lng2))
 }
+
+/** Shared geodesy constants (audit 2026-10-28): one home for the metres-per-degree
+ *  approximation that was previously copy-pasted as 111_320.0 across nine files. */
+object GeoConstants {
+    const val M_PER_DEG = 111_320.0
+    /** Metres per pixel at zoom 0 (512 px world). */
+    const val M_PER_PX_Z0 = 78271.517
+}
+

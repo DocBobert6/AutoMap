@@ -70,7 +70,7 @@ object ManeuverMapper {
     private fun glyph(type: ManeuverType): androidx.car.app.model.CarIcon? = runCatching {
         val bmp = app.vela.service.NavGlyphs.bitmap(type, GLYPH_PX, android.graphics.Color.TRANSPARENT)
         androidx.car.app.model.CarIcon.Builder(androidx.core.graphics.drawable.IconCompat.createWithBitmap(bmp)).build()
-    }.getOrNull()
+    }.onFailure { android.util.Log.w("VelaCar", "Maneuver glyph failed for $type — step ships without an icon", it) }.getOrNull()
 
     private const val GLYPH_PX = 128
 

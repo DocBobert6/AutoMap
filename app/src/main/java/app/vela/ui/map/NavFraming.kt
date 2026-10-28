@@ -132,6 +132,12 @@ internal object NavFraming {
     fun zoom(speedZoom: Double, offset: Double): Double =
         max(speedZoom + offset, min(speedZoom, ZOOM_FLOOR))
 
+    /** Phone speed zoom, one place (audit 2026-10-28): 18.5 close down to 15.8 over
+     *  0-30 m/s — even closer default (user 2026-07-15, was 18.0-15.5); speed still zooms out.
+     *  Both phone nav tickers call this instead of carrying the formula verbatim. */
+    fun speedZoom(speedMps: Float, offset: Double): Double =
+        zoom(18.5 - (speedMps / 30f) * (18.5 - 15.8), offset)
+
     /**
      * The top of the bottom chrome under the arrow's column, in px, 0 when nothing is known: the
      * bar, the road-name pill when it sits above the bar, and the speed box when large text has
@@ -293,7 +299,11 @@ internal object NavTurnTarget {
         r.maneuvers.getOrNull(i)?.location
     }
 
-    /** A continue or straight step the voice says nothing for: the same test as NavEngine's. */
+    /** A continue or straight step the voice says nothing for: the same test as NavEngine's.
+     *  Shared (audit 2026-10-28): the car renderer calls this instead of inlining the test,
+     *  so banner, framing and car scored maneuver can never disagree about "quiet". */
+    internal fun isQuiet(m: app.vela.core.model.Maneuver): Boolean = quiet(m)
+
     private fun quiet(m: app.vela.core.model.Maneuver): Boolean =
         (m.type == app.vela.core.model.ManeuverType.CONTINUE || m.type == app.vela.core.model.ManeuverType.STRAIGHT) &&
             !app.vela.core.model.continueHasGenuineFork(m.lanes)

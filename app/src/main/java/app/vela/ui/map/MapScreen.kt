@@ -1051,22 +1051,6 @@ fun MapScreen(
             )
         }
     }
-    // A downloaded update that would cost this phone its Android Auto listing (issue #179). The
-    // install source is what the head unit keys on and a self-install overwrites it, so the file
-    // is offered instead: installing it through AAEnabler or King Installer keeps the car.
-    state.updateApkPending?.let {
-        app.vela.ui.VelaDialog(
-            onDismissRequest = { vm.dismissPendingUpdate() },
-            title = stringResource(R.string.update_car_title),
-            confirmText = stringResource(R.string.update_car_save),
-            onConfirm = { vm.sharePendingUpdate() },
-            dismissText = stringResource(R.string.update_car_anyway),
-            onDismiss = { vm.installPendingUpdate() },
-            dismissLowEmphasis = true,
-        ) {
-            Text(stringResource(R.string.update_car_body), style = MaterialTheme.typography.bodyMedium)
-        }
-    }
     // START from the place sheet (issue #272): the pill routes, and guidance begins the moment a
     // route exists. It goes through onStartNav, NOT straight to the ViewModel, so the precise-
     // location and notification gates still get their say - a one-tap Start must not be a way to
@@ -2517,7 +2501,7 @@ fun MapScreen(
                     val zoomNow = remember(metersPerPixelState.value, state.center) {
                         val lat = state.center?.lat ?: 0.0
                         val mpp = metersPerPixelState.value
-                        if (mpp <= 0.0) 0.0 else kotlin.math.ln(78271.517 * kotlin.math.cos(Math.toRadians(lat)) / mpp) / kotlin.math.ln(2.0)
+                        if (mpp <= 0.0) 0.0 else kotlin.math.ln(app.vela.core.model.GeoConstants.M_PER_PX_Z0 * kotlin.math.cos(Math.toRadians(lat)) / mpp) / kotlin.math.ln(2.0)
                     }
                     val googleDeep = state.satDeep == -1 && zoomNow >= 18.6
                     val googleOnly = state.satDeep == -1 && zoomNow >= 19.6
@@ -2671,7 +2655,7 @@ fun MapScreen(
         val downloadsOk = !searchOpen
         val fasterOffer = state.navigating && state.fasterRoute != null
         if (state.status != null || fasterOffer ||
-            (bareMap && (state.notices.isNotEmpty() || state.updateInfo != null)) ||
+            (bareMap && (state.notices.isNotEmpty())) ||
             (downloadsOk && (downloadingVoiceId != null || state.asrDownloadPct != null || downloadingRegion || state.areaDownloadPct != null))
         ) {
             val bannerBottom = with(LocalDensity.current) { navBannerBottomPx.toDp() }
@@ -2788,17 +2772,6 @@ fun MapScreen(
                     }
                 }
                 if (bareMap) {
-                    // A newer release on GitHub (self-updater; the check is a Settings toggle).
-                    state.updateInfo?.let { u ->
-                        UpdateCard(
-                            versionName = u.versionName,
-                            notes = u.notes,
-                            downloadPct = state.updateDownloadPct,
-                            onUpdate = { vm.downloadUpdate() },
-                            onDismiss = { vm.dismissUpdate() },
-                            onCancel = { vm.cancelUpdateDownload() },
-                        )
-                    }
                     state.notices.filterNot { it.level == app.vela.core.config.Notice.LEVEL_URGENT }.forEach { n ->
                         NoticeCard(n, onDismiss = { vm.dismissNotice(n.id) })
                     }
@@ -5844,77 +5817,6 @@ private fun RegionDownloadCard(name: String, places: Boolean, pct: Int, area: Bo
             }
             Spacer(Modifier.height(8.dp))
             app.vela.ui.VelaProgressBar(if (!area && stage == 1) null else pct / 100f)
-        }
-    }
-}
-
-/** "A newer AutoMap is out" card (self-updater): download with progress, then the system
- *  installer takes over. "Not now" silences this version until a newer one appears. */
-@Composable
-private fun UpdateCard(
-    versionName: String,
-    notes: String = "",
-    downloadPct: Int?,
-    onUpdate: () -> Unit,
-    onDismiss: () -> Unit,
-    onCancel: (() -> Unit)? = null,
-    modifier: Modifier = Modifier,
-) {
-    Card(
-        modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        ),
-    ) {
-        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 4.dp)) {
-            Text(stringResource(R.string.update_available_title, versionName), fontWeight = FontWeight.SemiBold)
-            // What changed, from the release's own notes, folded by default (issue #330): the
-            // nightly notes are the commit list since the last release, which is exactly the
-            // "what am I installing" answer, minus markdown glyphs.
-            val plainNotes = remember(notes) { plainReleaseNotes(notes) }
-            if (plainNotes.isNotEmpty() && downloadPct == null) {
-                var showNotes by remember { mutableStateOf(false) }
-                TextButton(onClick = { showNotes = !showNotes }, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
-                    Text(stringResource(if (showNotes) R.string.update_notes_hide else R.string.update_notes_show), style = MaterialTheme.typography.labelLarge)
-                }
-                if (showNotes) {
-                    Text(
-                        plainNotes,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 24,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(end = 8.dp, bottom = 4.dp),
-                    )
-                }
-            }
-            if (downloadPct != null) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.update_downloading, downloadPct), style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                    onCancel?.let {
-                        IconButton(onClick = it, modifier = Modifier.size(28.dp).dpadHighlight(CircleShape)) {
-                            Icon(Sym.Close, contentDescription = stringResource(R.string.mapscreen_cancel), modifier = Modifier.size(18.dp))
-                        }
-                    }
-                }
-                app.vela.ui.VelaProgressBar(downloadPct / 100f, Modifier.padding(top = 6.dp, bottom = 8.dp))
-            } else {
-                Row(
-                    Modifier.fillMaxWidth().padding(bottom = 6.dp),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.update_later)) }
-                    Spacer(Modifier.width(4.dp))
-                    // A filled primary pill, same treatment as the dialogs' confirm button: the
-                    // action reads by SHAPE and fill, not by text color alone (color-blind safe).
-                    Button(
-                        onClick = onUpdate,
-                        shape = CircleShape,
-                        modifier = Modifier.dpadHighlight(CircleShape),
-                    ) { Text(stringResource(R.string.update_install)) }
-                }
-            }
         }
     }
 }

@@ -47,9 +47,7 @@ import app.vela.ui.dpadRowSibling
 /** About sub-screen: the project blurb, version + the in-app updater. */
 @Composable
 internal fun AboutSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
-    val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("vela_settings", android.content.Context.MODE_PRIVATE) }
     var page by remember { mutableStateOf<String?>(null) }
     if (page == null) {
         SettingsScaffold(stringResource(R.string.settings_about), onBack) { _ ->
@@ -197,116 +195,15 @@ internal fun AboutSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
                 .padding(horizontal = 16.dp, vertical = 12.dp),
         )
         Hint(stringResource(R.string.settings_whatsnew_hint))
-        ToggleRow(
-            label = stringResource(R.string.whatsnew_show_after_updates),
-            checked = app.vela.ui.WhatsNew.enabled.value,
-            onCheckedChange = { app.vela.ui.WhatsNew.setEnabled(context, it) },
-            hint = stringResource(R.string.settings_whatsnew_toggle_hint),
-        )
-        GroupDivider()
-        // AutoMap 2026-10-27: upstream Vela self-updater section REMOVED
-        // from view. It checked PimpinPumpkin/Vela and could offer an
-        // upstream build that would replace AutoMap. AutoMap updates live
-        // in the AutoMap updates section below (AutoMapUpdater). The block
-        // below is compiled out, not deleted, so the diff stays reviewable.
-        if (false) {
-        // Self-updater: a launch check (throttled to ~daily) plus a manual check here.
-        // The system installer does the install either way.
-        var selfUpdate by remember { mutableStateOf(prefs.getBoolean("self_update_check", true)) }
-        ToggleRow(
-            label = stringResource(R.string.settings_update_auto),
-            checked = selfUpdate,
-            onCheckedChange = { selfUpdate = it; prefs.edit().putBoolean("self_update_check", it).apply() },
-            hint = stringResource(R.string.settings_update_auto_hint),
-        )
-        GroupDivider()
-        // Update channel: stable (weekly), nightly (daily prereleases), canary (the rolling
-        // development build, replaced on every push to the canary branch). Seeded from the old
-        // nightly boolean so existing nightly users stay on nightly.
-        var channel by remember { mutableStateOf(app.vela.update.SelfUpdater.channel(prefs)) }
-        Text(
-            stringResource(R.string.settings_update_channel),
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-        )
-        listOf(
-            app.vela.update.SelfUpdater.CHANNEL_STABLE to stringResource(R.string.settings_update_channel_stable),
-            app.vela.update.SelfUpdater.CHANNEL_NIGHTLY to stringResource(R.string.settings_update_channel_nightly),
-            app.vela.update.SelfUpdater.CHANNEL_CANARY to stringResource(R.string.settings_update_channel_canary),
-        ).forEach { (id, label) ->
-            SelectableRow(
-                label = label,
-                selected = channel == id,
-                onClick = { channel = id; prefs.edit().putString("update_channel", id).apply() },
-            )
-        }
-        Hint(stringResource(R.string.settings_update_channel_hint))
-        GroupDivider()
-        // A clear gap between the hint paragraph and the button (they read as one clump otherwise).
-        Spacer(Modifier.height(14.dp))
-        var updateStatus by remember { mutableStateOf<String?>(null) }
-        val checkingText = stringResource(R.string.settings_update_checking)
-        val noneText = stringResource(R.string.settings_update_none)
-        // Found update: a full inline offer, right here. The map card said "go back to the
-        // map to install" from Settings, which was a pointless round trip - same state, same
-        // download call as the card, so the two surfaces stay in sync (start it here, the
-        // card shows the same progress, and vice versa).
-        state.updateInfo?.let { u ->
-            Text(
-                stringResource(R.string.update_available_title, u.versionName),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-            state.updateDownloadPct?.let { pct ->
-                Text(stringResource(R.string.update_downloading, pct), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 16.dp))
-                Spacer(Modifier.height(6.dp))
-                // 16 dp like every row in this group: the bar used to run past them (user 2026-09-18).
-                app.vela.ui.VelaProgressBar(pct / 100f, Modifier.padding(horizontal = 16.dp))
-                TextButton(
-                    onClick = { vm.cancelUpdateDownload() },
-                    modifier = Modifier.padding(horizontal = 8.dp).dpadHighlight(androidx.compose.foundation.shape.CircleShape),
-                ) { Text(stringResource(R.string.settings_cancel)) }
-                Spacer(Modifier.height(8.dp))
-            } ?: run {
-                val updFocus = remember { List(2) { FocusRequester() } }
-                Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-                    // D-pad (issue #65): these were plain Material buttons with no visible focus ring,
-                    // so a keypad user couldn't SEE the update button highlighted. dpadHighlight gives
-                    // them the fork's focus ring, like the map UpdateCard already has. The ring shape
-                    // MUST match each button's OWN shape - CircleShape drew a circle over a pill (tester
-                    // report), so pass the matching ButtonDefaults shape per button type.
-                    DpadRingBox(androidx.compose.material3.ButtonDefaults.shape) {
-                        Button(modifier = Modifier.dpadRowSibling(updFocus, 0), onClick = { vm.downloadUpdate() }) { Text(stringResource(R.string.update_install)) }
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    DpadRingBox(androidx.compose.material3.ButtonDefaults.textShape) {
-                        TextButton(modifier = Modifier.dpadRowSibling(updFocus, 1), onClick = { vm.dismissUpdate(); updateStatus = null }) { Text(stringResource(R.string.update_later)) }
-                    }
-                }
-            }
-        } ?: DpadRingBox(androidx.compose.material3.ButtonDefaults.filledTonalShape, Modifier.padding(horizontal = 16.dp)) {
-            FilledTonalButton(
-                onClick = {
-                    updateStatus = checkingText
-                    vm.checkForUpdateNow { found -> updateStatus = if (found) null else noneText }
-                },
-            ) { Text(stringResource(R.string.settings_update_check_now)) }
-        }
-        updateStatus?.let { Hint(it) }
-        Spacer(Modifier.height(10.dp))
-        } // end if (false) — upstream self-updater section
         }
         } // about
         Spacer(Modifier.height(8.dp))
         if (page == "updates") {
         // AutoMap updates (2026-10-27): the AutoSpace UpdateChecker pattern,
-        // ported as AutoMapUpdater and pointed at DocBobert6/AutoMap. This
-        // section is separate from the Vela self-updater section above on
-        // purpose: that one checks upstream Vela releases, this one checks
-        // AutoMap releases. Alpha is the default channel for alpha builds.
-        SettingsGroup(title = stringResource(R.string.settings_automap_updates)) {
+        // ported as AutoMapUpdater and pointed at DocBobert6/AutoMap. Alpha is
+        // the default channel for alpha builds. No group title here (audit
+        // A-09): the page itself is already titled "AutoMap updates".
+        SettingsGroup {
             val updState by app.vela.update.AutoMapUpdater.state.collectAsStateWithLifecycle()
             val updContext = LocalContext.current
             var updAuto by remember { mutableStateOf(app.vela.update.AutoMapUpdater.autoCheckEnabled(updContext)) }
@@ -315,6 +212,15 @@ internal fun AboutSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
                 checked = updAuto,
                 onCheckedChange = { updAuto = it; app.vela.update.AutoMapUpdater.setAutoCheckEnabled(updContext, it) },
                 hint = stringResource(R.string.settings_automap_update_auto_hint),
+            )
+            GroupDivider()
+            // What's New after an update (audit A-09, moved here from About):
+            // the toggle belongs with the updater that triggers the notes.
+            ToggleRow(
+                label = stringResource(R.string.whatsnew_show_after_updates),
+                checked = app.vela.ui.WhatsNew.enabled.value,
+                onCheckedChange = { app.vela.ui.WhatsNew.setEnabled(updContext, it) },
+                hint = stringResource(R.string.settings_whatsnew_toggle_hint),
             )
             GroupDivider()
             var updChannel by remember { mutableStateOf(app.vela.update.AutoMapUpdater.channel(updContext)) }

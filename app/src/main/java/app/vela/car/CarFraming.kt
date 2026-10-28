@@ -161,5 +161,5 @@ internal class FrontClip(private val lat: Double, private val lng: Double, beari
         return if (a == b) 0.0 else (a / (a - b)).coerceIn(0.0, 1.0)
     }
 
-    private companion object { const val M_PER_DEG = 111_320.0 }
+    private companion object { const val M_PER_DEG = app.vela.core.model.GeoConstants.M_PER_DEG }
 }

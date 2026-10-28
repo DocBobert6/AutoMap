@@ -48,7 +48,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.vela.R
 import app.vela.core.data.tiles.MapStyle
+import app.vela.ui.BuildingOverlay
 import app.vela.ui.Buildings3d
+import app.vela.ui.PaintedRoadsPref
+import app.vela.ui.SunShading
 import app.vela.ui.GoogleFree
 import app.vela.ui.MapLook
 import app.vela.ui.MapPoiPrefs
@@ -68,7 +71,8 @@ import app.vela.ui.theme.isMapDark
 /**
  * The browse map's top-right layers button and the panel it opens (issue #782): picture tiles in
  * three groups, Map type (the five looks and satellite, one chosen), Map details (traffic, transit
- * lines, terrain, 3D buildings, each on or off) and Place icons (Vela data, Google or both), then
+ * lines, terrain, 3D buildings, sun-angle shading, painted road markings and fill-missing-buildings,
+ * each on or off) and Place icons (Vela data, Google or both), then
  * the Google-free switch. The tiles flip the same holders Settings does, so the two stay in sync.
  * One call from MapScreen, which has no room for more (see the size notes there) and keeps only
  * the gate that decides when the button shows.
@@ -78,7 +82,7 @@ internal fun BoxScope.LayersCorner(vm: MapViewModel, landscapeChrome: Boolean, d
     var open by remember { mutableStateOf(false) }
     // The button takes the accent while something beyond the default map is on. 3D buildings are
     // on by default, so they do not count.
-    val anyLayerOn = SatelliteLayer.on.value || Traffic.on.value || TransitLayer.on.value || Topography.on.value
+    val anyLayerOn = SatelliteLayer.on.value || Traffic.on.value || TransitLayer.on.value || Topography.on.value || SunShading.on.value
     Box(
         modifier = Modifier
             .align(Alignment.TopEnd)
@@ -177,6 +181,15 @@ private fun LayersPanel(vm: MapViewModel, onClose: () -> Unit, onOpenSettings: (
                 },
                 Tile(stringResource(R.string.settings_buildings_3d), Buildings3d.on.value, { Buildings3d.set(ctx, !Buildings3d.on.value) }) {
                     GlyphDisc(Sym.Apartment, it)
+                },
+                Tile(stringResource(R.string.settings_sun_shading), SunShading.on.value, { SunShading.set(ctx, !SunShading.on.value) }) {
+                    GlyphDisc(Sym.Schedule, it)
+                },
+                Tile(stringResource(R.string.settings_painted_roads), PaintedRoadsPref.on.value, { PaintedRoadsPref.set(ctx, !PaintedRoadsPref.on.value) }) {
+                    GlyphDisc(Sym.Draw, it)
+                },
+                Tile(stringResource(R.string.settings_building_overlay), BuildingOverlay.on.value, { BuildingOverlay.set(ctx, !BuildingOverlay.on.value) }) {
+                    GlyphDisc(Sym.Home, it)
                 },
             ),
         )

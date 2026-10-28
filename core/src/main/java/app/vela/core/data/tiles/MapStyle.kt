@@ -34,13 +34,3 @@ enum class MapStyle(
     }
 }
 
-/**
- * Google's stable raster XYZ endpoint (mt0..mt3). Included for testing/parity
- * only: using it ships a Google-look map AND puts tile load back on Google,
- * both of which Vela deliberately avoids by using open tiles. lyrs: m=roads,
- * s=satellite, y=hybrid, t=terrain, h=transparent roads overlay.
- */
-object GoogleRasterTiles {
-    fun tiles(layers: String = "m"): List<String> =
-        (0..3).map { "https://mt$it.google.com/vt/lyrs=$layers&x={x}&y={y}&z={z}" }
-}

@@ -20,8 +20,6 @@
     <string name="settings_appearance_hint">AutoMap にのみ適用されます。</string>
     <string name="settings_dynamic_color">Material You カラー</string>
     <string name="settings_dynamic_color_hint">壁紙に合わせてボタンやアクセントの色を付けます。地図の色は変わりません。</string>
-    <string name="settings_map_style">地図のスタイル</string>
-    <string name="settings_map_style_hint">OpenFreeMap は API キーなしで動作します。</string>
     <string name="settings_units">単位</string>
     <string name="settings_units_imperial">ヤードポンド法（マイル、フィート）</string>
     <string name="settings_units_metric">メートル法（キロメートル、メートル）</string>
@@ -102,7 +100,6 @@
     <string name="settings_offline_map_area">周辺エリア</string>
     <string name="settings_offline_download_viewport">表示中のエリアをダウンロード</string>
     <string name="settings_offline_download_viewport_hint">表示中の地図を道路や住所ごと保存し、電波がなくてもこのエリアを使えるようにします。</string>
-    <string name="settings_offline_no_areas">保存済みのエリアはまだありません。</string>
     <string name="settings_offline_addresses_missing">このアップデートより前に保存したエリアには住所データが含まれていません。更新すると、オフラインでも住所を検索して経路を調べられます。</string>
     <string name="settings_offline_addresses_update">保存済みエリアを更新</string>
     <string name="settings_offline_delete_area">このオフライン エリアを削除</string>
@@ -120,7 +117,6 @@
     <string name="settings_routing_places_downloading">場所を保存中 · %1$d%%</string>
     <!-- format -->
     <string name="settings_get_places">場所を取得</string>
-    <string name="settings_update_places">場所を更新</string>
     <string name="settings_routing_update_available">インストール済み · 場所の更新があります</string>
     <string name="settings_routing_remove">オフライン経路データを削除</string>
     <string name="settings_download">ダウンロード</string>
@@ -193,10 +189,8 @@
     <!-- place: PlaceSheet.kt -->
     <string name="place_photo_number">写真 %1$d</string>
     <!-- format -->
-    <string name="place_photo_category_all">すべて</string>
     <string name="place_saved">保存済み</string>
     <string name="place_save">保存</string>
-    <string name="place_more_options">その他のオプション</string>
     <string name="place_set_as_home">自宅に設定</string>
     <string name="place_set_as_work">職場に設定</string>
     <string name="place_close">閉じる</string>
@@ -286,7 +280,6 @@
     <string name="place_open_web">ウェブで開く</string>
     <string name="place_copy_link">リンクをコピー</string>
     <string name="place_link_copied">リンクをコピーしました</string>
-    <string name="place_share_gmaps_link">Google マップのリンク</string>
     <string name="place_share_map_pin">地図のピン（geo:）</string>
     <string name="place_open_other_app">別の地図アプリで開く</string>
     <string name="place_share_coordinates">座標</string>
@@ -415,7 +408,6 @@
     <string name="mapvm_offline_no_match">保存したエリアに「%1$s」のオフライン検索結果はありません。オフライン検索の対象は、ダウンロードした OpenStreetMap の場所です。</string>
     <string name="mapvm_no_results">「%1$s」の結果はありません。</string>
     <!-- format -->
-    <string name="mapvm_offline_results">オフラインの検索結果（未接続）</string>
     <string name="mapvm_search_failed_reason">検索に失敗しました：%1$s</string>
     <!-- format -->
     <string name="mapvm_none_found_along_route">ルート沿いに「%1$s」は見つかりませんでした</string>
@@ -455,8 +447,6 @@
     <string name="mapvm_vela_voice_removed">AutoMap 音声を削除しました</string>
     <string name="mapvm_opening_installer">%1$s のインストーラーを開いています…</string>
     <!-- format -->
-    <string name="mapvm_pan_to_area_first">先に地図を開いて、保存するエリアを表示してください</string>
-    <string name="mapvm_offline_routing_ready">オフライン経路検索が利用可能になりました：%1$s</string>
     <!-- format -->
     <string name="mapvm_offline_routing_failed">オフライン経路データのダウンロードに失敗しました</string>
     <string name="mapvm_offline_routing_removed">オフライン経路データを削除しました</string>
@@ -477,16 +467,6 @@
     <string name="navservice_notif_text_faster_available"> · より速いルートあり</string>
     <string name="navservice_notif_action_end">終了</string>
     <string name="navservice_channel_name">ナビゲーション</string>
-    <string name="update_available_title">AutoMap %1$s が利用可能です</string>
-    <string name="update_downloading">ダウンロード中… %1$d%%</string>
-    <string name="update_later">後で</string>
-    <string name="update_install">更新</string>
-    <string name="update_download_failed">更新のダウンロードに失敗しました。後でもう一度お試しください。</string>
-    <string name="settings_update_auto">起動時に更新を確認</string>
-    <string name="settings_update_auto_hint">1 日 1 回ほど GitHub を確認し、新しいリリースを案内します。Obtainium で更新している場合はオフにしてください。</string>
-    <string name="settings_update_check_now">更新を確認</string>
-    <string name="settings_update_checking">確認しています…</string>
-    <string name="settings_update_none">最新バージョンを使用しています。</string>
     <string name="settings_place_pages">場所のページ</string>
     <plurals name="place_transit_stops">
         <!-- format -->
@@ -527,9 +507,6 @@
     <string name="car_search">検索</string>
     <string name="car_search_hint">入力して目的地を検索</string>
     <string name="car_go">出発</string>
-    <string name="car_end">終了</string>
-    <string name="car_mute">ミュート</string>
-    <string name="car_unmute">ミュート解除</string>
     <string name="car_faster_route">%1$d 分速いルート</string>
     <string name="car_no_route">ルートがありません。現在地を確認してください</string>
     <string name="map_parking_saved">駐車位置を保存しました</string>
@@ -564,8 +541,6 @@
         <item quantity="other">リストを保存 · %1$d 件の場所</item>
     </plurals>
     <string name="map_list_saved">「%1$s」をマイリストに保存しました</string>
-    <string name="settings_update_nightly">ナイトリービルドを含める</string>
-    <string name="settings_update_nightly_hint">安定版だけでなく、最新のナイトリー（プレリリース）にも更新します。ナイトリーは新しい分、テストは少なめです。</string>
     <string name="settings_lists_export_hint">リストをファイルにバックアップしたり、別の端末で復元したりできます。</string>
     <string name="settings_lists_imported">リストを %1$d 件インポートしました</string>
     <string name="settings_places_imported">場所を %1$d 件インポートしました</string>
@@ -578,12 +553,6 @@
         <item quantity="other">%1$d 件の場所</item>
     </plurals>
     <string name="navservice_notif_eta">%1$s に到着予定</string>
-    <string name="settings_advanced">詳細設定</string>
-    <string name="settings_advanced_hint">ほとんどの人には不要なオプションです。</string>
-    <string name="settings_developer">開発者向け</string>
-    <string name="settings_developer_hint">デモ、スクリーンショット、テスト用のツールです。通常の利用時はすべてオフにしてください。</string>
-    <string name="settings_browse_voices">音声を探す</string>
-    <string name="settings_browse_voices_hint">AutoMap の端末内音声をダウンロードして切り替えます。</string>
     <string name="voice_capture_listening">聞き取っています…</string>
     <string name="voice_capture_starting">準備しています…</string>
     <string name="voice_capture_done">完了</string>
@@ -594,7 +563,6 @@
     <string name="mapvm_closing_before_arrival">%1$s は %2$s に閉まるため、%3$s頃の到着では間に合いません</string>
     <!-- format -->
     <string name="settings_voice_search_model">AutoMap 音声</string>
-    <string name="settings_voice_search_model_hint">AutoMap 音声は、話した言葉を端末上でそのまま検索に変えます。ほかのアプリは不要で、何もアップロードされません。初回のみ %1$d MB のダウンロードです。</string>
     <!-- format -->
     <string name="settings_voice_search_download">ダウンロード（%1$d MB）</string>
     <!-- format -->
@@ -605,7 +573,6 @@
     <string name="settings_voice_search_engine_title">マイクをタップしたとき</string>
     <string name="settings_voice_search_engine_auto">AutoMap 音声</string>
     <string name="settings_voice_search_engine_default">Android のデフォルト</string>
-    <string name="settings_voice_search_engine_system">その他の音声アプリ</string>
     <string name="map_asr_offer_title">音声検索</string>
     <string name="map_asr_offer_body">AutoMap 音声をダウンロードすると、話して検索できるようになります。完全に端末上で動作し、何もアップロードしません。</string>
     <string name="nav_precise_title">正確な位置情報が必要です</string>
@@ -648,35 +615,23 @@
     <string name="settings_places">スポット</string>
     <string name="settings_privacy">プライバシー</string>
     <string name="settings_cameras_group">カメラ</string>
-    <string name="settings_experiments">試験機能</string>
     <string name="settings_hub_places_sub">スポットの取得元、表示、スポットのページ</string>
     <string name="settings_hub_appearance_sub">テーマ、地図スタイル、単位、言語</string>
     <string name="settings_hub_map_sub">交通状況、公共交通、レイヤー、3D 建物</string>
-    <string name="settings_hub_navigation_sub">案内、カメラ、ライブ再確認</string>
     <string name="settings_hub_voice_sub">音声案内と音声</string>
     <string name="settings_hub_search_sub">音声検索と音声モデル</string>
     <string name="settings_hub_offline_sub">オフライン地図、ルート、場所</string>
-    <string name="settings_hub_saved_sub">リスト、エクスポート、駐車履歴</string>
-    <string name="settings_hub_privacy_sub">Google に送られる情報、履歴の消去</string>
     <string name="settings_hub_diagnostics_sub">クラッシュレポート、走行記録、デモモード、試験機能</string>
     <string name="settings_hub_about_sub">バージョン、更新、サポート</string>
     <string name="settings_theme_amoled">AMOLEDブラック</string>
     <string name="settings_traffic_lights">信号を使った案内</string>
     <string name="settings_traffic_lights_hint">音声の目印案内:信号を過ぎて曲がる。英語のみ、デフォルトはオフ。</string>
-    <string name="map_asr_downloading">AutoMap Voice マイクをダウンロード中 · %1$d%%</string>
-    <string name="map_asr_installing">AutoMap Voice マイクをインストール中…</string>
     <string name="map_asr_waiting">AutoMap Voice マイク · AutoMap 音声を待機中</string>
     <!-- format -->
     <string name="place_review_more">もっと見る</string>
     <string name="place_review_less">折りたたむ</string>
-    <string name="root_voice_tts_title">音声で案内を読み上げる</string>
-    <string name="root_voice_tts_desc">音声のターンバイターン案内。おすすめです。初回のみ %1$d MB のダウンロード。</string>
     <!-- format -->
-    <string name="root_voice_mic_title">話して検索する</string>
-    <string name="root_voice_mic_desc">入力せずに音声で検索できます。なしの場合、マイクは Google を使います。初回のみ %1$d MB のダウンロード。</string>
     <!-- format -->
-    <string name="root_voice_none_picked">どちらかを選ぶか、「後で」を押してください。</string>
-    <string name="mapvm_stop_added">経由地を追加しました</string>
     <string name="shortcut_home">自宅</string>
     <string name="shortcut_work">職場</string>
     <string name="settings_asr_engines_hint">音声が端末内で検索になります。何もアップロードされません。マイクのエンジンを選択。</string>
@@ -688,31 +643,11 @@
     <string name="settings_asr_active">使用中</string>
     <string name="settings_asr_use">使う</string>
     <!-- format -->
-    <string name="mapscreen_filter_top_rated">4.0★</string>
-    <string name="mapscreen_section_recent_searches">最近の検索</string>
-    <string name="mapscreen_clear_recent_searches">最近の検索を消去</string>
-    <string name="root_diag_title">AutoMapの改善に協力しますか？</string>
-    <string name="root_diag_body">どちらも端末内に保存されます。エクスポートしない限り送信されません。設定でいつでも変更できます。</string>
-    <string name="root_diag_share_title">診断情報を共有</string>
-    <string name="root_diag_share_desc">検索、経路、エラーの短いローカルログ。</string>
-    <string name="root_diag_trips_title">移動を保存</string>
-    <string name="root_diag_trips_desc">テスト用に運転を再生できるよう、ナビのGPS軌跡を記録します。より詳細な情報：正確な経路。</string>
-    <string name="root_diag_save">選択を保存</string>
-    <string name="root_offline_title">オフラインマップ</string>
-    <string name="root_offline_body">AutoMapはGoogleから場所・検索・経路を取得するため、圏外ではダウンロード済みのエリアのみ利用できます。今のうちにエリアを設定して、圏外でも使えるようにしましょう。</string>
-    <string name="root_offline_setup">オフラインを設定</string>
     <string name="no_browser_installed">お使いの端末にはブラウザがありません</string>
     <string name="street_view_none">No Street View imagery here</string>
     <string name="street_view_move">Move here</string>
     <string name="street_view_dates">See other dates</string>
     <string name="street_view_fullscreen">Toggle full screen</string>
-    <string name="softkey_options">オプション</string>
-    <string name="softkey_search">検索</string>
-    <string name="softkey_recenter">中央に戻す</string>
-    <string name="softkey_mute">ミュート</string>
-    <string name="softkey_unmute">ミュート解除</string>
-    <string name="softkey_move_map">地図を移動</string>
-    <string name="softkey_stop_zoom">ズームを終了</string>
     <string name="voice_error_title">音声検索を開始できませんでした</string>
     <string name="voice_error_retry">再試行</string>
     <string name="voice_error_model">音声モデルの準備ができていません。設定 \u2192 検索 から再ダウンロードしてください。</string>
@@ -763,7 +698,6 @@
     <string name="settings_nav_trace_hint">ナビ中に地図のカメラがどう動いたかを記録し、地図のガタつきや流れるような動きを調べられるようにします。位置情報は含まず、方位・速度・タイミングのみなので、不具合報告に添付しても安全です。</string>
     <string name="settings_nav_trace_export">ナビのトレースを共有</string>
     <string name="settings_nav_trace_empty">トレースはまだ記録されていません。まずどこかへナビしてください。</string>
-    <string name="settings_voice_vela_name">AutoMap 音声（%1$s）</string>
     <string name="settings_voice_install_vela">AutoMap 音声をインストール（%1$d MB）</string>
     <string name="settings_voice_install_vela_hint">おすすめの音声案内用の音声です。見つからなくなったときやダウンロードに失敗したときは、ここから再インストールできます。</string>
     <string name="settings_texture_render">互換レンダリング</string>
@@ -879,7 +813,6 @@
     <string name="navservice_channel_turns_name">曲がり角の音声案内</string>
     <string name="download_notif_channel">ダウンロード</string>
     <string name="download_notif_title">%1$s をダウンロード中</string>
-    <string name="download_label_update">AutoMap の更新</string>
     <string name="download_label_map_data">地図データ</string>
     <string name="download_label_offline_places">オフラインの場所データ</string>
     <string name="map_area_downloading">このエリアをオフライン用に保存中 · %1$d%%</string>
@@ -896,11 +829,6 @@
     <string name="place_transit_tram">路面電車</string>
     <string name="settings_parking_history_empty">保存済みの駐車位置はまだありません。地図の P ボタンをタップすると、駐車した場所を保存できます。</string>
     <string name="list_emoji_label">好きな絵文字を入力</string>
-    <string name="settings_update_channel">更新チャンネル</string>
-    <string name="settings_update_channel_stable">安定版（毎週）</string>
-    <string name="settings_update_channel_nightly">ナイトリー（毎日）</string>
-    <string name="settings_update_channel_canary">カナリア（開発中のビルド）</string>
-    <string name="settings_update_channel_hint">安定版は週に 1 回、テスト済みのリリースが届きます。ナイトリーは変更があった日に毎日ビルドが届きます。カナリアは開発中の内容をそのまま反映するため、いつ動かなくなってもおかしくありません。</string>
     <string name="settings_voice_volume">案内の音量</string>
     <string name="settings_voice_volume_softer">小さめ</string>
     <string name="settings_voice_volume_normal">標準</string>
@@ -988,7 +916,6 @@
     <string name="settings_downloaded_title">ダウンロード済み</string>
     <string name="settings_downloaded_none">まだ何もダウンロードしていません。上で表示中のエリアを保存するか、下から州や国を選んでください。</string>
     <string name="settings_downloaded_area">保存済みエリア</string>
-    <string name="settings_region_group_title">%1$s 全域</string>
     <string name="settings_region_group_size">%1$d 個のパーツ、インストール後は約 %2$s</string>
     <string name="settings_region_group_partial">%2$d 個中 %1$d 個のパーツをインストール済み、すべてで約 %3$s</string>
     <string name="settings_region_group_installed">%1$d 個のパーツをすべてインストール済み</string>
@@ -1049,13 +976,7 @@
     <string name="mapvm_graphs_retired">オフライン経路検索のデータ形式が小さくなりました。設定 ▸ オフライン マップ で地域をもう一度ダウンロードしてください。</string>
     <string name="navservice_notif_action_pause">一時停止</string>
     <string name="navservice_notif_action_resume">再開</string>
-    <string name="update_car_title">この更新で AutoMap が Android Auto から消えます</string>
-    <string name="update_car_body">AutoMap は Android Auto が受け付ける方法でインストールされています。ここでこの更新をインストールするとその状態が置き換わり、最初に使ったツール（AAEnabler、King Installer）でファイルをインストールし直すまで、車に AutoMap が表示されなくなります。\n\n車で使い続けるには、ファイルを保存してその方法でインストールしてください。</string>
-    <string name="update_car_save">ファイルを保存</string>
-    <string name="update_car_anyway">このまま更新</string>
     <string name="place_transit_cached">%1$s に取得しました。接続がないため、時刻が変わっている可能性があります。</string>
-    <string name="car_pause">一時停止</string>
-    <string name="car_resume">再開</string>
     <string name="car_paused">一時停止中</string>
     <string name="car_along_route">ルート沿いを検索</string>
     <string name="car_along_none">近くに見つかりませんでした</string>
@@ -1064,9 +985,6 @@
     <string name="map_import_needs_google">Google なしで AutoMap を使っている間は、共有された Google マップのリストを開けません。</string>
     <string name="map_link_needs_google">「共有された Google マップのリンクを開く」は 設定 ▸ プライバシー でオフになっています。</string>
     <string name="map_link_unreadable">そのリンクを開けませんでした。</string>
-    <string name="settings_performance">パフォーマンス</string>
-    <string name="settings_hub_performance_sub">事前読み込み、地図の描画</string>
-    <string name="settings_performance_intro">事前に読み込んでおくと必要なときにすぐ使えますが、それまではメモリを消費します。初期設定はこの端末のメモリ容量に合わせています。</string>
     <string name="settings_full_place_load">すべての写真とクチコミを読み込む</string>
     <string name="settings_full_place_load_hint">オフの場合、場所ごとに最初の数枚の写真とクチコミの 1 ページ目だけを読み込み、残りは「写真をもっと見る」や「すべてのクチコミ」で取得します。オンにすると、開いた場所ごとに写真ギャラリー全体と最大 50 件のクチコミを読み込むため、表示が遅くなり、Google へのリクエストも大幅に増えます。</string>
     <string name="settings_speech_preload">起動時に音声検索を読み込む</string>
@@ -1114,11 +1032,6 @@
     <string name="settings_puck_shape">ナビのアイコン</string>
     <string name="settings_puck_shape_arrow">矢印</string>
     <string name="settings_puck_shape_car">車</string>
-    <string name="settings_car_red">赤</string>
-    <string name="settings_car_blue">青</string>
-    <string name="settings_car_white">白</string>
-    <string name="settings_car_green">緑</string>
-    <string name="settings_car_yellow">黄</string>
     <string name="settings_puck_shape_ufo">UFO</string>
     <string name="settings_puck_shape_ship">海賊船</string>
     <string name="settings_puck_shape_duck">ラバーダック</string>
@@ -1197,7 +1110,6 @@
     <string name="place_icon_title">%1$s の地図アイコン</string>
     <string name="place_icon_default">リストのアイコンを使う</string>
     <string name="settings_map_theme_title">地図</string>
-    <string name="settings_map_theme_follow">アプリと同じ</string>
     <string name="settings_map_theme_hint">地図だけ別のテーマにできます。ダークのアプリに明るい地図、またはライトのアプリに暗い地図です。運転中の昼と夜の切り替えは、引き続き地図に適用されます。</string>
     <string name="route_saved_label">マイルート: %1$s</string>
     <string name="route_save">このルートを保存</string>
@@ -1304,7 +1216,6 @@
     <string name="mapscreen_other_locations">ほかの店舗を表示</string>
     <string name="settings_other_locations_auto">ほかの店舗を自動で探す</string>
     <string name="settings_other_locations_auto_hint">名前で検索して 1 件の場所に絞られたとき、ほかの店舗も Google に問い合わせます。該当する検索のたびに Google へのリクエストが数回増えます。オフにすると、「ほかの店舗を表示」ボタンをタップしたときだけ問い合わせます。</string>
-    <string name="mapscreen_view_map">地図を表示</string>
     <string name="whatsnew_show_after_updates">アップデート後に新機能を表示</string>
     <string name="replay_play">再生</string>
     <string name="replay_pause">一時停止</string>
@@ -1354,13 +1265,6 @@
     <string name="search_offline_recheck">オフラインです。タップして再確認</string>
     <string name="settings_turn_declutter">曲がるときは地図を簡略化</string>
     <string name="settings_turn_declutter_hint">曲がり角で地図が回転している間は、道路名だけを表示します。回転が落ち着くと、場所、標識、カメラがすぐに戻ります。処理の遅い端末でも曲がり角の動きが滑らかになります。</string>
-    <string name="settings_softkeys">ハードウェア ソフトキー</string>
-    <string name="settings_softkeys_hint">端末の 2 つのソフトキーで地図を拡大・縮小します。キーパッド付きの端末専用です。</string>
-    <string name="settings_softkeys_calibrate">ソフトキーを調整</string>
-    <string name="settings_softkeys_calibrate_hint">ソフトキーでズームできない場合は、ここをタップしてから左、右の順にソフトキーを押してください。AutoMap がキーコードを記憶します。</string>
-    <string name="map_zoom_mode_hint">ズーム:  ◀ 縮小   ·   拡大 ▶      戻るで終了</string>
-    <string name="map_move_mode_hint">地図を移動:  ◀ ▲ ▼ ▶      戻るで終了</string>
-    <string name="softkey_zoom_menu">ズーム（◀ − ▶ +）</string>
     <string name="exp_chooser_alts_same">所要時間はほぼ同じ</string>
     <string name="exp_chooser_fewest_cams">カメラ最少</string>
     <string name="trip_shortcut_add">ホーム画面に追加</string>

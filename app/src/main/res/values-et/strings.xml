@@ -48,11 +48,6 @@
     <string name="nav_end_confirm_title">Kas lõpetad tee juhatamise?</string>
     <string name="settings_saved_route_rename">Muuda nime</string>
     <string name="settings_saved_route_delete">Kustuta</string>
-    <string name="settings_car_red">Punane</string>
-    <string name="settings_car_blue">Sinine</string>
-    <string name="settings_car_white">Valge</string>
-    <string name="settings_car_green">Roheline</string>
-    <string name="settings_car_yellow">Kollane</string>
     <string name="settings_puck_shape_ufo">UFO</string>
     <string name="settings_puck_shape_ship">Piraadilaev</string>
     <string name="settings_puck_shape_duck">Kummist part</string>

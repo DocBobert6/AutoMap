@@ -33,10 +33,8 @@
     <string name="settings_app_name_title">App name</string>
     <string name="settings_app_name_generic">Call it just “Maps”</string>
     <string name="settings_app_name_generic_hint">Shows the launcher icon as plain Maps instead of AutoMap, for a stock look. You may need to re-add a home screen shortcut after switching.</string>
-    <string name="settings_dynamic_color">Material You colors</string>
+    <string name="settings_dynamic_color">Material You colours</string>
     <string name="settings_dynamic_color_hint">Tints buttons and accents from your wallpaper. The map stays neutral.</string>
-    <string name="settings_map_style">Map style</string>
-    <string name="settings_map_style_hint">OpenFreeMap works without any API key.</string>
     <string name="settings_units">Units</string>
     <string name="settings_clock">Clock</string>
     <string name="settings_clock_system">Same as the phone</string>
@@ -111,7 +109,7 @@
     <string name="settings_sim_location">Simulate my location (demo)</string>
     <string name="settings_sim_location_hint">Pretends you\'re at the map\'s center, for demos and screenshots. Turn off to use real GPS.</string>
     <string name="settings_map">Map</string>
-    <string name="settings_live_traffic">Live traffic overlay</string>
+    <string name="settings_live_traffic">Traffic</string>
     <string name="settings_live_traffic_hint">Shades roads by congestion while browsing. Navigation already colors your route by traffic.</string>
     <string name="settings_transit_layer">Highlight transit lines</string>
     <string name="settings_transit_layer_hint">Draws train and subway lines on the map, each line in its own color where the open transit data has one.</string>
@@ -124,7 +122,7 @@
     <string name="settings_topography_hint">Shades hills and mountains on the map. Off by default.</string>
     <string name="settings_sun_shading">Sun-angle building shading</string>
     <string name="settings_sun_shading_hint">Shades 3D buildings by the sun\'s position, following the time of day. At night the buildings keep their night colours.</string>
-    <string name="settings_flock">Surveillance cameras</string>
+    <string name="settings_flock">Plate cameras</string>
     <string name="settings_flock_hint">Shows mapped automated license-plate reader (Flock) cameras, from the community DeFlock project in OpenStreetMap. On by default.</string>
     <string name="settings_speed_cams">Speed cameras</string>
     <string name="settings_speed_cam_warn">Warn me out loud</string>
@@ -148,7 +146,7 @@
     <string name="exp_chooser_alts_back">Back</string>
     <string name="exp_chooser_along">Add a stop along the way</string>
     <string name="exp_chooser_share_text">Directions to %1$s: %2$s, %3$s</string>
-    <string name="settings_flock_route_alert">Avoid surveillance cameras</string>
+    <string name="settings_flock_route_alert">Avoid plate cameras</string>
     <string name="settings_flock_detour">Try side streets around cameras</string>
     <string name="settings_flock_detour_hint">When the top route still passes cameras, tries a point just off the road at each camera and routes through it, the way you would by long-pressing the map. A route that passes fewer cameras within the same small detour goes to the top of the list. Costs a few extra route requests per trip. Off by default.</string>
     <string name="settings_flock_route_alert_hint">Counts the license-plate reader (Flock) cameras on each route (a camera aimed across the road is left out, since it reads cross traffic) and auto-picks a lower-camera one when it costs only a little longer. It never sends you far out of the way, so where cameras are unavoidable it just shows the counts and leaves the choice to you. Long-press the map to route through a point yourself. Off by default.</string>
@@ -174,8 +172,7 @@
     <string name="settings_nav_trace">Nav smoothness trace</string>
     <string name="settings_nav_trace_hint">Records how the map camera moves while you navigate, so a jittery or swimming map can be diagnosed. Contains no location data, only headings, speeds and timings, so it is safe to attach to a bug report.</string>
     <string name="settings_nav_trace_export">Share nav trace</string>
-    <string name="settings_nav_trace_empty">No trace recorded yet. Navigate somewhere first.</string>
-    <string name="settings_voice_vela_name">AutoMap voice (%1$s)</string> <!-- format -->
+    <string name="settings_nav_trace_empty">No trace recorded yet. Navigate somewhere first.</string> <!-- format -->
     <string name="settings_voice_install_vela">Install the AutoMap voice (%1$d MB)</string> <!-- format -->
     <string name="settings_voice_install_vela_hint">The recommended navigation voice. Reinstall it here any time it goes missing or a download failed.</string>
     <string name="settings_texture_render">Compatibility rendering</string>
@@ -226,7 +223,6 @@
         <item quantity="other">%1$d pieces have a newer version</item>
     </plurals>
     <string name="settings_area_confirm_region_have">Offline directions and places for %1$s are already downloaded.</string>
-    <string name="settings_offline_no_areas">No areas saved yet.</string>
     <string name="settings_offline_addresses_missing">Areas you saved before this update don\'t include address data. Update them to search and route to addresses offline.</string>
     <string name="settings_offline_addresses_update">Update saved areas</string>
     <string name="settings_offline_delete_area">Delete this offline area</string>
@@ -247,7 +243,7 @@
     <string name="settings_link_action_start">Start navigation</string>
     <string name="settings_link_action_hint">What happens when another app hands AutoMap a location. Start navigation suits delivery apps that send one stop after another.</string>
     <string name="settings_confirm_end_nav">Ask before ending navigation</string>
-    <string name="settings_confirm_end_nav_hint">Back during a drive always asks first. With this on, the red X asks too</string>
+    <string name="settings_confirm_end_nav_hint">Back during a drive always asks first. With this on, the red X asks too. On the car, a host stop ends navigation immediately.</string>
     <string name="nav_end_confirm_title">End navigation?</string>
     <string name="nav_end_confirm_body">The route and its stops are cleared.</string>
     <string name="nav_end_confirm_end">End</string>
@@ -276,7 +272,6 @@
     <string name="settings_places_shared_pack">Places cover all of %1$s (%2$s)</string> <!-- format: %1$s country or state name, %2$s a size like "1.9 GB" -->
     <string name="settings_routing_places_downloading">Saving places · %1$d%%</string> <!-- format -->
     <string name="settings_get_places">Get places</string>
-    <string name="settings_update_places">Update places</string>
     <string name="settings_routing_update_available">Installed · places update available</string>
     <string name="settings_routing_size_installed_here">About %1$s once installed · covers your location</string> <!-- format -->
     <string name="settings_routing_size_installed">About %1$s once installed</string> <!-- format -->
@@ -299,8 +294,7 @@
     <string name="settings_region_whole_or_pieces">One file, or %1$d pieces below</string> <!-- format -->
     <string name="settings_downloaded_title">Downloaded</string>
     <string name="settings_downloaded_none">Nothing downloaded yet. Save the area you are looking at above, or pick a state or country below.</string>
-    <string name="settings_downloaded_area">Saved area</string>
-    <string name="settings_region_group_title">All of %1$s</string> <!-- format -->
+    <string name="settings_downloaded_area">Saved area</string> <!-- format -->
     <string name="settings_region_group_size">%1$d pieces, about %2$s once installed</string> <!-- format -->
     <string name="settings_region_group_partial">%1$d of %2$d pieces installed, about %3$s for all</string> <!-- format -->
     <string name="settings_region_group_installed">All %1$d pieces installed</string> <!-- format -->
@@ -403,8 +397,8 @@
     <string name="settings_clear_history_confirm_body">Recent searches, recent places, parking history and every recorded trip will be deleted. This cannot be undone. Saved places and lists are not affected.</string>
     <string name="settings_clear_history_done">History cleared</string>
     <string name="settings_privacy_button">What data Google receives</string>
-    <string name="settings_google_free">Use AutoMap without Google</string>
-    <string name="settings_google_free_hint">Nothing is sent to Google. Search uses OpenStreetMap and your downloaded regions, places on the map come from AutoMap\'s own data, and routes come from the open router with no live traffic. You lose reviews, photos, Google\'s opening hours, live arrival times, Street View and the satellite close-ups. Transit directions come from the open planner. Downloaded regions still work fully offline.</string>
+    <string name="settings_google_free">Google-free</string>
+    <string name="settings_google_free_hint">Nothing is sent to Google, except the optional shared-links request below, which stays off unless you turn it on. Search uses OpenStreetMap and your downloaded regions, places on the map come from AutoMap\'s own data, and routes come from the open router with no live traffic. You lose reviews, photos, Google\'s opening hours, live arrival times, Street View and Google\'s satellite close-ups (Esri satellite still works). Transit directions come from the open planner. Downloaded regions still work fully offline.</string>
     <string name="settings_diagnostics">Diagnostics</string>
     <string name="settings_diagnostics_hint">Off by default. When on, AutoMap keeps a short local log you can export and hand to a developer. Nothing is uploaded, and turning it off wipes the log.</string>
     <string name="settings_share_diagnostics">Share diagnostics</string>
@@ -468,7 +462,7 @@
     <string name="settings_diag_consent_title">Turn on diagnostics?</string>
     <string name="settings_diag_consent_body">AutoMap will keep a short local log of your searches, routes and any errors. It never leaves the phone unless you tap Export and choose where to send it. Turn it off any time to wipe the log.</string>
     <string name="settings_about">About</string>
-    <string name="settings_about_hint">AutoMap is a maps client: open tiles for the basemap, scraped Google for places, routing and traffic-aware ETAs, and a Piper voice that runs on the phone. GPLv3. No Play Services required.</string>
+    <string name="settings_about_hint">AutoMap is a maps client: open tiles for the basemap, Google\'s public endpoints for places, routing and traffic-aware ETAs, and a Piper voice that runs on the phone. GPLv3. No Play Services required.</string>
     <string name="settings_version">Version</string>
     <string name="settings_version_line">AutoMap %1$s  (build %2$d)</string> <!-- format -->
     <string name="settings_installer_play">Installed by %1$s. This install is set up for Android Auto; an in-app update would undo that, so update through the same installer.</string>
@@ -501,10 +495,8 @@
 
     <!-- place: PlaceSheet.kt -->
     <string name="place_photo_number">Photo %1$d</string> <!-- format -->
-    <string name="place_photo_category_all">All</string>
     <string name="place_saved">Saved</string>
     <string name="place_save">Save</string>
-    <string name="place_more_options">More options</string>
     <string name="place_set_as_home">Set as Home</string>
     <string name="place_set_as_work">Set as Work</string>
     <string name="place_close">Close</string>
@@ -613,7 +605,6 @@
     <string name="update_notes_hide">Hide what\'s new</string>
     <string name="place_name_copied">Name copied</string>
     <string name="place_link_copied">Link copied</string>
-    <string name="place_share_gmaps_link">Google Maps link</string>
     <string name="place_share_map_pin">Map pin (geo:)</string>
     <string name="place_open_other_app">Open in another map app</string>
     <string name="place_share_coordinates">Coordinates</string>
@@ -668,7 +659,6 @@
     <string name="mapscreen_other_locations">Show other locations</string>
     <string name="settings_other_locations_auto">Find other locations automatically</string>
     <string name="settings_other_locations_auto_hint">When a name search lands on one place, also ask Google for its other locations. That is a few more requests to Google with each such search. Off, a \"Show other locations\" button does it when you tap it.</string>
-    <string name="mapscreen_view_map">View map</string>
     <string name="intent_home_unset">Set Home first (search page, under the search bar)</string>
     <string name="intent_work_unset">Set Work first (search page, under the search bar)</string>
     <string name="intent_eta_reply">About %1$s to go</string>
@@ -796,7 +786,6 @@
     <string name="mapvm_offline_no_data">You\'re offline. Download an area in Settings ▸ Offline to search without a connection.</string>
     <string name="mapvm_offline_no_match">No offline results for \"%1$s\" in your saved area. Offline search covers OpenStreetMap places you downloaded.</string>
     <string name="mapvm_no_results">No results for \"%1$s\".</string> <!-- format -->
-    <string name="mapvm_offline_results">Offline results (no connection)</string>
     <string name="mapvm_search_failed_reason">Search failed: %1$s</string> <!-- format -->
     <string name="mapvm_none_found_along_route">No \"%1$s\" found along your route</string> <!-- format -->
     <string name="mapvm_search_failed">Search failed</string>
@@ -843,9 +832,7 @@
     <string name="mapvm_voice_downloaded">%1$s downloaded</string> <!-- format -->
     <string name="mapvm_voice_download_failed">%1$s download failed</string> <!-- format -->
     <string name="mapvm_vela_voice_removed">AutoMap Voice removed</string>
-    <string name="mapvm_opening_installer">Opening installer for %1$s…</string> <!-- format -->
-    <string name="mapvm_pan_to_area_first">Open the map and pan to an area first</string>
-    <string name="mapvm_offline_routing_ready">Offline routing ready: %1$s</string> <!-- format -->
+    <string name="mapvm_opening_installer">Opening installer for %1$s…</string> <!-- format --> <!-- format -->
     <string name="mapvm_offline_routing_failed">Offline routing download failed</string>
     <string name="mapvm_offline_routing_removed">Offline routing removed</string>
     <string name="mapvm_graphs_retired">Offline routing moved to a smaller format. Download your regions again in Settings, Offline maps.</string>
@@ -865,20 +852,9 @@
     <string name="navservice_notif_action_end">End</string>
     <string name="navservice_channel_name">Navigation</string>
     <string name="navservice_channel_turns_name">Spoken turn alerts</string>
-
-    <string name="update_available_title">AutoMap %1$s is available</string>
-    <string name="update_downloading">Downloading… %1$d%%</string>
-    <string name="update_later">Not now</string>
-    <string name="update_install">Update</string>
-    <string name="update_download_failed">Update download failed. Try again later.</string>
-    <string name="update_car_title">This update will drop AutoMap from Android Auto</string>
-    <string name="update_car_body">AutoMap was installed in the way Android Auto accepts. Installing this update here replaces that, and the car will stop listing AutoMap until you install the file with the tool you used the first time (AAEnabler, King Installer).\n\nSave the file and install it that way to keep the car working.</string>
-    <string name="update_car_save">Save the file</string>
-    <string name="update_car_anyway">Update anyway</string>
     <!-- Background-download keeper notification (DownloadService, issue #212). -->
     <string name="download_notif_channel">Downloads</string>
     <string name="download_notif_title">Downloading %1$s</string> <!-- format -->
-    <string name="download_label_update">AutoMap update</string>
     <string name="download_label_map_data">map data</string>
     <string name="download_label_offline_places">offline places</string>
     <!-- Map-area tile download: progress card + one completion flash (was hardcoded English
@@ -887,11 +863,6 @@
     <string name="offline_area_saved">This area is saved for offline</string>
     <string name="offline_area_failed">Offline download failed. Try again later.</string>
     <string name="offline_area_too_large">Area too large. Zoom in and save a smaller area.</string>
-    <string name="settings_update_auto">Check for updates on launch</string>
-    <string name="settings_update_auto_hint">Checks GitHub about once a day and offers newer releases. Turn off if you update through Obtainium.</string>
-    <string name="settings_update_check_now">Check for updates</string>
-    <string name="settings_update_checking">Checking…</string>
-    <string name="settings_update_none">You\'re on the latest version.</string>
 
     <string name="settings_automap_updates" translatable="false">AutoMap updates</string>
     <string name="settings_automap_update_auto" translatable="false">Check for updates automatically</string>
@@ -950,12 +921,7 @@
     <string name="car_search">Search</string>
     <string name="car_search_hint">Type to search for a destination</string>
     <string name="car_go">Go</string>
-    <string name="car_end">End</string>
-    <string name="car_mute">Mute</string>
-    <string name="car_unmute">Unmute</string>
     <string name="car_faster_route">Faster −%1$d min</string>
-    <string name="car_pause">Pause</string>
-    <string name="car_resume">Resume</string>
     <string name="car_paused">Paused</string>
     <string name="car_along_route">Search along route</string>
     <string name="car_along_none">Nothing found nearby</string>
@@ -972,10 +938,12 @@
     <string name="car_setting_avoid_tolls">Avoid tolls</string>
     <string name="car_setting_avoid_highways">Avoid highways</string>
     <string name="car_setting_avoid_ferries">Avoid ferries</string>
-    <string name="car_setting_avoid_tolls_hint" translatable="false">Routes avoid toll roads. The same setting as the car settings and the route chooser.</string>
-    <string name="car_setting_avoid_highways_hint" translatable="false">Routes avoid motorways and highways. The same setting as the car settings and the route chooser.</string>
-    <string name="car_setting_avoid_ferries_hint" translatable="false">Routes avoid ferry crossings. The same setting as the car settings and the route chooser.</string>
+    <string name="car_setting_avoid_tolls_hint">Routes avoid toll roads. Avoids apply to every route until changed.</string>
+    <string name="car_setting_avoid_highways_hint">Routes avoid motorways and highways. Avoids apply to every route until changed.</string>
+    <string name="car_setting_avoid_ferries_hint">Routes avoid ferry crossings. Avoids apply to every route until changed.</string>
     <string name="car_setting_traffic">Traffic</string>
+    <string name="car_offline_title">Offline areas</string>
+    <string name="car_offline_count">%1$d saved</string>
     <string name="car_location_title">Allow location</string>
     <string name="car_location_body">AutoMap needs it to show where you are and give directions</string>
     <string name="car_location_denied">Location is off. Turn it on for AutoMap in your phone\'s settings.</string>
@@ -996,9 +964,6 @@
     <string name="map_import_needs_google">A shared Google Maps list can\'t open while AutoMap runs without Google.</string>
     <string name="map_link_needs_google">\"Open shared Google Maps links\" is off in Settings > Privacy.</string>
     <string name="map_link_unreadable">Couldn\'t open that link.</string>
-    <string name="settings_performance">Performance</string>
-    <string name="settings_hub_performance_sub">What loads ahead of time, map drawing</string>
-    <string name="settings_performance_intro">Loading things ahead of time makes them instant when you need them, and costs memory until then. The defaults follow how much memory this phone has.</string>
     <string name="settings_full_place_load">Load all photos and reviews</string>
     <string name="settings_full_place_load_hint">Off, a place loads its first few photos and first page of reviews, and More photos or All reviews fetch the rest. On, every place you open walks its whole photo gallery and up to 50 reviews, which is slower and sends Google many more requests.</string>
     <string name="settings_speech_preload">Load voice search at startup</string>
@@ -1086,13 +1051,6 @@
     <string name="draw_list_name">My drawings</string>
     <string name="draw_delete">Delete this drawing</string>
     <string name="map_list_saved">Saved “%1$s” to your lists</string>
-    <string name="settings_update_nightly">Include nightly builds</string>
-    <string name="settings_update_nightly_hint">Update to the newest nightly (prerelease) instead of only stable releases. Nightlies are fresher but less tested.</string>
-    <string name="settings_update_channel">Update channel</string>
-    <string name="settings_update_channel_stable">Stable (weekly)</string>
-    <string name="settings_update_channel_nightly">Nightly (daily)</string>
-    <string name="settings_update_channel_canary">Canary (development builds)</string>
-    <string name="settings_update_channel_hint">Stable gets one tested release a week. Nightly gets a build each day there are changes. Canary follows work in progress and can break at any time.</string>
     <string name="settings_voice_volume">Guidance volume</string>
     <string name="settings_voice_volume_softer">Softer</string>
     <string name="settings_voice_volume_normal">Normal</string>
@@ -1138,12 +1096,6 @@
         <item quantity="other">%1$d places</item>
     </plurals>
     <string name="navservice_notif_eta">Arrive %1$s</string>
-    <string name="settings_advanced">Advanced</string>
-    <string name="settings_advanced_hint">Options most people never need.</string>
-    <string name="settings_developer">Developer</string>
-    <string name="settings_developer_hint">Tools for demos, screenshots and testing. Turn each off for real use.</string>
-    <string name="settings_browse_voices">Browse voices</string>
-    <string name="settings_browse_voices_hint">Download and switch between AutoMap\'s on-device voices.</string>
     <string name="voice_capture_listening">Listening…</string>
     <string name="voice_capture_starting">Getting ready…</string>
     <string name="voice_capture_done">Done</string>
@@ -1151,8 +1103,7 @@
     <string name="mapvm_asr_download_failed">Couldn\'t download the voice model. Check your connection and try again.</string>
     <string name="mapvm_closing_soon">%1$s closes at %2$s and you arrive around %3$s</string> <!-- format -->
     <string name="mapvm_closing_before_arrival">%1$s closes at %2$s, before you arrive around %3$s</string> <!-- format -->
-    <string name="settings_voice_search_model">AutoMap Voice</string>
-    <string name="settings_voice_search_model_hint">AutoMap Voice turns speech into a search right on your phone: no other app needed and nothing is uploaded. One-time %1$d MB download.</string>  <!-- format -->
+    <string name="settings_voice_search_model">AutoMap Voice</string>  <!-- format -->
     <string name="settings_voice_search_download">Download (%1$d MB)</string>  <!-- format -->
     <string name="settings_voice_search_remove">Remove</string>
     <string name="settings_voice_search_downloading">Downloading… %1$d%%</string>  <!-- format -->
@@ -1169,7 +1120,6 @@
     <string name="settings_voice_search_engine_hint" translatable="false">The app that supplies the mic — AutoMap\'s own on-device model, or another installed voice app. Pinning an app stops Android asking which app to use.</string>
     <string name="settings_voice_search_engine_auto">AutoMap Voice</string>
     <string name="settings_voice_search_engine_default">Android default</string>
-    <string name="settings_voice_search_engine_system">Other voice app</string>
     <string name="map_asr_offer_title">Voice search</string>
     <string name="map_asr_offer_body">Download AutoMap Voice to speak your searches. It runs entirely on your phone and uploads nothing.</string>
     <string name="voice_capture_examples_title">Things you can say</string>
@@ -1209,7 +1159,7 @@
     <string name="settings_map_look_fiord">Fiord</string>
     <string name="settings_map_look_dark">Black</string>
     <string name="settings_map_look_hint">AutoMap is OpenFreeMap\'s Liberty style with AutoMap\'s own colors, icons and road widths. The others are OpenFreeMap\'s Bright, Positron, Fiord and Black (its Dark style) as they come; Fiord and Black are dark whatever the theme.</string>
-    <string name="settings_map_colors">Map colors</string>
+    <string name="settings_map_colors">Map colours</string>
     <string name="settings_map_buttons">Map buttons</string>
     <string name="settings_map_buttons_round">Round</string>
     <string name="settings_map_buttons_square">Square</string>
@@ -1271,23 +1221,18 @@
     <string name="settings_places">Places</string>
     <string name="settings_privacy">Privacy</string>
     <string name="settings_cameras_group">Cameras</string>
-    <string name="settings_road_alerts_group">Road alerts</string>
     <string name="settings_bridge_openings">Bridge openings</string>
     <string name="settings_bridge_openings_hint">In the Netherlands, says when a movable bridge on your route is open or due to open as you reach it. Planned and live openings come from NDW\'s open road data, asked only when your route enters the Netherlands. On by default.</string>
     <string name="nav_bridge_open_ahead">Bridge ahead is open</string>
     <string name="nav_bridge_opening_ahead">Bridge ahead: opening planned at %1$s</string> <!-- format: %1$s is a clock time -->
-    <string name="settings_experiments">Experiments</string>
     <string name="settings_hub_places_sub">Source, map icons, place pages</string>
-    <string name="settings_hub_appearance_sub">Theme, map style, units, language</string>
-    <string name="settings_hub_map_sub">Traffic, transit, layers, 3D buildings</string>
-    <string name="settings_hub_navigation_sub">Guidance, cameras, live rechecks</string>
+    <string name="settings_hub_appearance_sub">Theme, Display, Map style, Locale</string>
+    <string name="settings_hub_map_sub">Layers and buttons, Map behaviour, Addresses</string>
     <string name="settings_hub_voice_sub">Spoken directions and voices</string>
     <string name="settings_hub_search_sub">Voice search, speech models and quick search buttons</string>
     <string name="settings_hub_offline_sub">Offline maps, routing, places</string>
-    <string name="settings_hub_saved_sub">Your lists, export, parking history</string>
-    <string name="settings_hub_privacy_sub">What Google receives, clearing history</string>
     <string name="settings_hub_diagnostics_sub">Crash reports, trips, demo mode</string>
-    <string name="settings_hub_about_sub">Version, updates, support</string>
+    <string name="settings_hub_about_sub">Project, version, AutoMap updates</string>
     <string name="settings_hub_saved_places_sub">Places, lists, routes, parking history</string>
     <string name="settings_hub_navigation_sub2" translatable="false">Guidance, vehicle, cameras, route options</string>
     <string name="settings_hub_privacy_sub2" translatable="false">Google-free, sessions, history</string>
@@ -1315,7 +1260,6 @@
     <string name="settings_cat_vehicle" translatable="false">Vehicle and road display</string>
     <string name="settings_cat_vehicle_sub" translatable="false">Icon, size, speed, lights</string>
     <string name="settings_cat_vehicle_colour" translatable="false">Vehicle colour</string>
-    <string name="settings_cat_vehicle_colour_sub" translatable="false">Preview, wheel, sliders, hex</string>
     <string name="settings_cat_cameras" translatable="false">Cameras and road alerts</string>
     <string name="settings_cat_cameras_sub" translatable="false">Flock, speed cameras, bridges</string>
     <string name="settings_cat_route_options" translatable="false">Route options</string>
@@ -1345,8 +1289,8 @@
     <string name="settings_cat_google_free" translatable="false">Google-free and data</string>
     <string name="settings_cat_google_free_sub" translatable="false">Google-free switch, sessions</string>
     <string name="settings_cat_google_uses" translatable="false">What Google is used for</string>
-    <string name="welcome_google_uses_links" translatable="false">After setup, each of these lives on its own Settings page — tap a category there to change it. Until then, the Google choice you just made decides everything.</string>
-    <string name="settings_cat_google_uses_sub" translatable="false">See also: owning pages</string>
+    <string name="welcome_google_uses_links" translatable="false">After setup, these live in Settings — Places, Map, Navigation and Privacy. Until then, the Google choice you just made decides everything.</string>
+    <string name="settings_cat_google_uses_sub" translatable="false">These settings live on their own pages — tap one to change it</string>
     <string name="settings_cat_history" translatable="false">History</string>
     <string name="settings_cat_history_sub" translatable="false">Clear history, parking, trips</string>
     <string name="settings_cat_diagnostics" translatable="false">Diagnostics</string>
@@ -1360,11 +1304,9 @@
     <string name="settings_cat_updates" translatable="false">AutoMap updates</string>
     <string name="settings_cat_updates_sub" translatable="false">Check, download, install</string>
     <string name="settings_cat_more_phone" translatable="false">More settings on the phone</string>
-    <string name="settings_cat_see_also" translatable="false">See also</string>
     <string name="settings_cat_painted_only" translatable="false">Only applies to the Liberty look</string>
     <string name="settings_cat_auto_daylight" translatable="false">Already automatic: the app theme itself follows daylight.</string>
     <string name="settings_cat_satellite_hint" translatable="false">Satellite imagery from Esri, with Google as a fallback. Under Google-free, Google-sourced imagery is not used.</string>
-    <string name="settings_cat_vehicle_colour_link" translatable="false">Vehicle colour</string>
     <string name="settings_ui_scale_hint" translatable="false">Scales buttons, sheets and text — not the map itself. Larger sizes suit car and tablet screens.</string>
     <string name="settings_units_hint" translatable="false">App only; the phone\'s own setting is untouched. New installs follow the device locale: miles and feet for the US, UK, Liberia and Myanmar, kilometres and metres elsewhere.</string>
     <string name="settings_region_updates_hint" translatable="false">Default: never on its own. Updates are small patches — a few megabytes instead of a few hundred — and a full re-download is never automatic.</string>
@@ -1378,7 +1320,7 @@
     <string name="settings_cat_vehicle_colour_link_hint" translatable="false">The colour of the car icon on the map. Only applies when the navigation icon is the car.</string>
     <string name="settings_theme_amoled">AMOLED black</string>
     <string name="settings_map_theme_title">Map</string>
-    <string name="settings_map_scheme_title">Color scheme</string>
+    <string name="settings_map_scheme_title">Colour scheme</string>
     <string name="settings_map_scheme_automatic">Automatic</string>
     <string name="settings_map_scheme_day">Day</string>
     <string name="settings_map_scheme_night">Night</string>
@@ -1386,7 +1328,6 @@
     <string name="settings_map_detail_2d">2D</string>
     <string name="settings_map_detail_3d">3D</string>
     <string name="settings_map_detail_hint">2D hides the 3D buildings and shows the map top-down; 3D keeps the tilted view and the buildings the 3D buildings setting allows.</string>
-    <string name="settings_map_theme_follow">Same as the app</string>
     <string name="settings_map_theme_hint">The map on its own: light streets under a dark app, or dark streets under a light one. Automatic day and night while driving is the separate \'Day and night while navigating\' row under App theme (hidden while the app theme is Automatic).</string>
     <string name="settings_theme_auto">Day and night</string>
     <string name="settings_theme_auto_hint">Light during the day, dark after sunset, worked out from your location.</string>
@@ -1398,11 +1339,12 @@
     <string name="settings_road_label_bar">Above the bottom bar</string>
     <string name="settings_road_label_puck">Under the arrow</string>
     <string name="settings_road_label_inbar">Inside the bottom bar</string>
-    <string name="settings_puck_size">Navigation icon size</string>
+    <string name="settings_puck_size">Vehicle icon size</string>
+    <string name="settings_puck_size_hint">Sizes the arrow, car, UFO, ship and duck icons alike.</string>
     <string name="settings_puck_size_normal">Normal</string>
     <string name="settings_puck_size_large">Large</string>
     <string name="settings_puck_size_xl">Extra large</string>
-    <string name="settings_puck_style">Arrow colors</string>
+    <string name="settings_puck_style">Arrow colours</string>
     <string name="settings_puck_style_blue">Blue disc, white arrow</string>
     <string name="settings_puck_style_white">White disc, blue arrow</string>
     <string name="settings_road_label_hint">Where the name of the road you are on is shown while driving. Above the bar keeps it centered and readable for long names; under the arrow follows the arrow around.</string>
@@ -1463,6 +1405,7 @@
     <string name="settings_route_bar">Road ahead bar</string>
     <string name="settings_route_bar_hint">A strip beside the map showing traffic and what is coming up on the rest of your route. Shows only what AutoMap actually knows: congestion, lights, stop signs, level crossings, speed bumps and surveillance cameras. Portrait only.</string>
     <string name="settings_font">Font</string>
+    <string name="settings_font_builtin" translatable="false">Google Sans Flex</string>
     <string name="settings_font_system">System font</string>
     <string name="settings_font_choose">Choose a font file…</string>
     <string name="settings_font_flex_hint">Google Sans Flex is the openly licensed sibling of Google\'s own font. It covers Latin letters; other scripts keep the system font.</string>
@@ -1472,44 +1415,9 @@
     <string name="settings_traffic_lights_hint">Spoken landmark cues: pass the light, then turn. English only, on by default.</string>
     <string name="settings_speeding_alert">Speeding alert</string>
     <string name="settings_speeding_alert_hint">Says \"You\'re over the speed limit\" once you have been over the posted limit for a few seconds, and again after you slow down and creep back over it. Only where a posted limit is known, the one the speed badge shows. Off unless you turn it on.</string>
-    <string name="nav_speeding_alert">You\'re over the speed limit</string>
-    <string name="settings_softkeys">Hardware softkeys</string>
-    <string name="settings_softkeys_hint">Zoom the map with the phone\'s two soft keys. Keypad phones only.</string>
-    <string name="settings_softkeys_calibrate">Calibrate soft keys</string>
-    <string name="settings_softkeys_calibrate_hint">If the soft keys don\'t zoom, tap here and press your left then right soft key so AutoMap learns their codes.</string>
-    <string name="map_zoom_mode_hint">Zoom:  ◀ out   ·   in ▶      BACK to exit</string>
-    <string name="map_move_mode_hint">Move map:  ◀ ▲ ▼ ▶      BACK to exit</string>
-    <string name="softkey_options">Options</string>
-    <string name="softkey_search">Search</string>
-    <string name="softkey_move_map">Move map</string>
-    <string name="softkey_stop_zoom">Stop zoom</string>
-    <string name="softkey_recenter">Recenter</string>
-    <string name="softkey_mute">Mute</string>
-    <string name="softkey_unmute">Unmute</string>
-    <string name="softkey_zoom_menu">Zoom (◀ − ▶ +)</string>
-    <string name="map_asr_downloading">Downloading AutoMap Voice mic · %1$d%%</string>  <!-- format -->
-    <string name="map_asr_installing">Installing AutoMap Voice mic…</string>
+    <string name="nav_speeding_alert">You\'re over the speed limit</string>  <!-- format -->
     <string name="map_asr_waiting">AutoMap Voice mic · waiting for the voice</string>
-<!-- format -->
-    <string name="mapscreen_filter_top_rated">4.0★</string>
-    <string name="mapscreen_section_recent_searches">Recent searches</string>
-    <string name="mapscreen_clear_recent_searches">Clear recent searches</string>
-    <string name="root_diag_title">Help improve AutoMap?</string>
-    <string name="root_diag_body">Both stay on your phone. Nothing is sent unless you export it. Change either any time in Settings.</string>
-    <string name="root_diag_share_title">Share diagnostics</string>
-    <string name="root_diag_share_desc">A short local log of searches, routes &amp; errors.</string>
-    <string name="root_diag_trips_title">Save my trips</string>
-    <string name="root_diag_trips_desc">Records your nav GPS traces so drives can be replayed for testing. More revealing: your exact routes.</string>
-    <string name="root_diag_save">Save choices</string>
-    <string name="root_voice_tts_title">Speak directions aloud</string>
-    <string name="root_voice_tts_desc">Spoken turn-by-turn. Recommended. One-time %1$d MB download.</string>  <!-- format -->
-    <string name="root_voice_mic_title">Search by speaking</string>
-    <string name="root_voice_mic_desc">Dictate searches without typing. Without it, the mic uses Google. One-time %1$d MB download.</string>  <!-- format -->
-    <string name="root_voice_none_picked">Tick an option first, or choose Not now.</string>
-    <string name="root_offline_title">Offline maps</string>
-    <string name="root_offline_body">AutoMap gets places, search and directions from Google, so with no signal only areas you have downloaded will work. Set up an area now so you are covered when you lose service.</string>
-    <string name="root_offline_setup">Set up offline</string>
-    <string name="mapvm_stop_added">Stop added</string>
+<!-- format -->  <!-- format -->  <!-- format -->
  <!-- format -->
     <string name="voice_error_title">Voice search didn\'t start</string>
     <string name="voice_error_retry">Try again</string>
@@ -1572,14 +1480,9 @@
     <string name="settings_zoom_to_turn_floor_hint">How far out the map may zoom to keep the next turn on screen. Default: Town. Each step reaches about four times as far; the far ones trade street names for the stretch ahead.</string>
     <string name="settings_road_numbers">Road numbers first</string>
     <string name="settings_road_numbers_hint">A road with a route number goes by the number, not a name such as Pearl Harbor Memorial Expressway. Under the arrow, on the car screen and in the directions of the next route.</string>
-    <string name="settings_puck_shape">Navigation icon</string>
+    <string name="settings_puck_shape">Vehicle icon</string>
     <string name="settings_puck_shape_arrow">Arrow</string>
     <string name="settings_puck_shape_car">Car</string>
-    <string name="settings_car_red">Red</string>
-    <string name="settings_car_blue">Blue</string>
-    <string name="settings_car_white">White</string>
-    <string name="settings_car_green">Green</string>
-    <string name="settings_car_yellow">Yellow</string>
     <string name="settings_puck_color_title" translatable="false">Vehicle colour</string>
     <string name="settings_puck_color_hint" translatable="false">The top-down 3D car below is the exact car shown on the map. Pick a colour with the wheel, the sliders, or a hex code. It applies to the map car at once.</string>
     <string name="settings_puck_hex_label" translatable="false">Hex code, for example #1F6FEB</string>

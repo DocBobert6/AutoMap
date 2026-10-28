@@ -9,8 +9,6 @@
     <string name="settings_appearance_hint">Стосується лише AutoMap.</string>
     <string name="settings_dynamic_color">Кольори Material You</string>
     <string name="settings_dynamic_color_hint">Забарвлює кнопки й акценти під шпалери. Карта лишається нейтральною.</string>
-    <string name="settings_map_style">Стиль карти</string>
-    <string name="settings_map_style_hint">OpenFreeMap працює без ключа API.</string>
     <string name="settings_units">Одиниці</string>
     <string name="settings_units_imperial">Імперські (милі, фути)</string>
     <string name="settings_units_metric">Метричні (кілометри, метри)</string>
@@ -73,7 +71,6 @@
     <string name="settings_offline_map_area">Місцева область</string>
     <string name="settings_offline_download_viewport">Завантажити ділянку, яку ви переглядаєте</string>
     <string name="settings_offline_download_viewport_hint">Зберігає карту, яку ви бачите, разом із дорогами та адресами, щоб ця область працювала без зв\'язку.</string>
-    <string name="settings_offline_no_areas">Поки що немає збережених ділянок.</string>
     <string name="settings_offline_addresses_missing">Області, збережені до цього оновлення, не містять даних адрес. Оновіть їх, щоб шукати адреси та прокладати до них маршрути офлайн.</string>
     <string name="settings_offline_addresses_update">Оновити збережені області</string>
     <string name="settings_offline_delete_area">Видалити цю офлайн-ділянку</string>
@@ -89,7 +86,6 @@
     <string name="settings_routing_places_downloading">Збереження місць · %1$d%%</string>
     <!-- format -->
     <string name="settings_get_places">Завантажити місця</string>
-    <string name="settings_update_places">Оновити місця</string>
     <string name="settings_routing_update_available">Встановлено · доступне оновлення місць</string>
     <string name="settings_routing_remove">Видалити офлайн-маршрутизацію</string>
     <string name="settings_download">Завантажити</string>
@@ -151,10 +147,8 @@
     <string name="settings_voice_row_use">Використати</string>
     <string name="settings_voice_row_remove">Видалити %1$s</string>
     <string name="place_photo_number">Фото %1$d</string>
-    <string name="place_photo_category_all">Усі</string>
     <string name="place_saved">Збережено</string>
     <string name="place_save">Зберегти</string>
-    <string name="place_more_options">Більше опцій</string>
     <string name="place_set_as_home">Зробити домівкою</string>
     <string name="place_set_as_work">Зробити роботою</string>
     <string name="place_close">Закрити</string>
@@ -249,7 +243,6 @@
     <string name="place_open_web">Відкрити в інтернеті</string>
     <string name="place_copy_link">Копіювати посилання</string>
     <string name="place_link_copied">Посилання скопійовано</string>
-    <string name="place_share_gmaps_link">Посилання Google Maps</string>
     <string name="place_share_map_pin">Мітка на карті (geo:)</string>
     <string name="place_share_coordinates">Координати</string>
     <string name="place_copy_coordinates">Копіювати координати</string>
@@ -362,7 +355,6 @@
     <string name="mapvm_offline_no_match">Немає офлайн-результатів для \"%1$s\" у збереженій області. Офлайн-пошук охоплює завантажені місця OpenStreetMap.</string>
     <string name="mapvm_no_results">Немає результатів за запитом \"%1$s\".</string>
     <!-- format -->
-    <string name="mapvm_offline_results">Офлайн-результати (немає з’єднання)</string>
     <string name="mapvm_search_failed_reason">Помилка пошуку: %1$s</string>
     <string name="mapvm_none_found_along_route">Не знайдено «%1$s» уздовж вашого маршруту</string>
     <string name="mapvm_search_failed">Помилка пошуку</string>
@@ -388,8 +380,6 @@
     <string name="mapvm_voice_download_failed">Не вдалося завантажити %1$s</string>
     <string name="mapvm_vela_voice_removed">Голос AutoMap видалено</string>
     <string name="mapvm_opening_installer">Відкриття інсталятора для %1$s…</string>
-    <string name="mapvm_pan_to_area_first">Спершу відкрийте карту й перемістіться до потрібної зони</string>
-    <string name="mapvm_offline_routing_ready">Офлайн-маршрутизація готова: %1$s</string>
     <string name="mapvm_offline_routing_failed">Не вдалося завантажити офлайн-маршрутизацію</string>
     <string name="mapvm_offline_routing_removed">Офлайн-маршрутизацію видалено</string>
     <string name="mapvm_saved_places_offline">Збережено %1$d місць для офлайн-пошуку</string>
@@ -418,16 +408,6 @@
     <string name="mapscreen_your_destination">вашого пункту призначення</string>
     <string name="mapvm_resume_waiting_gps">Очікування GPS, щоб продовжити навігацію…</string>
     <string name="mapvm_resume_failed">Не вдалося продовжити навігацію</string>
-    <string name="update_available_title">Доступна AutoMap %1$s</string>
-    <string name="update_downloading">Завантаження… %1$d%%</string>
-    <string name="update_later">Не зараз</string>
-    <string name="update_install">Оновити</string>
-    <string name="update_download_failed">Не вдалося завантажити оновлення. Спробуйте пізніше.</string>
-    <string name="settings_update_auto">Перевіряти оновлення під час запуску</string>
-    <string name="settings_update_auto_hint">Перевіряє GitHub приблизно раз на день і пропонує новіші версії. Вимкніть, якщо оновлюєтеся через Obtainium.</string>
-    <string name="settings_update_check_now">Перевірити оновлення</string>
-    <string name="settings_update_checking">Перевірка…</string>
-    <string name="settings_update_none">У вас найновіша версія.</string>
     <string name="settings_place_pages">Сторінки місць</string>
     <plurals name="place_transit_stops">
         <!-- format -->
@@ -471,9 +451,6 @@
     <string name="car_search">Пошук</string>
     <string name="car_search_hint">Введіть, щоб знайти пункт призначення</string>
     <string name="car_go">Їхати</string>
-    <string name="car_end">Завершити</string>
-    <string name="car_mute">Без звуку</string>
-    <string name="car_unmute">Увімкнути звук</string>
     <string name="car_faster_route">Швидше −%1$d хв</string>
     <string name="car_no_route">Немає маршруту, перевірте місцезнаходження</string>
     <string name="map_parking_saved">Місце паркування збережено</string>
@@ -511,8 +488,6 @@
         <item quantity="other">Зберегти список · %1$d місця</item>
     </plurals>
     <string name="map_list_saved">«%1$s» збережено у ваших списках</string>
-    <string name="settings_update_nightly">Включати нічні збірки</string>
-    <string name="settings_update_nightly_hint">Оновлюватися до найновішої нічної збірки (передрелізу), а не лише до стабільних версій. Нічні свіжіші, але менш перевірені.</string>
     <string name="settings_lists_export_hint">Створіть резервну копію списків у файл або відновіть їх на іншому пристрої.</string>
     <string name="settings_lists_imported">Імпортовано списків: %1$d</string>
     <string name="settings_places_imported">Імпортовано місць: %1$d</string>
@@ -528,12 +503,6 @@
         <item quantity="other">%1$d місця</item>
     </plurals>
     <string name="navservice_notif_eta">Прибуття %1$s</string>
-    <string name="settings_advanced">Додатково</string>
-    <string name="settings_advanced_hint">Параметри, які більшості не потрібні.</string>
-    <string name="settings_developer">Розробник</string>
-    <string name="settings_developer_hint">Інструменти для демо, знімків екрана та тестів. Вимикайте їх для реального використання.</string>
-    <string name="settings_browse_voices">Огляд голосів</string>
-    <string name="settings_browse_voices_hint">Завантажуйте та перемикайте голоси AutoMap на пристрої.</string>
     <string name="voice_capture_listening">Слухаю…</string>
     <string name="voice_capture_starting">Підготовка…</string>
     <string name="voice_capture_done">Готово</string>
@@ -544,7 +513,6 @@
     <string name="mapvm_closing_before_arrival">%1$s зачиняється о %2$s, ще до вашого приїзду (близько %3$s)</string>
     <!-- format -->
     <string name="settings_voice_search_model">Голос AutoMap</string>
-    <string name="settings_voice_search_model_hint">Голос AutoMap перетворює мовлення на пошук просто на телефоні: без інших застосунків і без надсилання даних. Одноразове завантаження %1$d МБ.</string>
     <!-- format -->
     <string name="settings_voice_search_download">Завантажити (%1$d МБ)</string>
     <!-- format -->
@@ -555,7 +523,6 @@
     <string name="settings_voice_search_engine_title">Коли торкаєтеся мікрофона</string>
     <string name="settings_voice_search_engine_auto">Голос AutoMap</string>
     <string name="settings_voice_search_engine_default">Типова в Android</string>
-    <string name="settings_voice_search_engine_system">Інший голосовий застосунок</string>
     <string name="map_asr_offer_title">Голосовий пошук</string>
     <string name="map_asr_offer_body">Завантажте голос AutoMap, щоб диктувати запити. Він працює цілком на телефоні й нічого не надсилає.</string>
     <string name="nav_precise_title">Потрібна точна геолокація</string>
@@ -600,16 +567,12 @@
     <string name="settings_places">Місця</string>
     <string name="settings_privacy">Конфіденційність</string>
     <string name="settings_cameras_group">Камери</string>
-    <string name="settings_experiments">Експерименти</string>
     <string name="settings_hub_places_sub">Джерело місць, що показувати, картки</string>
     <string name="settings_hub_appearance_sub">Тема, стиль мапи, одиниці, мова</string>
     <string name="settings_hub_map_sub">Затори, транспорт, шари, 3D-будівлі</string>
-    <string name="settings_hub_navigation_sub">Ведення, камери, живі перевірки</string>
     <string name="settings_hub_voice_sub">Голосові підказки та голоси</string>
     <string name="settings_hub_search_sub">Голосовий пошук і моделі мовлення</string>
     <string name="settings_hub_offline_sub">Офлайн-мапи, маршрути, місця</string>
-    <string name="settings_hub_saved_sub">Ваші списки, експорт, історія паркування</string>
-    <string name="settings_hub_privacy_sub">Що отримує Google, очищення історії</string>
     <string name="settings_hub_diagnostics_sub">Звіти про збої, поїздки, демо-режим, експерименти</string>
     <string name="settings_hub_about_sub">Версія, оновлення, підтримка</string>
     <string name="settings_theme_amoled">AMOLED-чорний</string>
@@ -617,30 +580,9 @@
     <string name="place_review_less">Згорнути</string>
     <string name="settings_traffic_lights">Підказки за світлофорами</string>
     <string name="settings_traffic_lights_hint">Голосові орієнтири: проїхати світлофор і повернути. Лише англійська, типово вимкнено.</string>
-    <string name="map_asr_downloading">Завантаження мікрофона AutoMap Voice · %1$d %%</string>
-    <string name="map_asr_installing">Встановлення мікрофона AutoMap Voice…</string>
     <string name="map_asr_waiting">Мікрофон AutoMap Voice · чекає на голос AutoMap</string>
-    <string name="mapscreen_filter_top_rated">4.0★</string>
-    <string name="mapscreen_section_recent_searches">Нещодавні пошуки</string>
-    <string name="mapscreen_clear_recent_searches">Очистити нещодавні пошуки</string>
-    <string name="root_diag_title">Допомогти покращити AutoMap?</string>
-    <string name="root_diag_body">Обидва залишаються на вашому телефоні - нічого не надсилається, доки ви не експортуєте. Змінити кожен можна будь-коли в Налаштуваннях.</string>
-    <string name="root_diag_share_title">Поділитися діагностикою</string>
-    <string name="root_diag_share_desc">Короткий локальний журнал пошуків, маршрутів і помилок.</string>
-    <string name="root_diag_trips_title">Зберігати мої поїздки</string>
-    <string name="root_diag_trips_desc">Записує GPS-треки навігації, щоб поїздки можна було відтворити для перевірки. Розкриває більше - ваші точні маршрути.</string>
-    <string name="root_diag_save">Зберегти вибір</string>
-    <string name="root_voice_tts_title">Озвучувати підказки вголос</string>
-    <string name="root_voice_tts_desc">Голосові підказки на кожному повороті. Рекомендовано. Одноразове завантаження %1$d МБ.</string>
     <!-- format -->
-    <string name="root_voice_mic_title">Пошук голосом</string>
-    <string name="root_voice_mic_desc">Диктуйте запити без набору тексту. Без цього мікрофон використовує Google. Одноразове завантаження %1$d МБ.</string>
     <!-- format -->
-    <string name="root_voice_none_picked">Позначте опцію або виберіть Не зараз.</string>
-    <string name="root_offline_title">Офлайн-карти</string>
-    <string name="root_offline_body">AutoMap отримує місця, пошук і маршрути з Google, тому без сигналу працюватимуть лише завантажені вами області. Налаштуйте область зараз, щоб залишатися на зв\'язку, коли зникне мережа.</string>
-    <string name="root_offline_setup">Налаштувати офлайн</string>
-    <string name="mapvm_stop_added">Зупинку додано</string>
     <string name="shortcut_home">Дім</string>
     <string name="shortcut_work">Робота</string>
     <string name="settings_asr_engines_hint">Мовлення стає пошуком на телефоні. Нічого не надсилається. Оберіть рушій мікрофона.</string>
@@ -657,13 +599,6 @@
     <string name="street_view_move">Move here</string>
     <string name="street_view_dates">See other dates</string>
     <string name="street_view_fullscreen">Toggle full screen</string>
-    <string name="softkey_options">Опції</string>
-    <string name="softkey_search">Пошук</string>
-    <string name="softkey_recenter">Центрувати</string>
-    <string name="softkey_mute">Без звуку</string>
-    <string name="softkey_unmute">Увімкнути звук</string>
-    <string name="softkey_move_map">Рухати карту</string>
-    <string name="softkey_stop_zoom">Вийти із зуму</string>
     <string name="voice_error_title">Голосовий пошук не запустився</string>
     <string name="voice_error_retry">Повторити</string>
     <string name="voice_error_model">Голосова модель не готова. Завантажте її знову в Налаштуваннях \u2192 Пошук.</string>
@@ -713,7 +648,6 @@
     <string name="settings_nav_trace_hint">Записує, як рухається камера карти під час навігації, щоб можна було з\'ясувати причину смикання чи «плавання» карти. Не містить даних про місцезнаходження, лише напрямки, швидкості та час, тож його безпечно додавати до звіту про помилку.</string>
     <string name="settings_nav_trace_export">Поділитися трасуванням</string>
     <string name="settings_nav_trace_empty">Трасувань ще немає. Спершу проїдьте кудись із навігацією.</string>
-    <string name="settings_voice_vela_name">Голос AutoMap (%1$s)</string>
     <string name="settings_voice_install_vela">Встановити голос AutoMap (%1$d МБ)</string>
     <string name="settings_voice_install_vela_hint">Рекомендований голос для навігації. Перевстановіть його тут будь-коли, якщо він зник або завантаження не вдалося.</string>
     <string name="settings_texture_render">Сумісний режим відтворення</string>
@@ -827,7 +761,6 @@
     <string name="navservice_channel_turns_name">Голосові підказки про повороти</string>
     <string name="download_notif_channel">Завантаження</string>
     <string name="download_notif_title">Завантаження: %1$s</string>
-    <string name="download_label_update">Оновлення AutoMap</string>
     <string name="download_label_map_data">дані карти</string>
     <string name="download_label_offline_places">офлайн-місця</string>
     <string name="map_area_downloading">Збереження цієї області для офлайн · %1$d%%</string>
@@ -844,11 +777,6 @@
     <string name="place_transit_tram">Трамвай</string>
     <string name="settings_parking_history_empty">Збережених місць паркування ще немає. Натисніть кнопку P на карті, щоб зберегти, де ви припаркувалися.</string>
     <string name="list_emoji_label">Введіть будь-який емодзі</string>
-    <string name="settings_update_channel">Канал оновлень</string>
-    <string name="settings_update_channel_stable">Стабільний (щотижня)</string>
-    <string name="settings_update_channel_nightly">Нічний (щодня)</string>
-    <string name="settings_update_channel_canary">Canary (збірки в розробці)</string>
-    <string name="settings_update_channel_hint">Стабільний дає один перевірений випуск на тиждень. Нічний, збірку щодня, коли є зміни. Canary стежить за роботою в процесі й може зламатися будь-коли.</string>
     <string name="settings_voice_volume">Гучність підказок</string>
     <string name="settings_voice_volume_softer">Тихіше</string>
     <string name="settings_voice_volume_normal">Звичайна</string>
@@ -941,7 +869,6 @@
     <string name="settings_downloaded_title">Завантажено</string>
     <string name="settings_downloaded_none">Поки нічого не завантажено. Збережіть видиму область вище або виберіть регіон чи країну нижче.</string>
     <string name="settings_downloaded_area">Збережена область</string>
-    <string name="settings_region_group_title">%1$s повністю</string>
     <!-- format -->
     <string name="settings_region_group_size">Частин: %1$d, приблизно %2$s після встановлення</string>
     <!-- format -->
@@ -1016,13 +943,7 @@
     <string name="mapvm_graphs_retired">Офлайн-маршрутизація перейшла на компактніший формат. Завантажте регіони знову в Налаштуваннях, у розділі офлайн-карт.</string>
     <string name="navservice_notif_action_pause">Пауза</string>
     <string name="navservice_notif_action_resume">Продовжити</string>
-    <string name="update_car_title">Після цього оновлення AutoMap зникне з Android Auto</string>
-    <string name="update_car_body">AutoMap встановлено способом, який приймає Android Auto. Якщо встановити це оновлення тут, цей спосіб буде замінено, і автомобіль перестане показувати AutoMap, доки ви не встановите файл тим самим інструментом, що й першого разу (AAEnabler, King Installer).\n\nЗбережіть файл і встановіть його так, щоб автомобіль і далі працював.</string>
-    <string name="update_car_save">Зберегти файл</string>
-    <string name="update_car_anyway">Однаково оновити</string>
     <string name="place_transit_cached">Оновлено %1$s. Немає зв\'язку, тож час міг змінитися.</string>
-    <string name="car_pause">Пауза</string>
-    <string name="car_resume">Продовжити</string>
     <string name="car_paused">На паузі</string>
     <string name="car_along_route">Пошук уздовж маршруту</string>
     <string name="car_along_none">Поблизу нічого не знайдено</string>
@@ -1031,9 +952,6 @@
     <string name="map_import_needs_google">Спільний список Google Maps не можна відкрити, поки AutoMap працює без Google.</string>
     <string name="map_link_needs_google">«Відкривати надіслані посилання Google Maps» вимкнено в Налаштуваннях &gt; Конфіденційність.</string>
     <string name="map_link_unreadable">Не вдалося відкрити це посилання.</string>
-    <string name="settings_performance">Продуктивність</string>
-    <string name="settings_hub_performance_sub">Попереднє завантаження, малювання карти</string>
-    <string name="settings_performance_intro">Попереднє завантаження робить усе миттєвим, коли воно знадобиться, але доти займає пам\'ять. Типові значення залежать від обсягу пам\'яті телефона.</string>
     <string name="settings_full_place_load">Завантажувати всі фото й відгуки</string>
     <string name="settings_full_place_load_hint">Вимк. = місце завантажує кілька перших фото й першу сторінку відгуків, а «Більше фото» чи «Усі відгуки» довантажують решту. Увімк. = кожне відкрите місце проходить усю галерею фото й до 50 відгуків, це повільніше й надсилає Google набагато більше запитів.</string>
     <string name="settings_speech_preload">Завантажувати голосовий пошук під час запуску</string>
@@ -1084,11 +1002,6 @@
     <string name="settings_puck_shape">Значок навігації</string>
     <string name="settings_puck_shape_arrow">Стрілка</string>
     <string name="settings_puck_shape_car">Авто</string>
-    <string name="settings_car_red">Червоне</string>
-    <string name="settings_car_blue">Синє</string>
-    <string name="settings_car_white">Біле</string>
-    <string name="settings_car_green">Зелене</string>
-    <string name="settings_car_yellow">Жовте</string>
     <string name="settings_puck_shape_ufo">НЛО</string>
     <string name="settings_puck_shape_ship">Піратський корабель</string>
     <string name="settings_puck_shape_duck">Гумова качечка</string>
@@ -1176,7 +1089,6 @@
     <string name="place_icon_title">Значок на карті для %1$s</string>
     <string name="place_icon_default">Використовувати значок списку</string>
     <string name="settings_map_theme_title">Карта</string>
-    <string name="settings_map_theme_follow">Як у застосунку</string>
     <string name="settings_map_theme_hint">Карта окремо: світлі вулиці в темному застосунку або темні у світлому. День і ніч під час їзди й далі діють для карти.</string>
     <string name="route_saved_label">Ваш маршрут: %1$s</string>
     <string name="route_save">Зберегти цей маршрут</string>
@@ -1292,7 +1204,6 @@
     <string name="mapscreen_other_locations">Показати інші розташування</string>
     <string name="settings_other_locations_auto">Шукати інші розташування автоматично</string>
     <string name="settings_other_locations_auto_hint">Коли пошук за назвою знаходить одне місце, AutoMap також запитує в Google про інші його розташування. Це ще кілька запитів до Google на кожен такий пошук. Якщо вимкнено, це робить кнопка «Показати інші розташування», коли ви її натискаєте.</string>
-    <string name="mapscreen_view_map">Переглянути карту</string>
     <string name="whatsnew_show_after_updates">Показувати, що нового, після оновлень</string>
     <string name="replay_play">Відтворити</string>
     <string name="replay_pause">Пауза</string>
@@ -1342,13 +1253,6 @@
     <string name="search_offline_recheck">Офлайн. Торкніться, щоб перевірити ще раз</string>
     <string name="settings_turn_declutter">Спрощувати карту на поворотах</string>
     <string name="settings_turn_declutter_hint">Поки карта обертається на повороті, на ній лишаються тільки назви вулиць. Місця, знаки й камери повертаються, щойно вона заспокоїться. Так повороти лишаються плавними на повільніших телефонах.</string>
-    <string name="settings_softkeys">Апаратні функціональні клавіші</string>
-    <string name="settings_softkeys_hint">Змінюйте масштаб карти двома функціональними клавішами телефона. Лише для кнопкових телефонів.</string>
-    <string name="settings_softkeys_calibrate">Калібрувати функціональні клавіші</string>
-    <string name="settings_softkeys_calibrate_hint">Якщо функціональні клавіші не змінюють масштаб, торкніться тут і натисніть ліву, а потім праву функціональну клавішу, щоб AutoMap запам\'ятала їхні коди.</string>
-    <string name="map_zoom_mode_hint">Зум:  ◀ далі   ·   ближче ▶      НАЗАД, щоб вийти</string>
-    <string name="map_move_mode_hint">Рух карти:  ◀ ▲ ▼ ▶      НАЗАД, щоб вийти</string>
-    <string name="softkey_zoom_menu">Зум (◀ − ▶ +)</string>
     <string name="exp_chooser_alts_same">Приблизно той самий час</string>
     <string name="exp_chooser_fewest_cams">найменше камер</string>
     <string name="trip_shortcut_add">Додати на головний екран</string>

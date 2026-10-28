@@ -9,12 +9,11 @@ import androidx.core.content.ContextCompat
 import app.vela.core.voice.VelaPiper
 
 /**
- * First-run welcome + a *tasteful* one-time donation prompt.
- *
- * Donation-prompt etiquette (so it never reads as nagware): it appears **once**,
- * only **after the app has earned it** (a week since first launch), is trivially
- * dismissed with no guilt, and never blocks anything. A permanent "Support Vela"
- * entry in Settings is the path for anyone who wants to give on their own.
+ * First-run welcome state (audit R-09, 2026-10-28): the old header described a
+ * donation prompt and a permanent "Support Vela" Settings entry, neither of which
+ * exists in AutoMap — support was removed in Build 0 and the credit lives in
+ * About. What this object actually owns is the first-run prompt chain (location,
+ * notification, voice, sun-shading), each asked once and never blocking.
  *
  * Process-wide reactive holder, same shape as [Units]/[Traffic]; `init()`-ed in
  * `VelaApp`, persisted to `vela_onboarding`.
@@ -23,11 +22,11 @@ object Onboarding {
     /** False until the user has seen the welcome screen once. */
     val welcomeDone = mutableStateOf(true)
 
-    /** True for the single session where the one-time location RATIONALE should show — a plain-words
-     *  "here's why, you can say no" screen BEFORE Android's raw system dialog, offered first thing
-     *  after the welcome. Suppressed once location is granted or the user has answered. The map no
-     *  longer fires the system dialog on its own; this owns the first ask (a denial still leaves
-     *  search/browse working, and the locate button re-asks later). */
+    /** True for the single session where the one-time location prompt should fire. The
+     *  first-run flow fires the system permission dialog directly (there is no separate
+     *  rationale screen in the current flow — the old docstring claiming one was stale);
+     *  suppressed once location is granted or the user has answered. A denial still leaves
+     *  search/browse working, and the locate button re-asks later. */
     val showLocationPrompt = mutableStateOf(false)
 
     /** True for the single session where the one-time notification ask should fire — right after the

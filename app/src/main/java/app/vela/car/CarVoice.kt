@@ -37,9 +37,14 @@ object CarVoice {
         voiceGuide.muted = !on
         val alerts = !on && voiceGuide.alertsOnly
         app.vela.ui.VoiceAlertsOnly.on.value = alerts
+        // Audit 2026-10-28: persist the NORMALIZED alerts flag (the same value the
+        // in-memory flag and MapViewModel's listener compute), not the raw flag.
+        // The in-memory voiceGuide.alertsOnly is deliberately left untouched, so a
+        // driver who flips on and back off within a session still lands in
+        // Alerts only; on restart the listener normalizes the same way.
         context.getSharedPreferences("vela_settings", Context.MODE_PRIVATE).edit()
             .putBoolean("spoken_directions", on)
-            .putBoolean("spoken_alerts_only", voiceGuide.alertsOnly)
+            .putBoolean("spoken_alerts_only", alerts)
             .apply()
     }
 }

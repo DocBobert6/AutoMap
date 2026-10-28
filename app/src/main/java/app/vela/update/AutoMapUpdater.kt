@@ -26,8 +26,8 @@ import java.security.MessageDigest
  * own installer (which enforces same package + same signing key).
  *
  * Divergences from AutoSpace, each deliberate and stated here:
- * - API base is DocBobert6/AutoMap, NOT upstream Vela. Vela's own
- *   SelfUpdater points at PimpinPumpkin/Vela through VelaLinks and
+ * - API base is DocBobert6/AutoMap, NOT upstream Vela. The former
+ *   upstream updater pointed at PimpinPumpkin/Vela through VelaLinks and
  *   must NOT be repointed: VelaLinks also feeds map/place/road-feature
  *   downloads that AutoMap still takes from upstream. This updater has
  *   its own base constant and never touches VelaLinks.

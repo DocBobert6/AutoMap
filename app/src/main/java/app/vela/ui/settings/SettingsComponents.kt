@@ -109,18 +109,20 @@ internal fun CollapsibleSectionTitle(text: String, expanded: Boolean, modifier: 
 }
 
 @Composable
-internal fun SelectableRow(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun SelectableRow(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    // Audit 2026-10-28 house rule: a row whose reason is changeable from the same page stays
+    // visible and disabled with its hint, never hidden and never a hint-only dead end.
     Row(
-        modifier.fillMaxWidth().settingsAnchor(label).dpadHighlight(DpadShape(10.dp)).dpadClickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier.fillMaxWidth().settingsAnchor(label).dpadHighlight(DpadShape(10.dp)).then(if (enabled) Modifier.dpadClickable(onClick = onClick) else Modifier).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // onClick = null: the RadioButton is display-only so the ROW is the single focus stop. A
         // separately-focusable RadioButton made the row TWO focus stops, and a horizontal (LEFT/
         // RIGHT) D-pad move into that nested target cleared focus with no way back (dpad audit
         // 2026-07-08) - the Material "clickable row + indicator" pattern.
-        RadioButton(selected = selected, onClick = null)
+        RadioButton(selected = selected, onClick = null, enabled = enabled)
         androidx.compose.foundation.layout.Spacer(Modifier.width(14.dp))
-        Text(label, style = MaterialTheme.typography.bodyLarge)
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -171,18 +173,20 @@ internal fun SubHead(text: String) {
  * with these rows, each opening a short, one-idea page. Title + one-line subtitle, one focus stop.
  */
 @Composable
-internal fun CategoryRow(title: String, subtitle: String, onClick: () -> Unit) {
+internal fun CategoryRow(title: String, subtitle: String, enabled: Boolean = true, onClick: () -> Unit) {
+    // Audit 2026-10-28 house rule: see SelectableRow — a disabled category row stays visible
+    // with its subtitle as the explanation, and loses its chevron and click (it is not a link).
     Row(
         Modifier.fillMaxWidth().padding(vertical = 3.dp)
             .clip(DpadShape(26.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .dpadHighlight(DpadShape(26.dp))
-            .dpadClickable(onClick = onClick)
+            .then(if (enabled) Modifier.dpadClickable(onClick = onClick) else Modifier)
             .padding(vertical = 14.dp, horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(title, style = MaterialTheme.typography.titleMedium, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 subtitle,
                 style = MaterialTheme.typography.bodyMedium,
@@ -191,7 +195,7 @@ internal fun CategoryRow(title: String, subtitle: String, onClick: () -> Unit) {
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             )
         }
-        Icon(Sym.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (enabled) Icon(Sym.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

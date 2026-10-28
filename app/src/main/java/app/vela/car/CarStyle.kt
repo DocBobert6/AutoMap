@@ -42,7 +42,7 @@ internal object CarStyle {
     /** [lightPosition] is the style-light position [radial, azimuthal, polar] for
      *  sun-angle building shading (Build 18); null keeps the style default. */
     fun inject(json: String, trafficTiles: String, twins: Boolean = true, paintDensity: Float = 2.0f, lightPosition: JSONArray? = null, paintUrl: String? = null): String {
-        val style = runCatching { JSONObject(json) }.getOrNull() ?: return json
+        val style = runCatching { JSONObject(json) }.getOrNull() ?: run { android.util.Log.w("VelaCarStyle", "CarStyle.inject: style JSON did not parse — painted roads/traffic twins skipped, not a crash"); return json }
         val sources = style.optJSONObject("sources") ?: return json
         val src = when {
             sources.has("openmaptiles") -> "openmaptiles"
