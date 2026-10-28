@@ -221,12 +221,7 @@
     <string name="settings_diag_consent_title">Bekapcsolod a diagnosztikát?</string>
     <string name="settings_diag_consent_body">A AutoMap egy rövid helyi naplót vezet a kereséseidről, útvonalaidról és a hibákról. Soha nem hagyja el a telefont, hacsak nem koppintasz az Exportálásra és választasz egy célt. Bármikor kikapcsolhatod a napló törléséhez.</string>
     <string name="settings_about">Névjegy</string>
-    <string name="settings_about_hint">A AutoMap egy degoogled térképkliens: nyílt csempék az alaptérképhez, lekapart Google-adat helyekhez, útvonaltervezéshez és forgalomfüggő érkezési időkhöz, a telefonon futó Piper hang. GPLv3. Nincs szükség Play Services-re.</string>
-    <string name="settings_support">Támogatás</string>
-    <string name="settings_support_hint">A AutoMap ingyenes és reklámmentes. Ha hasznosnak bizonyult, egy adomány segít fenntartani a fejlesztést. Teljesen opcionális.</string>
-    <string name="settings_support_button">AutoMap támogatása</string>
-    <string name="donate_no_browser">Nincs telepített böngésző az adományozási oldal megnyitásához</string>
-    <string name="settings_version">Verzió</string>
+    <string name="settings_about_hint">A AutoMap egy degoogled térképkliens: nyílt csempék az alaptérképhez, lekapart Google-adat helyekhez, útvonaltervezéshez és forgalomfüggő érkezési időkhöz, a telefonon futó Piper hang. GPLv3. Nincs szükség Play Services-re.</string>    <string name="settings_version">Verzió</string>
     <string name="settings_version_line">AutoMap %1$s (build %2$d)</string>
     <string name="settings_installer_play">Telepítette: %1$s. Ez a telepítés Android Auto-hoz van beállítva; egy alkalmazáson belüli frissítés ezt visszacsinálná, ezért ugyanazzal a telepítővel frissíts.</string>
     <string name="settings_installer_none">Kézzel telepítve (nincs rögzített telepítő). Az Android Auto nem fogja listázni ezt a telepítést.</string>
@@ -464,12 +459,7 @@
     <string name="welcome_feature_places_body">Élő keresés, vélemények, fotók, tömegközlekedés és forgalomfüggő útvonaltervezés.</string>
     <string name="welcome_feature_open_source_title">Ingyenes és nyílt forráskódú</string>
     <string name="welcome_feature_open_source_body">GPLv3, GrapheneOS-hez és más degoogled telefonokhoz készült.</string>
-    <string name="welcome_get_started">Kezdjük</string>
-    <string name="welcome_donate_title">Tetszik a AutoMap?</string>
-    <string name="welcome_donate_body">A AutoMap ingyenes és reklámmentes, szűkös keretből épül. Ha hasznosnak bizonyult, egy kis egyszeri adomány segít fenntartani. Teljesen opcionális, és csak most kérdezzük meg. A Beállítások menüben mindig van egy Támogatás pont is.</string>
-    <string name="welcome_donate_confirm">AutoMap támogatása</string>
-    <string name="welcome_donate_dismiss">Talán később</string>
-    <string name="search_close_cd">Keresés bezárása</string>
+    <string name="welcome_get_started">Kezdjük</string>    <string name="search_close_cd">Keresés bezárása</string>
     <string name="search_fill_cd">Beírás a keresőmezőbe</string>
     <string name="search_placeholder">Keresés</string>
     <string name="search_offline">Offline</string>

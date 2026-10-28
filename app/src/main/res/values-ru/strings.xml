@@ -125,11 +125,7 @@
     <string name="settings_diag_consent_title">Включить диагностику?</string>
     <string name="settings_diag_consent_body">AutoMap будет вести короткий локальный журнал ваших поисков, маршрутов и любых ошибок. Он никогда не покидает телефон, пока вы не нажмёте «Экспорт» и не выберете, куда его отправить. Выключите в любой момент, чтобы стереть журнал.</string>
     <string name="settings_about">О приложении</string>
-    <string name="settings_about_hint">AutoMap, это дегуглённый клиент карт: открытые тайлы для основной карты, данные Google для мест, маршрутизация и ETA с учётом пробок, голос Piper, работающий на телефоне. GPLv3. Play Services не требуются.</string>
-    <string name="settings_support">Поддержка</string>
-    <string name="settings_support_hint">AutoMap бесплатна и без рекламы. Если она стала полезной, пожертвование поможет продолжать разработку, полностью по желанию.</string>
-    <string name="settings_support_button">Поддержать AutoMap</string>
-    <string name="settings_version">Версия</string>
+    <string name="settings_about_hint">AutoMap, это дегуглённый клиент карт: открытые тайлы для основной карты, данные Google для мест, маршрутизация и ETA с учётом пробок, голос Piper, работающий на телефоне. GPLv3. Play Services не требуются.</string>    <string name="settings_version">Версия</string>
     <string name="settings_version_line">AutoMap %1$s  (сборка %2$d)</string>
     <string name="settings_version_copied">Версия скопирована</string>
     <string name="settings_collapse">Свернуть</string>
@@ -355,12 +351,7 @@
     <string name="welcome_feature_places_body">Актуальный поиск, отзывы, фото, транспорт и маршруты с учётом пробок.</string>
     <string name="welcome_feature_open_source_title">Бесплатно и с открытым кодом</string>
     <string name="welcome_feature_open_source_body">GPLv3, создано для GrapheneOS и других дегуглённых телефонов.</string>
-    <string name="welcome_get_started">Начать</string>
-    <string name="welcome_donate_title">Нравится AutoMap?</string>
-    <string name="welcome_donate_body">AutoMap бесплатна и без рекламы, создана на энтузиазме. Если она стала полезной, небольшое разовое пожертвование поможет ей развиваться, полностью по желанию, и об этом спрашивается лишь один раз. В настройках всегда есть раздел «Поддержка».</string>
-    <string name="welcome_donate_confirm">Поддержать AutoMap</string>
-    <string name="welcome_donate_dismiss">Может быть, позже</string>
-    <string name="search_close_cd">Закрыть поиск</string>
+    <string name="welcome_get_started">Начать</string>    <string name="search_close_cd">Закрыть поиск</string>
     <string name="search_placeholder">Поиск</string>
     <string name="search_offline">Офлайн</string>
     <string name="search_clear_cd">Очистить поиск</string>
@@ -807,9 +798,7 @@
     <string name="settings_name_trips_hint">После окончания записанной поездки AutoMap спросит, как её назвать. По умолчанию выключено, переименовать поездку можно в любой момент в списке ниже.</string>
     <string name="trip_name_prompt_title">Назовите эту поездку</string>
     <string name="trip_name_prompt_save">Сохранить название</string>
-    <string name="trip_name_prompt_skip">Не сейчас</string>
-    <string name="donate_no_browser">Нет браузера, чтобы открыть страницу пожертвований</string>
-    <string name="place_tab_menu">Меню</string>
+    <string name="trip_name_prompt_skip">Не сейчас</string>    <string name="place_tab_menu">Меню</string>
     <string name="place_sort_relevant">Самые релевантные</string>
     <string name="place_sort_newest">Сначала новые</string>
     <string name="place_sort_highest">Сначала высокий рейтинг</string>

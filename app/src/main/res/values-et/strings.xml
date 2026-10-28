@@ -79,10 +79,7 @@
     <string name="welcome_feature_places_body">Otsing reaalajas, arvustused, fotod, ühistransport ja liiklustingimustega arvestamine.</string>
     <string name="welcome_feature_open_source_title">Vaba ja avatud lähtekoodiga</string>
     <string name="welcome_feature_open_source_body">Avaldatud GPLv3 litsentsi alusel, mõeldud GrapheneOS-i ja teiste ilma Google\'ita Androidipõhiste seadmete jaoks.</string>
-    <string name="welcome_get_started">Alustame siis</string>
-    <string name="welcome_donate_confirm">Toeta AutoMap arendust</string>
-    <string name="welcome_donate_dismiss">Võib-olla hiljem</string>
-    <string name="search_close_cd">Sulge otsing</string>
+    <string name="welcome_get_started">Alustame siis</string>    <string name="search_close_cd">Sulge otsing</string>
     <string name="search_fill_cd">Pane otsingukasti</string>
     <string name="search_placeholder">Otsi</string>
 </resources>

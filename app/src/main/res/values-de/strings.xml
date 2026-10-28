@@ -126,11 +126,7 @@
     <string name="settings_diag_consent_title">Diagnose aktivieren?</string>
     <string name="settings_diag_consent_body">AutoMap führt ein kurzes lokales Protokoll Ihrer Suchanfragen, Routen und etwaiger Fehler. Es verlässt das Telefon nie, es sei denn, Sie tippen auf „Exportieren“ und wählen ein Ziel. Zum Löschen des Protokolls jederzeit deaktivieren.</string>
     <string name="settings_about">Über</string>
-    <string name="settings_about_hint">AutoMap ist ein degoogelter Karten-Client: offene Kacheln für die Basiskarte, gescraptes Google für POIs, Routing und verkehrsabhängige Ankunftszeiten, eine Piper-Stimme, die auf dem Telefon läuft. GPLv3. Keine Play-Dienste erforderlich.</string>
-    <string name="settings_support">Unterstützen</string>
-    <string name="settings_support_hint">AutoMap ist kostenlos und werbefrei. Wenn es Ihnen nützlich geworden ist, hilft eine Spende, die Entwicklung am Laufen zu halten, völlig freiwillig.</string>
-    <string name="settings_support_button">AutoMap unterstützen</string>
-    <string name="settings_version">Version</string>
+    <string name="settings_about_hint">AutoMap ist ein degoogelter Karten-Client: offene Kacheln für die Basiskarte, gescraptes Google für POIs, Routing und verkehrsabhängige Ankunftszeiten, eine Piper-Stimme, die auf dem Telefon läuft. GPLv3. Keine Play-Dienste erforderlich.</string>    <string name="settings_version">Version</string>
     <string name="settings_version_line">AutoMap %1$s  (Build %2$d)</string>
     <string name="settings_version_copied">Version kopiert</string>
     <string name="settings_collapse">Einklappen</string>
@@ -355,12 +351,7 @@
     <string name="welcome_feature_places_body">Live-Suche, Rezensionen, Fotos, ÖPNV und verkehrsabhängige Routen.</string>
     <string name="welcome_feature_open_source_title">Kostenlos &amp; quelloffen</string>
     <string name="welcome_feature_open_source_body">GPLv3, entwickelt für GrapheneOS und andere degoogelte Telefone.</string>
-    <string name="welcome_get_started">Los geht’s</string>
-    <string name="welcome_donate_title">Gefällt Ihnen AutoMap?</string>
-    <string name="welcome_donate_body">AutoMap ist kostenlos und werbefrei, mit minimalen Mitteln entwickelt. Wenn es Ihnen nützlich geworden ist, hilft eine kleine einmalige Spende, es am Laufen zu halten, völlig freiwillig, und nur dieses eine Mal wird danach gefragt. In den Einstellungen gibt es außerdem immer einen Eintrag zum Unterstützen.</string>
-    <string name="welcome_donate_confirm">AutoMap unterstützen</string>
-    <string name="welcome_donate_dismiss">Vielleicht später</string>
-    <string name="search_close_cd">Suche schließen</string>
+    <string name="welcome_get_started">Los geht’s</string>    <string name="search_close_cd">Suche schließen</string>
     <string name="search_placeholder">Suchen</string>
     <string name="search_offline">Offline</string>
     <string name="search_clear_cd">Suche löschen</string>
@@ -799,9 +790,7 @@
     <string name="settings_name_trips_hint">Nach einer aufgezeichneten Fahrt fragt AutoMap, wie sie heißen soll. Standardmäßig aus; Sie können eine Fahrt jederzeit später in der Liste unten umbenennen.</string>
     <string name="trip_name_prompt_title">Diese Fahrt benennen</string>
     <string name="trip_name_prompt_save">Namen speichern</string>
-    <string name="trip_name_prompt_skip">Jetzt nicht</string>
-    <string name="donate_no_browser">Kein Browser installiert, um die Spendenseite zu öffnen</string>
-    <string name="place_tab_menu">Speisekarte</string>
+    <string name="trip_name_prompt_skip">Jetzt nicht</string>    <string name="place_tab_menu">Speisekarte</string>
     <string name="place_sort_relevant">Relevanteste</string>
     <string name="place_sort_newest">Neueste</string>
     <string name="place_sort_highest">Beste Bewertung</string>

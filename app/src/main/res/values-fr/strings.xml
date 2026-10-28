@@ -126,11 +126,7 @@
     <string name="settings_diag_consent_title">Activer les diagnostics ?</string>
     <string name="settings_diag_consent_body">AutoMap conservera un court journal local de vos recherches, itinéraires et erreurs éventuelles. Il ne quitte jamais le téléphone tant que vous n\'appuyez pas sur Exporter et ne choisissez pas une destination. Désactivez-le à tout moment pour effacer le journal.</string>
     <string name="settings_about">À propos</string>
-    <string name="settings_about_hint">AutoMap est un client cartographique dégooglisé : tuiles ouvertes pour le fond de carte, extraction de Google pour les lieux, le routage et les estimations tenant compte du trafic, une voix Piper qui tourne sur le téléphone. GPLv3. Ne nécessite pas les Play Services.</string>
-    <string name="settings_support">Soutien</string>
-    <string name="settings_support_hint">AutoMap est gratuit et sans publicité. S\'il vous est devenu utile, un don aide à poursuivre le développement, entièrement facultatif.</string>
-    <string name="settings_support_button">Soutenir AutoMap</string>
-    <string name="settings_version">Version</string>
+    <string name="settings_about_hint">AutoMap est un client cartographique dégooglisé : tuiles ouvertes pour le fond de carte, extraction de Google pour les lieux, le routage et les estimations tenant compte du trafic, une voix Piper qui tourne sur le téléphone. GPLv3. Ne nécessite pas les Play Services.</string>    <string name="settings_version">Version</string>
     <string name="settings_version_line">AutoMap %1$s  (build %2$d)</string>
     <string name="settings_version_copied">Version copiée</string>
     <string name="settings_collapse">Réduire</string>
@@ -355,12 +351,7 @@
     <string name="welcome_feature_places_body">Recherche en direct, avis, photos, transports et itinéraires tenant compte du trafic.</string>
     <string name="welcome_feature_open_source_title">Gratuit et open source</string>
     <string name="welcome_feature_open_source_body">GPLv3, conçu pour GrapheneOS et autres téléphones dégooglisés.</string>
-    <string name="welcome_get_started">Commencer</string>
-    <string name="welcome_donate_title">AutoMap vous plaît ?</string>
-    <string name="welcome_donate_body">AutoMap est gratuit et sans publicité, développé avec très peu de moyens. S\'il vous est devenu utile, un petit don ponctuel aide à le maintenir, entièrement facultatif, et c\'est la seule fois où il vous sera demandé. Une entrée Soutien reste toujours disponible dans les Paramètres.</string>
-    <string name="welcome_donate_confirm">Soutenir AutoMap</string>
-    <string name="welcome_donate_dismiss">Peut-être plus tard</string>
-    <string name="search_close_cd">Fermer la recherche</string>
+    <string name="welcome_get_started">Commencer</string>    <string name="search_close_cd">Fermer la recherche</string>
     <string name="search_placeholder">Rechercher</string>
     <string name="search_offline">Hors ligne</string>
     <string name="search_clear_cd">Effacer la recherche</string>
@@ -798,9 +789,7 @@
     <string name="settings_name_trips_hint">À la fin d\'un trajet enregistré, AutoMap demande comment l\'appeler. Désactivé par défaut ; vous pouvez toujours renommer un trajet plus tard dans la liste ci-dessous.</string>
     <string name="trip_name_prompt_title">Nommer ce trajet</string>
     <string name="trip_name_prompt_save">Enregistrer le nom</string>
-    <string name="trip_name_prompt_skip">Pas maintenant</string>
-    <string name="donate_no_browser">Aucun navigateur installé pour ouvrir la page de don</string>
-    <string name="place_tab_menu">Menu</string>
+    <string name="trip_name_prompt_skip">Pas maintenant</string>    <string name="place_tab_menu">Menu</string>
     <string name="place_sort_relevant">Les plus pertinents</string>
     <string name="place_sort_newest">Les plus récents</string>
     <string name="place_sort_highest">Note la plus élevée</string>

@@ -144,11 +144,7 @@
     <string name="settings_diag_consent_title">Ativar o diagnóstico?</string>
     <string name="settings_diag_consent_body">O AutoMap vai manter um breve registro local das suas pesquisas, trajetos e quaisquer erros. Nunca sai do celular, a menos que você toque em Exportar e escolha para onde enviar. Desative quando quiser para apagar o registro.</string>
     <string name="settings_about">Sobre</string>
-    <string name="settings_about_hint">O AutoMap é um cliente de mapas sem Google: tiles abertos para o mapa base, dados do Google coletados para locais, rotas e horários de chegada sensíveis ao trânsito, e uma voz Piper que roda no celular. GPLv3. Não requer os Serviços do Google Play.</string>
-    <string name="settings_support">Apoiar</string>
-    <string name="settings_support_hint">O AutoMap é gratuito e sem anúncios. Se ele se tornou útil, uma doação ajuda a manter o desenvolvimento, totalmente opcional.</string>
-    <string name="settings_support_button">Apoiar o AutoMap</string>
-    <string name="settings_version">Versão</string>
+    <string name="settings_about_hint">O AutoMap é um cliente de mapas sem Google: tiles abertos para o mapa base, dados do Google coletados para locais, rotas e horários de chegada sensíveis ao trânsito, e uma voz Piper que roda no celular. GPLv3. Não requer os Serviços do Google Play.</string>    <string name="settings_version">Versão</string>
     <string name="settings_version_line">AutoMap %1$s  (compilação %2$d)</string>
     <string name="settings_installer_play">Instalado por %1$s. Esta instalação está preparada para o Android Auto; uma atualização dentro do app desfaria isso, por isso atualize pelo mesmo instalador.</string>
     <string name="settings_installer_none">Instalado manualmente (sem instalador registrado). O Android Auto não vai listar esta instalação.</string>
@@ -392,12 +388,7 @@
     <string name="welcome_feature_places_body">Pesquisa ao vivo, avaliações, fotos, transporte público e direções sensíveis ao trânsito.</string>
     <string name="welcome_feature_open_source_title">Gratuito e de código aberto</string>
     <string name="welcome_feature_open_source_body">GPLv3, criado para o GrapheneOS e outros celulares sem Google.</string>
-    <string name="welcome_get_started">Começar</string>
-    <string name="welcome_donate_title">Gostando do AutoMap?</string>
-    <string name="welcome_donate_body">O AutoMap é gratuito e sem anúncios, criado com poucos recursos. Se ele se tornou útil, uma pequena doação única ajuda a mantê-lo, totalmente opcional, e esta é a única vez que ele vai pedir. Também há sempre uma entrada Apoiar nas Configurações.</string>
-    <string name="welcome_donate_confirm">Apoiar o AutoMap</string>
-    <string name="welcome_donate_dismiss">Talvez mais tarde</string>
-    <string name="search_close_cd">Fechar pesquisa</string>
+    <string name="welcome_get_started">Começar</string>    <string name="search_close_cd">Fechar pesquisa</string>
     <string name="search_fill_cd">Colocar na caixa de pesquisa</string>
     <string name="search_placeholder">Pesquisar</string>
     <string name="search_offline">Off-line</string>
@@ -906,9 +897,7 @@
     <string name="settings_name_trips_hint">Quando um trajeto gravado termina, o AutoMap pergunta que nome dar a ele. Desativado por padrão; você sempre pode renomear uma viagem depois, na lista abaixo.</string>
     <string name="trip_name_prompt_title">Dar um nome a este trajeto</string>
     <string name="trip_name_prompt_save">Salvar nome</string>
-    <string name="trip_name_prompt_skip">Agora não</string>
-    <string name="donate_no_browser">Não há nenhum navegador instalado para abrir a página de doações</string>
-    <string name="place_tab_menu">Cardápio</string>
+    <string name="trip_name_prompt_skip">Agora não</string>    <string name="place_tab_menu">Cardápio</string>
     <string name="place_sort_relevant">Mais relevantes</string>
     <string name="place_sort_newest">Mais recentes</string>
     <string name="place_sort_highest">Melhor avaliação</string>

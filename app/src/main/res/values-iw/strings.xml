@@ -142,11 +142,7 @@
     <string name="settings_diag_consent_title">להפעיל אבחון?</string>
     <string name="settings_diag_consent_body">AutoMap תשמור יומן מקומי קצר של החיפושים, המסלולים וכל שגיאה. הוא לעולם לא עוזב את הטלפון אלא אם תקיש \"ייצא\" ותבחר לאן לשלוח. כבה בכל עת כדי למחוק את היומן.</string>
     <string name="settings_about">אודות</string>
-    <string name="settings_about_hint">AutoMap הוא לקוח מפות ללא Google: אריחים פתוחים למפת הבסיס, נתוני Google שנאספים למקומות, ניתוב וזמני הגעה מודעי-תנועה, וקול Piper שרץ על הטלפון. GPLv3. ללא צורך ב-Play Services.</string>
-    <string name="settings_support">תמיכה</string>
-    <string name="settings_support_hint">AutoMap חינמי וללא פרסומות. אם הוא הפך שימושי, תרומה עוזרת לשמור על המשך הפיתוח. אופציונלי לחלוטין.</string>
-    <string name="settings_support_button">תמוך ב-AutoMap</string>
-    <string name="settings_version">גרסה</string>
+    <string name="settings_about_hint">AutoMap הוא לקוח מפות ללא Google: אריחים פתוחים למפת הבסיס, נתוני Google שנאספים למקומות, ניתוב וזמני הגעה מודעי-תנועה, וקול Piper שרץ על הטלפון. GPLv3. ללא צורך ב-Play Services.</string>    <string name="settings_version">גרסה</string>
     <string name="settings_version_line">AutoMap %1$s  (בנייה %2$d)</string>
     <string name="settings_installer_play">הותקן על ידי %1$s. ההתקנה הזו מוגדרת ל-Android Auto; עדכון מתוך האפליקציה יבטל את זה, לכן עדכן דרך אותו מתקין.</string>
     <string name="settings_installer_none">הותקן ידנית (לא נרשם מתקין). Android Auto לא יציג את ההתקנה הזו.</string>
@@ -385,12 +381,7 @@
     <string name="welcome_feature_places_body">חיפוש חי, ביקורות, תמונות, תחבורה ציבורית, ומסלולים מודעי-תנועה.</string>
     <string name="welcome_feature_open_source_title">חינמי &amp; קוד פתוח</string>
     <string name="welcome_feature_open_source_body">GPLv3, נבנה עבור GrapheneOS וטלפונים אחרים ללא Google.</string>
-    <string name="welcome_get_started">בואו נתחיל</string>
-    <string name="welcome_donate_title">כיף לך להשתמש ב־AutoMap?</string>
-    <string name="welcome_donate_body">היישום AutoMap הוא חופשי ונטול פרסומות, נבנה בתקציב זעום. אם הוא שימושי עבורך, תרומה חד־פעמית קטנה תעזור לשמור עליו. זו לא חובה, וזו הפעם היחידה שנבקש זאת ממך. תמיד יש גם רשומת „תמיכה” בהגדרות.</string>
-    <string name="welcome_donate_confirm">תמוך ב-AutoMap</string>
-    <string name="welcome_donate_dismiss">אולי מאוחר יותר</string>
-    <string name="search_close_cd">סגור חיפוש</string>
+    <string name="welcome_get_started">בואו נתחיל</string>    <string name="search_close_cd">סגור חיפוש</string>
     <string name="search_fill_cd">הכנס לתיבת החיפוש</string>
     <string name="search_placeholder">חיפוש</string>
     <string name="search_offline">לא מקוון</string>
@@ -887,9 +878,7 @@
     <string name="settings_name_trips_hint">אחרי שנסיעה מוקלטת מסתיימת, AutoMap שואל איך לקרוא לה. כבוי כברירת מחדל; תמיד אפשר לשנות שם של נסיעה מאוחר יותר ברשימה שלמטה.</string>
     <string name="trip_name_prompt_title">תן שם לנסיעה</string>
     <string name="trip_name_prompt_save">שמור שם</string>
-    <string name="trip_name_prompt_skip">לא עכשיו</string>
-    <string name="donate_no_browser">אין דפדפן מותקן לפתיחת עמוד התרומה</string>
-    <string name="place_tab_menu">תפריט</string>
+    <string name="trip_name_prompt_skip">לא עכשיו</string>    <string name="place_tab_menu">תפריט</string>
     <string name="place_sort_relevant">הרלוונטיות ביותר</string>
     <string name="place_sort_newest">החדשות ביותר</string>
     <string name="place_sort_highest">הדירוג הגבוה ביותר</string>

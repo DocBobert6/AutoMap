@@ -144,11 +144,7 @@
     <string name="settings_diag_consent_title">Attivare la diagnostica?</string>
     <string name="settings_diag_consent_body">AutoMap conserverà un breve registro locale delle tue ricerche, dei percorsi e di eventuali errori. Non lascia mai il telefono finché non tocchi Esporta e scegli dove inviarlo. Disattivala in qualsiasi momento per cancellare il registro.</string>
     <string name="settings_about">Informazioni</string>
-    <string name="settings_about_hint">AutoMap è un client di mappe degoogled: riquadri aperti per la mappa di base, dati Google estratti per i POI, percorsi ed ETA con traffico, una voce Piper che gira sul telefono. GPLv3. Nessun Play Services richiesto.</string>
-    <string name="settings_support">Supporto</string>
-    <string name="settings_support_hint">AutoMap è gratuita e senza pubblicità. Se ti è diventata utile, una donazione aiuta a portare avanti lo sviluppo, del tutto facoltativa.</string>
-    <string name="settings_support_button">Sostieni AutoMap</string>
-    <string name="settings_version">Versione</string>
+    <string name="settings_about_hint">AutoMap è un client di mappe degoogled: riquadri aperti per la mappa di base, dati Google estratti per i POI, percorsi ed ETA con traffico, una voce Piper che gira sul telefono. GPLv3. Nessun Play Services richiesto.</string>    <string name="settings_version">Versione</string>
     <string name="settings_version_line">AutoMap %1$s  (build %2$d)</string>
     <string name="settings_installer_play">Installato da %1$s. Questa installazione è configurata per Android Auto; un aggiornamento dall\'app la annullerebbe, quindi aggiorna con lo stesso installer.</string>
     <string name="settings_installer_none">Installato manualmente (nessun installer registrato). Android Auto non mostrerà questa installazione.</string>
@@ -392,12 +388,7 @@
     <string name="welcome_feature_places_body">Ricerca in tempo reale, recensioni, foto, mezzi pubblici e indicazioni che tengono conto del traffico.</string>
     <string name="welcome_feature_open_source_title">Gratuita e open source</string>
     <string name="welcome_feature_open_source_body">GPLv3, creata per GrapheneOS e altri telefoni de-Googled.</string>
-    <string name="welcome_get_started">Inizia</string>
-    <string name="welcome_donate_title">Ti piace AutoMap?</string>
-    <string name="welcome_donate_body">AutoMap è gratuita e senza pubblicità, realizzata con risorse minime. Se ti è diventata utile, una piccola donazione una tantum aiuta a portarla avanti, del tutto facoltativa, e questa è l\'unica volta che te lo chiederà. C\'è sempre anche una voce Supporto nelle Impostazioni.</string>
-    <string name="welcome_donate_confirm">Sostieni AutoMap</string>
-    <string name="welcome_donate_dismiss">Forse più tardi</string>
-    <string name="search_close_cd">Chiudi ricerca</string>
+    <string name="welcome_get_started">Inizia</string>    <string name="search_close_cd">Chiudi ricerca</string>
     <string name="search_fill_cd">Inserisci nella barra di ricerca</string>
     <string name="search_placeholder">Cerca</string>
     <string name="search_offline">Offline</string>
@@ -905,9 +896,7 @@
     <string name="settings_name_trips_hint">Quando un viaggio registrato finisce, AutoMap chiede come chiamarlo. Disattivo di default; puoi sempre rinominare un viaggio più tardi nell\'elenco qui sotto.</string>
     <string name="trip_name_prompt_title">Dai un nome a questo viaggio</string>
     <string name="trip_name_prompt_save">Salva nome</string>
-    <string name="trip_name_prompt_skip">Non ora</string>
-    <string name="donate_no_browser">Nessun browser installato per aprire la pagina delle donazioni</string>
-    <string name="place_tab_menu">Menu</string>
+    <string name="trip_name_prompt_skip">Non ora</string>    <string name="place_tab_menu">Menu</string>
     <string name="place_sort_relevant">Più pertinenti</string>
     <string name="place_sort_newest">Più recenti</string>
     <string name="place_sort_highest">Valutazione più alta</string>

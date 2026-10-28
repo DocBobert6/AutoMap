@@ -126,11 +126,7 @@
     <string name="settings_diag_consent_title">Slå på diagnostik?</string>
     <string name="settings_diag_consent_body">AutoMap håller en kort lokal logg över dina sökningar, rutter och eventuella fel. Den lämnar aldrig telefonen om du inte trycker på Exportera och väljer var den ska skickas. Slå av den när som helst för att radera loggen.</string>
     <string name="settings_about">Om</string>
-    <string name="settings_about_hint">AutoMap är en avgooglad kartklient: öppna rutor för baskartan, skrapad Google för intressepunkter, ruttning och trafikmedvetna ankomsttider, en Piper-röst som körs på telefonen. GPLv3. Inga Play Services krävs.</string>
-    <string name="settings_support">Stöd</string>
-    <string name="settings_support_hint">AutoMap är gratis och reklamfri. Om den blivit användbar hjälper en donation till att hålla utvecklingen igång, helt frivilligt.</string>
-    <string name="settings_support_button">Stöd AutoMap</string>
-    <string name="settings_version">Version</string>
+    <string name="settings_about_hint">AutoMap är en avgooglad kartklient: öppna rutor för baskartan, skrapad Google för intressepunkter, ruttning och trafikmedvetna ankomsttider, en Piper-röst som körs på telefonen. GPLv3. Inga Play Services krävs.</string>    <string name="settings_version">Version</string>
     <string name="settings_version_line">AutoMap %1$s  (bygge %2$d)</string>
     <string name="settings_version_copied">Version kopierad</string>
     <string name="settings_collapse">Fäll ihop</string>
@@ -355,12 +351,7 @@
     <string name="welcome_feature_places_body">Sökning i realtid, recensioner, foton, kollektivtrafik och trafikmedvetna vägbeskrivningar.</string>
     <string name="welcome_feature_open_source_title">Fri &amp; öppen källkod</string>
     <string name="welcome_feature_open_source_body">GPLv3, byggd för GrapheneOS och andra avgooglade telefoner.</string>
-    <string name="welcome_get_started">Kom igång</string>
-    <string name="welcome_donate_title">Gillar du AutoMap?</string>
-    <string name="welcome_donate_body">AutoMap är gratis och reklamfri, byggd på en knapp budget. Om den blivit användbar hjälper en liten engångsdonation till att hålla den igång, helt frivilligt, och det här är enda gången den frågar. Det finns alltid en Stöd-post i Inställningar också.</string>
-    <string name="welcome_donate_confirm">Stöd AutoMap</string>
-    <string name="welcome_donate_dismiss">Kanske senare</string>
-    <string name="search_close_cd">Stäng sökning</string>
+    <string name="welcome_get_started">Kom igång</string>    <string name="search_close_cd">Stäng sökning</string>
     <string name="search_placeholder">Sök</string>
     <string name="search_offline">Offline</string>
     <string name="search_clear_cd">Rensa sökning</string>
@@ -799,9 +790,7 @@
     <string name="settings_name_trips_hint">När en inspelad körning avslutats frågar AutoMap vad den ska heta. Av som standard; du kan alltid byta namn på en resa senare i listan nedan.</string>
     <string name="trip_name_prompt_title">Namnge den här körningen</string>
     <string name="trip_name_prompt_save">Spara namn</string>
-    <string name="trip_name_prompt_skip">Inte nu</string>
-    <string name="donate_no_browser">Ingen webbläsare installerad för att öppna donationssidan</string>
-    <string name="place_tab_menu">Meny</string>
+    <string name="trip_name_prompt_skip">Inte nu</string>    <string name="place_tab_menu">Meny</string>
     <string name="place_sort_relevant">Mest relevanta</string>
     <string name="place_sort_newest">Nyaste</string>
     <string name="place_sort_highest">Högsta betyg</string>

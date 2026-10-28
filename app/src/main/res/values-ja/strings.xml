@@ -157,11 +157,7 @@
     <string name="settings_diag_consent_title">診断をオンにしますか？</string>
     <string name="settings_diag_consent_body">AutoMap は検索、経路、エラーの短いログを端末内に保存します。「エクスポート」をタップして送信先を選ばない限り、端末の外に出ることはありません。いつでもオフにでき、オフにするとログは消去されます。</string>
     <string name="settings_about">このアプリについて</string>
-    <string name="settings_about_hint">AutoMap は脱Googleの地図クライアントです。ベースマップにはオープンな地図タイル、場所・経路・交通状況を反映した到着予測には Google から取得したデータ、音声には端末上で動く Piper の音声を使用しています。GPLv3。Play 開発者サービスは不要です。</string>
-    <string name="settings_support">支援</string>
-    <string name="settings_support_hint">AutoMap は無料で広告もありません。役に立っていると感じたら、寄付が開発の継続に役立ちます。完全に任意です。</string>
-    <string name="settings_support_button">AutoMap を支援</string>
-    <string name="settings_version">バージョン</string>
+    <string name="settings_about_hint">AutoMap は脱Googleの地図クライアントです。ベースマップにはオープンな地図タイル、場所・経路・交通状況を反映した到着予測には Google から取得したデータ、音声には端末上で動く Piper の音声を使用しています。GPLv3。Play 開発者サービスは不要です。</string>    <string name="settings_version">バージョン</string>
     <string name="settings_version_line">AutoMap %1$s（ビルド %2$d）</string>
     <!-- format -->
     <string name="settings_collapse">折りたたむ</string>
@@ -404,12 +400,7 @@
     <string name="welcome_feature_places_body">リアルタイム検索、クチコミ、写真、公共交通機関、交通状況を反映した経路。</string>
     <string name="welcome_feature_open_source_title">無料・オープンソース</string>
     <string name="welcome_feature_open_source_body">GPLv3。GrapheneOS をはじめとする脱Google端末のために作られています。</string>
-    <string name="welcome_get_started">はじめる</string>
-    <string name="welcome_donate_title">AutoMap を気に入っていただけましたか？</string>
-    <string name="welcome_donate_body">AutoMap は無料・広告なしで、ごくわずかな資金で開発されています。役に立っていると感じたら、一度きりの少額の寄付が継続の支えになります。完全に任意で、このお願いが表示されるのは今回だけです。設定にはいつでも「支援」の項目があります。</string>
-    <string name="welcome_donate_confirm">AutoMap を支援</string>
-    <string name="welcome_donate_dismiss">また今度</string>
-    <!-- search: SearchBar.kt -->
+    <string name="welcome_get_started">はじめる</string>    <!-- search: SearchBar.kt -->
     <string name="search_close_cd">検索を閉じる</string>
     <string name="search_placeholder">検索</string>
     <string name="search_offline">オフライン</string>
@@ -857,9 +848,7 @@
     <string name="settings_name_trips_hint">記録した走行が終わるたびに、AutoMap が名前を尋ねます。初期状態ではオフです。後から下の一覧でいつでも名前を変更できます。</string>
     <string name="trip_name_prompt_title">この走行に名前を付ける</string>
     <string name="trip_name_prompt_save">名前を保存</string>
-    <string name="trip_name_prompt_skip">後で</string>
-    <string name="donate_no_browser">寄付ページを開けるブラウザがインストールされていません</string>
-    <string name="place_tab_menu">メニュー</string>
+    <string name="trip_name_prompt_skip">後で</string>    <string name="place_tab_menu">メニュー</string>
     <string name="place_sort_relevant">関連度順</string>
     <string name="place_sort_newest">新しい順</string>
     <string name="place_sort_highest">評価の高い順</string>

@@ -350,11 +350,7 @@
     <string name="settings_crash_discard">Zavrzi</string>
     <string name="settings_crash_enable_diag">Vklopi diagnostiko</string>
     <string name="settings_diag_consent_title">Želiš vklopiti diagnostiko?</string>
-    <string name="settings_about">O aplikaciji</string>
-    <string name="settings_support">Podpri razvoj</string>
-    <string name="settings_support_button">Podpri Velo</string>
-    <string name="donate_no_browser">Za odpiranje strani za donacije ni nameščenega brskalnika</string>
-    <string name="settings_version">Različica</string>
+    <string name="settings_about">O aplikaciji</string>    <string name="settings_version">Različica</string>
     <string name="settings_version_line">AutoMap %1$s (gradnja %2$d)</string>
     <string name="settings_version_copied">Različica je kopirana</string>
     <string name="settings_collapse">Strni</string>
@@ -652,11 +648,7 @@
     <string name="welcome_google_off_sends">Googlu se ne pošlje nič.</string>
     <string name="whatsnew_got_it">Razumem</string>
     <string name="whatsnew_full_notes">Celotne opombe ob izdaji</string>
-    <string name="settings_whatsnew_hint">Opombe ob izdaji za trenutno različico aplikacije.</string>
-    <string name="welcome_donate_title">Ti je AutoMap všeč?</string>
-    <string name="welcome_donate_confirm">Podpri Velo</string>
-    <string name="welcome_donate_dismiss">Morda pozneje</string>
-    <string name="search_close_cd">Zapri iskanje</string>
+    <string name="settings_whatsnew_hint">Opombe ob izdaji za trenutno različico aplikacije.</string>    <string name="search_close_cd">Zapri iskanje</string>
     <string name="search_fill_cd">Vnesi v iskalno polje</string>
     <string name="search_placeholder">Išči</string>
     <string name="search_offline">Brez povezave</string>

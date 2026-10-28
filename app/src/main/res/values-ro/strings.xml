@@ -437,12 +437,7 @@
     <string name="settings_diag_consent_title">Activezi funcția de diagnosticare?</string>
     <string name="settings_diag_consent_body">AutoMap va păstra un jurnal local succint al căutărilor, traseelor și eventualelor erori. Acesta nu părăsește niciodată telefonul, cu excepția cazului în care apeși pe „Export” și alegi unde să-l trimiți. Poți dezactiva această funcție oricând pentru a șterge jurnalul.</string>
     <string name="settings_about">Despre</string>
-    <string name="settings_about_hint">AutoMap este un client de hărți fără servicii Google: folosește OpenTiles pentru harta de bază, preia date de la Google pentru puncte de interes (POI), oferă rute și estimări ale timpului de sosire (ETA) în funcție de trafic, iar vocea este o voce Piper care rulează pe telefon. Licențiat sub GPLv3. Nu sunt necesare serviciile Play.</string>
-    <string name="settings_support">Sprijin</string>
-    <string name="settings_support_hint">AutoMap este gratuită și nu conține reclame. Dacă ți s-a dovedit utilă, o donație ne ajută să continuăm dezvoltarea aplicației. Este o opțiune complet facultativă.</string>
-    <string name="settings_support_button">Susține AutoMap</string>
-    <string name="donate_no_browser">Nu ai instalat niciun browser pentru a deschide pagina de donații</string>
-    <string name="settings_version">Versiune</string>
+    <string name="settings_about_hint">AutoMap este un client de hărți fără servicii Google: folosește OpenTiles pentru harta de bază, preia date de la Google pentru puncte de interes (POI), oferă rute și estimări ale timpului de sosire (ETA) în funcție de trafic, iar vocea este o voce Piper care rulează pe telefon. Licențiat sub GPLv3. Nu sunt necesare serviciile Play.</string>    <string name="settings_version">Versiune</string>
     <string name="settings_version_line">AutoMap %1$s (asamblare %2$d)</string>
     <string name="settings_installer_play">Aplicația a fost instalată de %1$s. Această instalare este configurată pentru Android Auto; o actualizare din aplicație ar anula această configurare, așa că actualizează folosind același program de instalare.</string>
     <string name="settings_installer_started_by">Instalarea a fost inițiată de %1$s, iar acesta este elementul verificat de versiunile mai recente ale Android Auto.</string>
@@ -749,12 +744,7 @@
     <string name="whatsnew_full_notes">Note complete</string>
     <string name="settings_whatsnew">Noutăți în această versiune</string>
     <string name="settings_whatsnew_hint">Notele de lansare pentru versiunea pe care o utilizezi.</string>
-    <string name="whatsnew_show_after_updates">Afișează noutățile după actualizări</string>
-    <string name="welcome_donate_title">Îți place AutoMap?</string>
-    <string name="welcome_donate_body">AutoMap este gratuită și fără reclame, fiind dezvoltată cu un buget foarte redus. Dacă ți s-a dovedit utilă, o mică donație unică ne ajută să o menținem în funcțiune. Este o acțiune complet opțională, iar aceasta este singura dată când ți se va solicita acest lucru. De asemenea, în Setări vei găsi întotdeauna o secțiune dedicată sprijinului.</string>
-    <string name="welcome_donate_confirm">Susține AutoMap</string>
-    <string name="welcome_donate_dismiss">Poate mai târziu</string>
-    <string name="search_close_cd">Închide căutarea</string>
+    <string name="whatsnew_show_after_updates">Afișează noutățile după actualizări</string>    <string name="search_close_cd">Închide căutarea</string>
     <string name="search_fill_cd">Introdu în caseta de căutare</string>
     <string name="search_placeholder">Căutare</string>
     <string name="search_offline">Off-line</string>

@@ -130,9 +130,7 @@
     <string name="search_settings_cd">Sazkarî</string>
     <string name="search_placeholder">Bigere</string>
     <string name="settings_cancel">Têk bibe</string>
-    <string name="settings_about">Derbar</string>
-    <string name="settings_support">Piştgirî</string>
-    <string name="settings_collapse">Hilweşîne</string>
+    <string name="settings_about">Derbar</string>    <string name="settings_collapse">Hilweşîne</string>
     <string name="nav_stop_offer_detour">+%1$s</string>
     <string name="place_review_more">Bêtir</string>
     <string name="steps_continue">Bidomîne</string>
