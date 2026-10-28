@@ -38,6 +38,11 @@ class RoutePreviewCarScreen(
     private val deps: CarDeps,
     private val destName: String,
     private val dest: LatLng,
+    // Audit pass 2: a saved route opened from SavedCarScreen. A run previews
+    // through its stops; a shape previews through vias derived from its line
+    // (the phone's SavedRoutes.viasAgainst, same rule) so the preview is the
+    // saved way, not just a fresh route to the same destination.
+    private val savedRoute: app.vela.core.model.SavedRoute? = null,
 ) : Screen(carContext), DefaultLifecycleObserver {
 
     private var routes: List<Route> = emptyList()
@@ -45,6 +50,10 @@ class RoutePreviewCarScreen(
     private var loading = true
     private var fetched = false
     private var origin: LatLng? = null
+    // The via points the current preview was built through: a run's stops, or
+    // a shape's line-derived vias. Reused by the Go-time re-fetch so a moved
+    // origin does not silently drop the saved way back to a fresh route.
+    private var viaPoints: List<LatLng> = emptyList()
     // Freshness (2026-10-27, parked-origin fix): originFreshAtMs is elapsed-realtime
     // when the origin was verified fresh (live puck or a ≤30 s snapshot); 0 means the
     // origin was never verified fresh and must not be routed from silently.
@@ -177,17 +186,49 @@ class RoutePreviewCarScreen(
             origin = from
             originFreshAtMs = if (fresh) android.os.SystemClock.elapsedRealtime() else 0L
             staleOrigin = !fresh
+            // Saved-route vias first: a run's stops in order; a shape starts
+            // direct and gets its vias below, once a reference route exists.
+            viaPoints = savedRoute?.takeIf { it.isRun }?.stops?.map { it.location }.orEmpty()
             routes = if (!fresh || from == null) emptyList()
             else runCatching {
                 // The avoid settings (car Settings or the phone's chooser); without them a car
                 // preview offered toll roads to a driver who had turned tolls off.
                 deps.mapDataSource.directions(
-                    from, dest, TravelMode.DRIVE,
+                    from, dest, TravelMode.DRIVE, viaPoints,
                     avoidTolls = app.vela.core.data.RoutingPrefs.avoidTolls,
                     avoidHighways = app.vela.core.data.RoutingPrefs.avoidHighways,
                     avoidFerries = app.vela.core.data.RoutingPrefs.avoidFerries,
                 )
             }.getOrDefault(emptyList())
+            // Shape saved route: derive vias where its line leaves the fresh
+            // route's line, re-fetch through them, and lead with that route —
+            // the phone's offerSavedRoutes rule, without the phone's chooser.
+            if (savedRoute != null && !savedRoute.isRun && routes.isNotEmpty() && from != null) {
+                val savedLine = runCatching {
+                    app.vela.core.data.google.PolylineCodec.decode(savedRoute.polyline)
+                }.getOrDefault(emptyList())
+                val vias = if (savedLine.size >= 2) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                        app.vela.core.nav.SavedRoutes.viasAgainst(savedLine, routes.first().polyline)
+                    }
+                } else emptyList()
+                if (vias.isNotEmpty()) {
+                    val viaRoutes = runCatching {
+                        deps.mapDataSource.directions(
+                            from, dest, TravelMode.DRIVE, vias,
+                            avoidTolls = app.vela.core.data.RoutingPrefs.avoidTolls,
+                            avoidHighways = app.vela.core.data.RoutingPrefs.avoidHighways,
+                            avoidFerries = app.vela.core.data.RoutingPrefs.avoidFerries,
+                        )
+                    }.getOrDefault(emptyList())
+                    if (viaRoutes.isNotEmpty()) {
+                        viaPoints = vias
+                        val mine = viaRoutes.first().copy(detourPlan = vias, savedName = savedRoute.name)
+                        routes = listOf(mine) + routes
+                        selected = 0
+                    }
+                }
+            }
             loading = false
             invalidate()
             showSelected(deps.mapRenderer(carContext)) // frame the route once fetched
@@ -208,7 +249,7 @@ class RoutePreviewCarScreen(
             if (liveFresh && from != null && live.first.distanceTo(from) > 50.0) {
                 val freshRoutes = runCatching {
                     deps.mapDataSource.directions(
-                        live.first, dest, TravelMode.DRIVE,
+                        live.first, dest, TravelMode.DRIVE, viaPoints,
                         avoidTolls = app.vela.core.data.RoutingPrefs.avoidTolls,
                         avoidHighways = app.vela.core.data.RoutingPrefs.avoidHighways,
                         avoidFerries = app.vela.core.data.RoutingPrefs.avoidFerries,

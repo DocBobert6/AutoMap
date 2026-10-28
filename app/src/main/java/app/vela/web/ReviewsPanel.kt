@@ -101,7 +101,10 @@ fun GoogleReviewsPanel(
     // NO nested scroll — the scroll-sync touch listener is skipped, and the carve is lighter (keeps
     // Google's own search/sort/histogram + lets Google's native photo/VIDEO viewer handle taps, so
     // videos play). Inline (false) is unused now that the inline reviews are the native list; the
-    // panel exists only as this full-screen view.
+    // panel exists only as this full-screen view, and audit pass 2 removed the inline-only
+    // scroll-sync branches below (they evaluated to nothing with fullScreen = true, the only
+    // value any caller passes — see PlaceSheet). The parameter is retained for the D-pad
+    // handling and the carve, which do branch on it.
     fullScreen: Boolean = false,
 ) {
     val cid = cidOf(featureId) ?: return
@@ -210,7 +213,8 @@ private fun buildPanelWebView(
     // flings didn't — the panel became a scroll trap). Manual delta-forwarding has no ownership
     // transfer at all, so it also survives mid-gesture direction reversals.
     val panelAtTop = java.util.concurrent.atomic.AtomicBoolean(true)
-    val panelAtBottom = java.util.concurrent.atomic.AtomicBoolean(false)
+    // No panelAtBottom: bottom-edge forwarding was inline-only (a full-screen
+    // view has no sheet to grow), and it is removed with the inline branches.
     // All positions are WINDOW-space (view-local y + the view's window offset): the forwarded
     // scroll moves the WebView itself, so a view-local delta shrinks by exactly the amount the
     // sheet just moved — the sheet would track at HALF the finger speed, stepping every other
@@ -258,9 +262,9 @@ private fun buildPanelWebView(
     // close like the photo viewer (user 2026-07-11). The bottom/up forwarding stays inline-only
     // (full-screen has no sheet to grow), and there's no parent to disallow-intercept against.
     wv.setOnTouchListener { v, ev ->
-        if (!fullScreen && ev.actionMasked != MotionEvent.ACTION_UP && ev.actionMasked != MotionEvent.ACTION_CANCEL) {
-            v.parent?.requestDisallowInterceptTouchEvent(true)
-        }
+        // Audit pass 2: the inline sheet's disallow-intercept branch is gone —
+        // it never ran with fullScreen = true, and full-screen has no sheet
+        // parent to disallow against.
         v.getLocationInWindow(winLoc)
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
@@ -297,14 +301,16 @@ private fun buildPanelWebView(
                     // into the boundary-exit branch below and fire the end signal with the finger
                     // still down — past the threshold that closed the page mid-drag (user
                     // 2026-07-11). Like the photo viewer, the pull now judges only at release.
-                    if ((fullScreen && forwarded) ||
+                    if (forwarded ||
                         // Otherwise forward only clearly-vertical boundary drags (a horizontal
                         // chip swipe with a slight slope must not jiggle the sheet).
                         (kotlin.math.abs(dy) > kotlin.math.abs(dx) &&
                             // Full-screen: the WebView itself may be the scroller; a pull needs
                             // its own scroll at the top as well as the page's verdict.
-                            ((panelAtTop.get() && (!fullScreen || v.scrollY <= 0) && dy > 0f) ||
-                                (!fullScreen && panelAtBottom.get() && dy < 0f)))
+                            // (With fullScreen = true, the old "(fullScreen && forwarded)"
+                            // and "(!fullScreen || scrollY <= 0)" evaluated to exactly
+                            // this; the inline-only bottom branch is deleted.)
+                            (panelAtTop.get() && v.scrollY <= 0 && dy > 0f))
                     ) {
                         forwarded = true
                         forwardDist += kotlin.math.abs(dy)
@@ -355,9 +361,10 @@ private fun buildPanelWebView(
 
         // Scroll-sync edge state (JavaBridge thread → read on the UI thread by the touch listener).
         @JavascriptInterface
-        fun onPanelEdge(atTop: Boolean, atBottom: Boolean) {
+        fun onPanelEdge(atTop: Boolean, @Suppress("UNUSED_PARAMETER") atBottom: Boolean) {
+            // atBottom is reported by the page's bridge but no longer read:
+            // bottom-edge forwarding was inline-only and is removed.
             panelAtTop.set(atTop)
-            panelAtBottom.set(atBottom)
         }
 
         // An inertial inner fling landed on the top edge with leftover momentum (CSS px/s):

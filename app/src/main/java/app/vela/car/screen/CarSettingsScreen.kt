@@ -19,9 +19,13 @@ import app.vela.offline.OfflineMaps
  * toggle read muted, so an Alerts-only driver saw OFF. Tapping the row steps through the
  * same three modes as the drive's speaker button. Terrain follows the phone's holder and,
  * like the phone, is hidden during navigation by the renderer. The offline row reports the
- * saved-areas count (a viewport-coverage check is not available in a car template); transit
- * and places-source have no car control on purpose — the car style has no transit layer and
- * no ambient places layer, so toggles for them would change nothing on the car map.
+ * saved-areas count (a viewport-coverage check is not available in a car template).
+ * Transit (audit pass 2) now has a car control: the car style carries a
+ * vela-transit layer, and this toggle writes the phone's TransitLayer
+ * setting, so phone and car agree; the renderer shows it only outside
+ * navigation. Places-source still has no car control on purpose — there
+ * is no ambient places layer distinct from the basemap POI tiers on the
+ * car map, so such a toggle would change nothing there.
  */
 class CarSettingsScreen(carContext: CarContext, private val deps: CarDeps) : Screen(carContext) {
 
@@ -64,6 +68,14 @@ class CarSettingsScreen(carContext: CarContext, private val deps: CarDeps) : Scr
             .addItem(
                 toggleRow(app.vela.R.string.settings_topography, app.vela.ui.Topography.on.value) { on ->
                     app.vela.ui.Topography.set(carContext, on)
+                },
+            )
+            // Transit lines (audit pass 2): writes the phone's TransitLayer
+            // setting, so the car map and the phone map always agree. The
+            // renderer shows the highlight only outside navigation.
+            .addItem(
+                toggleRow(app.vela.R.string.settings_transit_layer, app.vela.ui.TransitLayer.on.value) { on ->
+                    app.vela.ui.TransitLayer.set(carContext, on)
                 },
             )
 

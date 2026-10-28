@@ -107,7 +107,7 @@ internal object PaintedRoadsLayer {
         ensureArrowImages(style, dark)
         val roadColor = (style.getLayer("road_trunk_primary") as? LineLayer)?.lineColor?.value as? String
             ?: if (dark) "#476789" else "#AAB9C9"
-        val paintWhite = if (dark) "#C9D2DC" else "#FFFFFF"
+        val paintWhite = PaintedPalette.white(dark)
         val offset = PropertyFactory.lineOffset(meters(Expression.coalesce(Expression.get("off"), Expression.literal(0))))
         val width = meters(Expression.coalesce(Expression.get("w"), Expression.literal(0)))
         fun kind(k: PaintedRoads.Kind) = Expression.eq(Expression.get("k"), Expression.literal(k.name))
@@ -119,7 +119,7 @@ internal object PaintedRoadsLayer {
             }
         val layers: List<Layer> = listOf(
             line("median", PaintedRoads.Kind.MEDIAN,
-                PropertyFactory.lineColor(if (dark) "#22303F" else "#E4E8EE"), PropertyFactory.lineWidth(width),
+                PropertyFactory.lineColor(PaintedPalette.median(dark)), PropertyFactory.lineWidth(width),
                 PropertyFactory.lineCap(Property.LINE_CAP_ROUND)),
             line("surface", PaintedRoads.Kind.SURFACE,
                 PropertyFactory.lineColor(roadColor), PropertyFactory.lineWidth(width),
@@ -132,13 +132,13 @@ internal object PaintedRoadsLayer {
                 PropertyFactory.lineColor(paintWhite), PropertyFactory.lineWidth(metersConst(0.6)),
                 PropertyFactory.lineOpacity(fadeIn)),
             line("bike", PaintedRoads.Kind.BIKE,
-                PropertyFactory.lineColor(if (dark) "#2E6B47" else "#86CFA0"), PropertyFactory.lineWidth(metersConst(1.2)),
+                PropertyFactory.lineColor(PaintedPalette.bike(dark)), PropertyFactory.lineWidth(metersConst(1.2)),
                 offset, PropertyFactory.lineOpacity(Expression.product(fadeIn, Expression.literal(0.9f)))),
             line("lane", PaintedRoads.Kind.LANE,
                 PropertyFactory.lineColor(paintWhite), PropertyFactory.lineWidth(thin),
                 PropertyFactory.lineDasharray(arrayOf(5f, 7f)), offset, PropertyFactory.lineOpacity(fadeIn)),
             line("center", PaintedRoads.Kind.CENTER,
-                PropertyFactory.lineColor(if (dark) "#C9A227" else "#F2C200"), PropertyFactory.lineWidth(thin),
+                PropertyFactory.lineColor(PaintedPalette.center(dark)), PropertyFactory.lineWidth(thin),
                 PropertyFactory.lineGapWidth(thin), offset, PropertyFactory.lineOpacity(fadeIn)),
             SymbolLayer("vela-paint-arrow", src).apply {
                 sourceLayer?.let { setSourceLayer(it) }

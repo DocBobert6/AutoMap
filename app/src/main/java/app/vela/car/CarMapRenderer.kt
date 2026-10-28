@@ -830,18 +830,18 @@ class CarMapRenderer(
         // be added after load, images can). Density matches the inject-time arrow sizing.
         runCatching {
             val suffix = if (night) "-d" else "-l"
-            val paintWhite = if (night) "#C9D2DC" else "#FFFFFF"
+            val paintWhite = app.vela.ui.map.PaintedPalette.white(night)
             fun lineColor(id: String, color: String) {
                 host.getLayer(id)?.setProperties(
                     org.maplibre.android.style.layers.PropertyFactory.lineColor(color))
             }
-            lineColor("vela-paint-median", if (night) "#22303F" else "#E4E8EE")
+            lineColor("vela-paint-median", app.vela.ui.map.PaintedPalette.median(night))
             lineColor("vela-paint-surface", if (night) "#7a8fb5" else "#a8b6c4")
             lineColor("vela-paint-crosswalk", paintWhite)
             lineColor("vela-paint-stop", paintWhite)
-            lineColor("vela-paint-bike", if (night) "#2E6B47" else "#86CFA0")
+            lineColor("vela-paint-bike", app.vela.ui.map.PaintedPalette.bike(night))
             lineColor("vela-paint-lane", paintWhite)
-            lineColor("vela-paint-center", if (night) "#C9A227" else "#F2C200")
+            lineColor("vela-paint-center", app.vela.ui.map.PaintedPalette.center(night))
             (host.getLayer("vela-paint-arrow") as? org.maplibre.android.style.layers.SymbolLayer)?.setProperties(
                 org.maplibre.android.style.layers.PropertyFactory.iconImage(
                     org.maplibre.android.style.expressions.Expression.concat(
@@ -1028,6 +1028,8 @@ class CarMapRenderer(
     private var arrivalParkingShown: Boolean? = null
     // AutoMap (Build 17): whether the hillshade layer is currently shown.
     private var hillshadeShown: Boolean? = null
+    // Audit pass 2: whether the transit highlight is currently shown.
+    private var transitShown: Boolean? = null
     private var buildingFadeOpacity = 1f
     private var buildingFadeApplied = 1f
 
@@ -1041,7 +1043,10 @@ class CarMapRenderer(
      *  effect excludes it for the same reason. Gated on TurnDeclutterPref like the phone. */
     private val DECLUTTER_LAYERS = listOf(
         "poi_r1", "poi_r7", "poi_r20", "poi_transit", "vela-transit-stops",
-        "vela-bikeroutes", "vela-trails", "vela-transit",
+        "vela-bikeroutes", "vela-trails",
+        // NOTE: vela-transit is NOT here (audit pass 2) — the transit block
+        // below owns it outright, so a declutter restore can never resurrect
+        // it while TransitLayer is off, and nav always hides it.
         "label_other", "label_village",
         "road_one_way_arrow", "road_one_way_arrow_opposite",
     )
@@ -1163,6 +1168,24 @@ class CarMapRenderer(
                         org.maplibre.android.style.layers.PropertyFactory.visibility(vis),
                     )
                 }
+            }
+        }
+        // Audit pass 2: transit highlight, AFTER the declutter block on
+        // purpose — declutter restores vela-transit to VISIBLE when it is
+        // off, which would otherwise resurrect the highlight during a
+        // drive. Transit shows only in browse/overview, like the phone
+        // (ensureTransit steps it aside during drive nav), and only when
+        // the phone's TransitLayer setting is on — the car toggle below
+        // writes that same setting, so phone and car always agree.
+        val transit = app.vela.ui.TransitLayer.on.value && !nav
+        if (transitShown != transit) {
+            transitShown = transit
+            val vis = if (transit) org.maplibre.android.style.layers.Property.VISIBLE
+                else org.maplibre.android.style.layers.Property.NONE
+            runCatching {
+                s.getLayer(CarStyle.TRANSIT_LAYER)?.setProperties(
+                    org.maplibre.android.style.layers.PropertyFactory.visibility(vis),
+                )
             }
         }
         val detail3d = app.vela.ui.MapDetail.threeD.value

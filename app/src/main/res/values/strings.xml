@@ -933,6 +933,7 @@
     <string name="car_more_nearby">More nearby</string>
     <string name="car_saved">Saved</string>
     <string name="car_saved_empty">No saved places yet. Save one on your phone.</string>
+    <string name="car_saved_route">Saved route</string>
     <string name="car_home">Home</string>
     <string name="car_work">Work</string>
     <string name="car_settings">Settings</string>

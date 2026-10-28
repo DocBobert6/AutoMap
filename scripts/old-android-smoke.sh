@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# STANDALONE emulator dev tool (audit pass 2, verified kept, 2026-10-28): it is NOT
+# referenced by the app and NOT wired to any workflow in this repo — the only
+# workflows here are automap-release.yml and automap-debug-release.yml, and neither
+# mentions this script. The workflow it names (.github/workflows/old-android-smoke.yml)
+# does not exist in this repo (it is upstream Vela history, see SPEC.md). Run it by
+# hand inside an emulator runner only; do not delete it as "dead app code", because
+# it is not app code at all.
 # The body of .github/workflows/old-android-smoke.yml, run inside the emulator runner: install the
 # x86_64 release APK, start the app through a geo: search (a Davis, CA fixture place), open the
 # first result, and fail on a crash or a missing Cronet engine. Evidence goes to smoke-out/.

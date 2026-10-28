@@ -30,6 +30,7 @@ internal object CarStyle {
     const val DEM_SRC = "vela-dem"
     const val HILLSHADE_LAYER = "vela-hillshade"
     const val TERRARIUM_TILES = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
+    const val TRANSIT_LAYER = "vela-transit"
     const val PAINT_SRC = "vela-paint-baked"
     const val PAINT_LAYER = "paint"
     val PAINT_IDS = listOf("median", "surface", "crosswalk", "stop", "bike", "lane", "center", "arrow").map { "vela-paint-$it" }
@@ -133,7 +134,7 @@ internal object CarStyle {
                     JSONObject().put("line-color", color).put("line-width", width).apply(extra)
                 val paintLayers = listOf(
                     paintLayer("vela-paint-median", "line", "MEDIAN",
-                        linePaint("#E4E8EE", widthW),
+                        linePaint(app.vela.ui.map.PaintedPalette.median(false), widthW),
                         JSONObject().put("line-cap", "round")),
                     paintLayer("vela-paint-surface", "line", "SURFACE",
                         linePaint("#a8b6c4", widthW),
@@ -143,11 +144,11 @@ internal object CarStyle {
                     paintLayer("vela-paint-stop", "line", "STOP",
                         linePaint("#FFFFFF", metersOf(0.6)) { put("line-opacity", fadeIn) }),
                     paintLayer("vela-paint-bike", "line", "BIKE",
-                        linePaint("#86CFA0", metersOf(1.2)) { put("line-offset", offW); put("line-opacity", JSONArray(listOf("*", fadeIn, 0.9))) }),
+                        linePaint(app.vela.ui.map.PaintedPalette.bike(false), metersOf(1.2)) { put("line-offset", offW); put("line-opacity", JSONArray(listOf("*", fadeIn, 0.9))) }),
                     paintLayer("vela-paint-lane", "line", "LANE",
                         linePaint("#FFFFFF", thin) { put("line-dasharray", JSONArray(listOf(5, 7))); put("line-offset", offW); put("line-opacity", fadeIn) }),
                     paintLayer("vela-paint-center", "line", "CENTER",
-                        linePaint("#F2C200", thin) { put("line-gap-width", thin); put("line-offset", offW); put("line-opacity", fadeIn) }),
+                        linePaint(app.vela.ui.map.PaintedPalette.center(false), thin) { put("line-gap-width", thin); put("line-offset", offW); put("line-opacity", fadeIn) }),
                     paintLayer("vela-paint-arrow", "symbol", "ARROW",
                         JSONObject().put("icon-opacity", fadeIn),
                         JSONObject()
@@ -208,6 +209,34 @@ internal object CarStyle {
                 JSONArray(listOf("==", JSONArray(listOf("get", "brunnel")), "bridge")),
                 null, shadowPaint, JSONObject().put("line-cap", "round")))
         }
+        // Audit pass 2 (2026-10-28): the phone's transit highlight, as style
+        // JSON — the car style had no transit layer, so a car transit toggle
+        // would have been a no-op (alpha.15's reason for skipping it). Same
+        // source-layer (transportation), same classes (rail = heavy rail,
+        // transit = subway/light-rail/tram), same colours (teal for transit,
+        // purple for rail) and widths (zoom 8→1, 13→2.4, 16→4.2) as the
+        // phone's ensureTransit. Hidden by default; the renderer shows it
+        // when TransitLayer is on and the car is not navigating (the phone
+        // likewise steps transit aside during a drive, and the Build 5
+        // declutter already lists vela-transit — it was a no-op until now
+        // because the layer did not exist). Below the first symbol layer
+        // so labels stay on top, like the phone.
+        val transitPaint = JSONObject()
+            .put("line-color", JSONArray(listOf("match", JSONArray(listOf("get", "class")),
+                "transit", "#12B5A5", "#7E57C2")))
+            .put("line-width", JSONArray(listOf("interpolate", JSONArray(listOf("linear")), JSONArray(listOf("zoom")),
+                8, 1.0, 13, 2.4, 16, 4.2)))
+            .put("line-opacity", 0.9)
+            .put("line-cap", "round")
+            .put("line-join", "round")
+        val transitLayer = layer(TRANSIT_LAYER, "line", "transportation",
+            JSONArray(listOf("any",
+                JSONArray(listOf("==", JSONArray(listOf("get", "class")), "rail")),
+                JSONArray(listOf("==", JSONArray(listOf("get", "class")), "transit")))),
+            null, transitPaint,
+            JSONObject().put("visibility", "none"))
+        val firstSymbolForTransit = out.indexOfFirst { it.optString("type") == "symbol" }
+        if (firstSymbolForTransit >= 0) out.add(firstSymbolForTransit, transitLayer) else out.add(transitLayer)
         // AutoMap (Build 16): nearby car parks as nearby places (NOT a parking
         // recommendation — just the tile POIs, shown only on arrival). OMT's poi
         // layer carries the original OSM tag value in `subclass`, so

@@ -18,6 +18,7 @@ data class CarDeps(
     val mapDataSource: MapDataSource,
     val recentPlaces: RecentPlaceStore,
     val savedPlaces: SavedPlaceStore,
+    val savedRoutes: app.vela.core.data.SavedRouteStore,
     val shortcuts: PlaceShortcutStore,
     val voiceGuide: VoiceGuide,
     val routeEngine: RouteEngine, // for the speed-limit badge (offline graphs' max_speed)

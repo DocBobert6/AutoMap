@@ -124,7 +124,12 @@ object AutoMapUpdater {
             .remove(KEY_FOUND).remove(KEY_CHECKED_AT).apply()
         val current = flow.value
         if (current is State.Checking || current is State.Downloading) return
-        updatesDir(context).deleteRecursively()
+        // Audit pass 2 (L7): the old unconditional delete never checked its
+        // result. A failed delete is now logged; the next check re-creates
+        // the folder, so this stays a warning, not a new failure state.
+        if (!updatesDir(context).deleteRecursively()) {
+            android.util.Log.w("AutoMapUpdate", "update: could not clear the old update folder on channel change")
+        }
         flow.value = State.Idle
         if (autoCheckEnabled(context) && !BuildConfig.DEBUG) check(context)
     }
@@ -148,12 +153,27 @@ object AutoMapUpdater {
         if (dueForCheck(context)) check(context)
     }
 
+    // Audit pass 2 (L2): the Checking/Downloading guard is now atomic —
+    // the old plain flow.value reads let two near-simultaneous taps both
+    // pass it. The guard + initial state set happen under one lock; the
+    // thread body itself runs outside it. install() is untouched.
+    private val guardLock = Any()
+
+    private fun updateThread(body: () -> Unit): Thread =
+        Thread(body, "automap-update").also { t ->
+            t.uncaughtExceptionHandler = Thread.UncaughtExceptionHandler { _, e ->
+                android.util.Log.w("AutoMapUpdate", "update: uncaught on update thread: ${e.message}")
+                flow.value = State.Failed(e.message ?: "The update failed. Try again.")
+            }
+        }
+
     fun check(context: Context) {
-        val current = flow.value
-        if (current is State.Checking || current is State.Downloading) return
         val app = context.applicationContext
-        flow.value = State.Checking
-        Thread({ flow.value = checkNow(app) }, "automap-update").start()
+        synchronized(guardLock) {
+            if (flow.value is State.Checking || flow.value is State.Downloading) return
+            flow.value = State.Checking
+        }
+        updateThread({ flow.value = checkNow(app) }).start()
     }
 
     private fun checkNow(app: Context): State = runCatching { fetchNewest(channel(app)) }.fold(
@@ -176,13 +196,22 @@ object AutoMapUpdater {
     )
 
     fun download(context: Context, release: Release) {
-        if (flow.value is State.Downloading) return
         val app = context.applicationContext
-        flow.value = State.Downloading(release, 0f)
-        Thread({
-            val dir = updatesDir(app).apply { deleteRecursively(); mkdirs() }
+        synchronized(guardLock) {
+            if (flow.value is State.Downloading) return
+            flow.value = State.Downloading(release, 0f)
+        }
+        updateThread({
+            // Audit pass 2 (L7): the folder create used to run outside the
+            // runCatching and its mkdirs() result was never checked, so
+            // storage pressure left no cached APK and no error until the
+            // fetch failed. It is now inside, and a failed create is a
+            // plain Failed state instead of a silent dead end.
+            val dir = updatesDir(app)
             val apk = File(dir, "AutoMap-${release.version}.apk")
             flow.value = runCatching {
+                dir.deleteRecursively()
+                if (!dir.exists() && !dir.mkdirs()) error("Could not create the update folder. Try again.")
                 fetchApk(release, apk)
                 android.util.Log.i("AutoMapUpdate", "update: downloaded ${release.version}")
                 State.Ready(release, apk)
@@ -192,7 +221,7 @@ object AutoMapUpdater {
                 State.Failed(it.message ?: "The download failed. Try again.", release)
             }
             if (flow.value is State.Ready) install(app)
-        }, "automap-update").start()
+        }).start()
     }
 
     /** Hands the downloaded APK to Android's installer, via the unknown-sources flow if needed.

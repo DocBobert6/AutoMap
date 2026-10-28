@@ -9,6 +9,7 @@ import app.vela.core.data.PlaceShortcutStore
 import app.vela.core.data.RecentPlaceStore
 import app.vela.core.data.RouteEngine
 import app.vela.core.data.SavedPlaceStore
+import app.vela.core.data.SavedRouteStore
 import app.vela.core.location.LocationProvider
 import app.vela.core.nav.NavSession
 import app.vela.core.voice.VoiceGuide
@@ -36,6 +37,7 @@ class VelaCarAppService : CarAppService() {
     @Inject lateinit var mapDataSource: MapDataSource
     @Inject lateinit var recentPlaces: RecentPlaceStore
     @Inject lateinit var savedPlaces: SavedPlaceStore
+    @Inject lateinit var savedRoutes: SavedRouteStore
     @Inject lateinit var shortcuts: PlaceShortcutStore
     @Inject lateinit var voiceGuide: VoiceGuide
     @Inject lateinit var routeEngine: RouteEngine
@@ -77,7 +79,7 @@ class VelaCarAppService : CarAppService() {
         // with the phone UI never opened has to open them itself for offline car search.
         Thread { runCatching { poiPacks.registerPacks() } }.start()
         return VelaCarSession(
-        CarDeps(navSession, locationProvider, mapDataSource, recentPlaces, savedPlaces, shortcuts, voiceGuide, routeEngine, offlinePois, offlineAddresses, http),
+        CarDeps(navSession, locationProvider, mapDataSource, recentPlaces, savedPlaces, savedRoutes, shortcuts, voiceGuide, routeEngine, offlinePois, offlineAddresses, http),
         )
     }
 }

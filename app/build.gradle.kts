@@ -42,8 +42,8 @@ android {
         // a build that does not bump these can never present as an
         // update. The old 0.3.0 / 1 scheme, with every build on one
         // reused tag, is what made updates indistinguishable.
-        versionCode = (project.findProperty("appVersionCode") as String?)?.toIntOrNull() ?: 17
-        versionName = (project.findProperty("appVersionName") as String?) ?: "0.3.0-alpha.16"
+        versionCode = (project.findProperty("appVersionCode") as String?)?.toIntOrNull() ?: 18
+        versionName = (project.findProperty("appVersionName") as String?) ?: "0.3.0-alpha.17"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
