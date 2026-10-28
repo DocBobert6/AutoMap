@@ -564,8 +564,13 @@ fun MapScreen(
         val me = state.myLocation ?: return@LaunchedEffect
         if (followMe && c.distanceTo(me) > 1_000.0) followMe = false
     }
+    // AutoMap 2026-10-28 (bug 1): picking an origin/destination/stop also
+    // suppresses free-drive follow, even if the directions panel itself has closed
+    // — a lingering pick state must never let the follow ticker fight a pan made
+    // to choose the endpoint.
     val driveFollowing = followMe && !state.navigating && !resultsShown && state.selected == null &&
-        !state.directionsOpen && !state.showSteps && !searchOpen && state.pickOnMap == null
+        !state.directionsOpen && !state.showSteps && !searchOpen && state.pickOnMap == null &&
+        !state.pickingOrigin && !state.pickingDest && !state.pickingStop
     // The posted-limit ("Speed B") overlay is armed by ACTUAL MOTION, never by the bare browse map.
     // driveFollowing alone is true whenever you're just looking at the map (followMe defaults on), and
     // keying the overlay off it mounted the maxspeed PMTiles sources on the browse map - native tile
@@ -2550,8 +2555,17 @@ fun MapScreen(
                     movingFree = movingFree,
                 )
             }
-            // Never hidden for the speed box: it rides above it with the credit (issue #848).
-            if (!sidePanelUp) ScaleBarReader(metersPerPixelState, movingFree, chromeLift)
+        }
+        // AutoMap 2026-10-28 (bug 6): the scale bar is map furniture, not a FAB — it
+        // used to live inside the fabChromeOk block above, so ANY sheet, search,
+        // directions panel, step list, driving chrome or transient prompt shortly
+        // after launch unmounted it (and it only came back when every one of those
+        // cleared). It now draws whenever the map itself is shown, outside that
+        // block, gated only by the landscape side panel (which owns the corner)
+        // and Street View (whose bottom half is the pose mini-map). It still lifts
+        // over the speed box / nav bar via chromeLift + speedBoxLift.
+        if (!sidePanelUp && state.streetView == null && !state.streetViewLoading) {
+            ScaleBarReader(metersPerPixelState, movingFree, chromeLift)
         }
             // Outside the FAB-chrome block on purpose: the Your-lists button in the search bar is
             // reachable while the search overlay is open, and that block is not composed then,
@@ -5998,6 +6012,26 @@ private fun FasterRouteCard(
     Card(
         modifier
             .fillMaxWidth()
+            // AutoMap 2026-10-28 (bug 5): the countdown used to freeze only on
+            // FOCUS, and on a touch phone tapping a button never gives the card
+            // itself focus — so the 10 s clock kept running (and auto-fired) while
+            // the driver was reaching for Switch/No, and a tap landing as the
+            // clock hit zero lost to the auto-action. Freeze the clock on any
+            // touch press anywhere on the card, and resume on release/cancel.
+            // Observed in the Initial pass and NEVER consumed, so the buttons
+            // still receive the tap — a consuming tap detector here would steal
+            // the very clicks this fix is meant to save.
+            .pointerInput(offerKey) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                        when (event.type) {
+                            androidx.compose.ui.input.pointer.PointerEventType.Press -> held = true
+                            androidx.compose.ui.input.pointer.PointerEventType.Release -> held = false
+                        }
+                    }
+                }
+            }
             .onFocusChanged { held = it.hasFocus },
         // The same dress as every other card in the stack (update, downloads, notices) and the
         // same pair as its own countdown bar (primary on secondaryContainer): it used to be the one

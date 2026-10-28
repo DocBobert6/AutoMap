@@ -1391,6 +1391,12 @@ fun VelaMapView(
     var lastCameraTarget by remember { mutableStateOf<LatLng?>(if (startFramed) cameraTarget else null) }
     var lastInsetPx by remember { mutableStateOf(if (startFramed) 0 else -1) }
     var lastFittedRouteKey by remember { mutableStateOf<Int?>(null) }
+    var lastFittedRouteHash by remember { mutableStateOf<Int?>(null) }
+    // AutoMap 2026-10-28 (bug 1): set on a user pan gesture, cleared on a genuinely
+    // new route. While set, an inset-only change (sheet appearing/minimising while
+    // choosing a route) must not re-fire the whole-route fit and yank the camera
+    // back after the pan.
+    var routePannedSinceFit by remember { mutableStateOf(false) }
     var lastFittedTransitKey by remember { mutableStateOf<Int?>(null) }
     // Whole-trip coords for the chooser fit; during transit NAV the fit narrows to the guided
     // leg's own coords (falling back to the whole trip when a leg carries no geometry).
@@ -2805,8 +2811,16 @@ fun VelaMapView(
                         continue
                     } else {
                         browseEngaged[0] = true
-                        browseCam[0] = cp.target?.latitude ?: loc.lat
-                        browseCam[1] = cp.target?.longitude ?: loc.lng
+                        // AutoMap 2026-10-28 (bugs 1-2): seed the eased follow point from the
+                        // LIVE FIX, not from the camera centre. The old seed (cp.target) meant
+                        // that after a small pan, re-engaging follow drew the puck AT the panned
+                        // camera centre and eased it toward the fix — the marker visibly
+                        // drifted with the map. Follow means "centre on the fix": seeding
+                        // from the fix makes the puck sit on the fix from the first frame
+                        // (the camera glides to it, and the FOLLOW_JUMP_M snap below covers
+                        // a far panned-away camera without dragging through tiles).
+                        browseCam[0] = loc.lat
+                        browseCam[1] = loc.lng
                     }
                 }
                 // tau 0.22 s (was 0.16): a slightly longer time-constant keeps the camera CHASING
@@ -4292,7 +4306,7 @@ fun VelaMapView(
                     // time the camera first moves, onScaleBegin/onShoveBegin has set the flag —
                     // the ordering the nav listener already relies on. gestureMove stays set
                     // either way so "Search this area" still keys off a zoom change.
-                    if (gestureMove[0] && !scaling[0] && !shoving[0] && twoFingerMove[0] == 0f) userPan.value()
+                    if (gestureMove[0] && !scaling[0] && !shoving[0] && twoFingerMove[0] == 0f) { routePannedSinceFit = true; userPan.value() }
                 }
                 // Tell a PAN from a PINCH during nav (the move-started reason can't): a pan
                 // detaches the follow-camera so you can look around (the Re-center button
@@ -5387,7 +5401,20 @@ fun VelaMapView(
             // Not while a route is up: the route fit re-frames for the new inset itself, and a
             // nulled target made the NEXT frame fly to the selected place, canceling that fit
             // (the chooser's "Compare routes" swap landed zoomed in on the destination, 2026-09-17).
-            if (grew && !(routePolyline.size >= 2 && !navMode) && transitFitCoords.size < 2) lastCameraTarget = null // re-frame the current target against the new inset
+            // AutoMap 2026-10-28 (bug 1): only re-frame against the new inset when the
+            // camera is actually ON the target. The old unconditional null let the
+            // else-branch below re-fire on the stale cameraTarget the next frame and
+            // fly the map back after the user had panned away — e.g. while picking a
+            // route origin/destination, when a sheet appearing grows the inset. A
+            // panned-away camera (camera centre >200 m from the target) keeps its
+            // lastCameraTarget, so no fly fires; a camera already on the target
+            // re-frames against the new inset exactly as before.
+            if (grew && !(routePolyline.size >= 2 && !navMode) && transitFitCoords.size < 2) {
+                val curT = map.cameraPosition.target
+                val nearTarget = cameraTarget == null || curT == null ||
+                    app.vela.core.model.LatLng(curT.latitude, curT.longitude).distanceTo(cameraTarget) < 200.0
+                if (nearTarget) lastCameraTarget = null
+            }
         }
         // While the results sheet is closed forget the last marker fit, so pulling the list back
         // up frames the cluster again even after a manual pan away - EXCEPT while a place sheet
@@ -5556,7 +5583,18 @@ fun VelaMapView(
             // nav follow branch's own pre-engage swallow.
             routePolyline.size >= 2 &&
                 (navMode || (routePolyline.hashCode() * 31 + cameraBottomInsetPx * 7 + cameraLeftInsetPx * 13 + cameraTopInsetPx) != lastFittedRouteKey) -> {
-                if (!navMode) { // in-nav framing is owned by the follow ticker + navOverviewTick
+                // AutoMap 2026-10-28 (bug 1): an inset-only key change after a user
+                // pan is swallowed — the key is adopted so it does not fire again,
+                // but no flight runs. A genuinely new route still fits (hash below).
+                // NOTE: the flag is deliberately NOT cleared here — clearing it would
+                // make the guard below true again and the flight would run anyway.
+                // The adopted key means this branch will not match again until the
+                // route or an inset changes anew; a genuinely new route clears the
+                // flag in the fit body below.
+                if (!navMode && lastFittedRouteHash != null && routePolyline.hashCode() == lastFittedRouteHash && routePannedSinceFit) {
+                    lastFittedRouteKey = routePolyline.hashCode() * 31 + cameraBottomInsetPx * 7 + cameraLeftInsetPx * 13 + cameraTopInsetPx
+                }
+                if (!navMode && !(lastFittedRouteHash != null && routePolyline.hashCode() == lastFittedRouteHash && routePannedSinceFit)) { // in-nav framing is owned by the follow ticker + navOverviewTick
                     lastFittedRouteKey = routePolyline.hashCode() * 31 + cameraBottomInsetPx * 7 + cameraLeftInsetPx * 13 + cameraTopInsetPx
                     val builder = MLLatLngBounds.Builder()
                     routePolyline.forEach { builder.include(MLLatLng(it.lat, it.lng)) }
@@ -7763,9 +7801,20 @@ private fun ensureTraffic(style: Style, on: Boolean) {
             firstSymbol != null -> style.addLayerBelow(layer, firstSymbol)
             else -> style.addLayer(layer)
         }
+    } else if (on && present) {
+        // AutoMap 2026-10-28 (bug 4): re-show a layer hidden by the branch below
+        // (its source stayed cached, so no refetch storm).
+        style.getLayer(TRAFFIC_LAYER)?.setProperties(PropertyFactory.visibility(Property.VISIBLE))
     } else if (!on && present) {
-        style.removeLayer(TRAFFIC_LAYER)
-        style.getSource(TRAFFIC_SRC)?.let { runCatching { style.removeSource(it) } }
+        // AutoMap 2026-10-28 (bug 4): HIDE, do not remove, the traffic layer. The
+        // old remove-layer-and-source forced a full re-fetch of every tile on the
+        // next toggle / style pass; at close street zoom (where z16 tiles are
+        // overscaled) Google throttles those bursts and the tiles that never came
+        // left blank patches next to stretched z13 bands. Keeping the source
+        // cached means toggling back on reuses tiles already fetched instead of
+        // re-requesting the whole viewport at once. (A fresh style still has no
+        // layer/source, so the add branch above re-creates them then.)
+        style.getLayer(TRAFFIC_LAYER)?.setProperties(PropertyFactory.visibility(Property.NONE))
     }
 }
 

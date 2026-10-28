@@ -2322,18 +2322,24 @@ class MapViewModel @Inject constructor(
     init { app.vela.ui.SearchActions.openNow = ::searchOpenNow }
 
     fun searchThisArea() {
-        val here = plausibleBias(mapCenter)
-        // The results are narrowed to this view (AreaNarrow), and the camera's remembered center
-        // becomes this view's: with the old one the map flew back to where the first search was
-        // made before moving to the new results (issue #670).
+        // AutoMap 2026-10-28 (bug 3): bias AND narrow box from the SAME live viewport
+        // (its centre), never from mapCenter alone. mapCenter is only refreshed on
+        // camera idle, so a tap during/just after a pan could still hold the PREVIOUS
+        // area's centre — the search then ran for, and the camera flew back to, the
+        // originally searched area instead of the current screen bounds. The viewport
+        // is the box the results are narrowed to, so its centre is the honest bias.
+        // And state.center is NOT set here at all: the camera is already on this
+        // view, and setting it created a fly target (cameraTarget) that could yank
+        // the camera back to this view after a further pan while results loaded.
+        val vp = viewport
+        val here = plausibleBias(
+            if (vp != null && vp.size >= 4) LatLng((vp[0] + vp[2]) / 2.0, (vp[1] + vp[3]) / 2.0) else mapCenter
+        )
         narrowToView = viewport?.copyOf(4)
-        narrowAskedMs = android.os.SystemClock.elapsedRealtime()
-        if (here != null) _state.update { it.copy(center = here) }
         runSearch(_state.value.query.trim(), here)
     }
     /** Set by [searchThisArea] for the one search it starts: the view to keep the results to. */
     private var narrowToView: DoubleArray? = null
-    private var narrowAskedMs = 0L
 
     // "More results" (2026-09-13): the search fetches three pages; this pulls the next three of
     // the SAME request (query, window, ranking point) and appends what is new. The row disappears
@@ -2945,7 +2951,14 @@ class MapViewModel @Inject constructor(
                             .take(20)
                     } else emptyList()
                     // Only for the search that asked: a failed one must not narrow a later search.
-                    val viewBox = narrowToView.takeIf { android.os.SystemClock.elapsedRealtime() - narrowAskedMs < 30_000 }.also { narrowToView = null }
+                    // AutoMap 2026-10-28 (bug 3): no 30 s expiry on the narrow box.
+                    // A slow search (weak connection, offline fallback) used to lose its
+                    // narrowing, so the results — and the marker fit that frames them —
+                    // fell back to the ORIGINAL search area's wide set and the camera
+                    // flew back there. The box is still consumed once (also{} clears
+                    // it), and the next searchThisArea tap replaces it, so a stale box
+                    // can never narrow a later, unrelated search.
+                    val viewBox = narrowToView.also { narrowToView = null }
                     val shownPlaces = app.vela.core.search.AreaNarrow.inView(res.places, viewBox)
                     val shownExtra = if (viewBox == null) ambientExtra else app.vela.core.search.AreaNarrow.inView(ambientExtra, viewBox).takeIf { shownPlaces.size < res.places.size || it.size < ambientExtra.size } ?: ambientExtra
                     if (viewBox != null) android.util.Log.i("VelaSearch", "this area: ${shownPlaces.size} of ${res.places.size} result(s) are in the view")

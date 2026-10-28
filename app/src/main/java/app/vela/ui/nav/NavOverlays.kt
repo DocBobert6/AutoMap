@@ -1373,7 +1373,13 @@ fun NavStopOffer(
     // (a speedo tick, the detour figure landing) must not give the driver back their ten seconds.
     val left = remember(offerKey, autoDismissMs) { androidx.compose.animation.core.Animatable(1f) }
     val dismiss = rememberUpdatedState(onDismiss)
-    LaunchedEffect(offerKey, autoDismissMs) {
+    // AutoMap 2026-10-28 (bug 5, same defect class as FasterRouteCard): this
+    // countdown used to run regardless of touch, so a tap landing as it hit zero
+    // lost to the auto-dismiss. Freeze it while the card is being touched
+    // (observed, never consumed, so Add/Remove still receive the tap).
+    var held by androidx.compose.runtime.remember(offerKey) { androidx.compose.runtime.mutableStateOf(false) }
+    LaunchedEffect(offerKey, autoDismissMs, held) {
+        if (held) return@LaunchedEffect
         left.snapTo(1f)
         left.animateTo(
             0f,
@@ -1386,7 +1392,17 @@ fun NavStopOffer(
     }
     val ringColor = MaterialTheme.colorScheme.primary
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().pointerInput(offerKey) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                    when (event.type) {
+                        androidx.compose.ui.input.pointer.PointerEventType.Press -> held = true
+                        androidx.compose.ui.input.pointer.PointerEventType.Release -> held = false
+                    }
+                }
+            }
+        },
         shape = RoundedCornerShape(22.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 3.dp,
