@@ -37,6 +37,7 @@ import app.vela.ui.settings.CollapsibleSectionTitle
 import app.vela.ui.settings.GroupDivider
 import app.vela.ui.settings.Hint
 import app.vela.ui.settings.SelectableRow
+import app.vela.ui.settings.CategoryRow
 import app.vela.ui.settings.SettingsGroup
 import app.vela.ui.settings.SettingsScaffold
 import app.vela.ui.settings.ToggleRow
@@ -53,8 +54,24 @@ import kotlinx.coroutines.withContext
 internal fun VoiceSettingsScreen(vm: MapViewModel, onBack: () -> Unit, openLibrary: Boolean = false) {
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    SettingsScaffold(stringResource(R.string.settings_voice), onBack) { topRow ->
+    var page by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(if (openLibrary) "library" else null) }
+    if (page == null) {
+        SettingsScaffold(stringResource(R.string.settings_voice), onBack) { _ ->
+            Spacer(Modifier.height(4.dp))
+            CategoryRow(stringResource(R.string.settings_cat_guidance_voice), stringResource(R.string.settings_cat_guidance_voice_sub)) { page = "guidance" }
+            CategoryRow(stringResource(R.string.settings_cat_voice_library), stringResource(R.string.settings_cat_voice_library_sub)) { page = "library" }
+            Spacer(Modifier.height(24.dp))
+        }
+        return
+    }
+    val pageTitle = if (page == "guidance") stringResource(R.string.settings_cat_guidance_voice) else stringResource(R.string.settings_cat_voice_library)
+    SettingsScaffold(pageTitle, { page = null }) { topRow ->
         Spacer(Modifier.height(4.dp))
+        if (page == "library") {
+            VoiceLibrary(vm, state)
+            Spacer(Modifier.height(24.dp))
+        }
+        if (page == "guidance") {
         // The master choice: persisted, and the in-nav speaker button steps the SAME state (issue
         // 735): on, alerts only (muted, with the speeding and camera alerts as a chime), off.
         SettingsGroup {
@@ -233,14 +250,7 @@ internal fun VoiceSettingsScreen(vm: MapViewModel, onBack: () -> Unit, openLibra
             }
         }
 
-        // Voice library - browse, download, switch between and remove Vela's neural voices (Piper).
-        // Auto-expanded when nothing is installed so the download path is obvious.
-        var voiceLibExpanded by remember { mutableStateOf(openLibrary || state.installedVoiceIds.isEmpty()) }
-        CollapsibleSectionTitle(
-            stringResource(R.string.settings_voice_library),
-            voiceLibExpanded,
-        ) { voiceLibExpanded = !voiceLibExpanded }
-        if (voiceLibExpanded) VoiceLibrary(vm, state)
+        // Voice library lives on its own page (2026-10-28); the collapsible here is gone.
 
         if (engineList?.isNotEmpty() == true) {
             // Speed + the niche bits (playground, the multi-speaker variant picker) - most people never
@@ -335,12 +345,13 @@ internal fun VoiceSettingsScreen(vm: MapViewModel, onBack: () -> Unit, openLibra
                             modifier = Modifier.dpadHighlight(androidx.compose.material3.ButtonDefaults.filledTonalShape),
                         ) { Text(stringResource(R.string.settings_voice_variant_go)) }
                     }
-                    Hint(stringResource(R.string.settings_voice_variant_hint))
+                    Hint(stringResource(R.string.settings_voice_variant_hint, cnt))
                 }
                 }
                 }
             } // end "Advanced voice options"
         }
+        } // guidance
         Spacer(Modifier.height(24.dp))
     }
 }

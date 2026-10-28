@@ -51,6 +51,14 @@ class CarSettingsScreen(carContext: CarContext, private val deps: CarDeps) : Scr
                 },
             )
 
+        // "More settings on the phone" (2026-10-28): the car keeps its five toggles and
+        // the voice toggle (which now preserves Alerts-only, see CarVoice.set); everything
+        // else lives on the phone, and this row says so instead of duplicating switches.
+        list.addItem(
+            Row.Builder()
+                .setTitle(carContext.getString(app.vela.R.string.settings_cat_more_phone))
+                .build(),
+        )
         return ListTemplate.Builder()
             .setTitle(carContext.getString(app.vela.R.string.car_settings))
             .setHeaderAction(Action.BACK)

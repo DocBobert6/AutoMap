@@ -74,7 +74,7 @@ import app.vela.ui.theme.isMapDark
  * the gate that decides when the button shows.
  */
 @Composable
-internal fun BoxScope.LayersCorner(vm: MapViewModel, landscapeChrome: Boolean, darkTheme: Boolean) {
+internal fun BoxScope.LayersCorner(vm: MapViewModel, landscapeChrome: Boolean, darkTheme: Boolean, onOpenSettings: () -> Unit = {}) {
     var open by remember { mutableStateOf(false) }
     // The button takes the accent while something beyond the default map is on. 3D buildings are
     // on by default, so they do not count.
@@ -107,7 +107,7 @@ internal fun BoxScope.LayersCorner(vm: MapViewModel, landscapeChrome: Boolean, d
         // VelaMenu, not a bare DropdownMenu (docs/dpad.md): a Popup cannot be pre-focused, so a
         // key-first device gets the chooser dialog, and the first tile takes focus on open.
         VelaMenu(expanded = open, onDismissRequest = { open = false }) {
-            LayersPanel(vm, onClose = { open = false })
+            LayersPanel(vm, onClose = { open = false }, onOpenSettings = onOpenSettings)
         }
     }
 }
@@ -129,7 +129,7 @@ private class Tile(
 )
 
 @Composable
-private fun LayersPanel(vm: MapViewModel, onClose: () -> Unit) {
+private fun LayersPanel(vm: MapViewModel, onClose: () -> Unit, onOpenSettings: () -> Unit = {}) {
     val ctx = LocalContext.current
     val firstTile = rememberDpadAutoFocus()
     val satellite = SatelliteLayer.on.value
@@ -196,6 +196,15 @@ private fun LayersPanel(vm: MapViewModel, onClose: () -> Unit) {
         )
         Spacer(Modifier.height(4.dp))
         SwitchRow(stringResource(R.string.settings_google_free), GoogleFree.on.value) { GoogleFree.set(ctx, it) }
+        // Quick panel, not a second settings page (2026-10-28): one-line explanations under
+        // the tiles, and a shortcut to the owning Settings pages for the rest.
+        Text(
+            stringResource(R.string.settings_cat_satellite_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 4.dp),
+        )
+        ActionRow(stringResource(R.string.settings_map), SymOutlined.Settings) { onClose(); onOpenSettings() }
         // Driving mode (issue #727): the map alone in the drive's layout, from the map's own
         // panel. Its bar's X comes back to this button.
         ActionRow(stringResource(R.string.driving_mode), Sym.DirectionsCar) { onClose(); vm.enterDrivingMode() }

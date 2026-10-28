@@ -100,12 +100,33 @@ fun WelcomeScreen(vm: app.vela.ui.map.MapViewModel, onGetStarted: () -> Unit) {
     }
 }
 
-/** The per-feature switches from Settings > Privacy, reachable before the map exists: the same
- *  section, in the same frame as a Settings page, with Continue under it. */
+/** What Google is used for, as LINKS to the owning Settings pages (2026-10-28 restructure):
+ *  no second copy of the switches lives in onboarding. The master Google choice on the
+ *  previous page already gates every request, so nothing is sent before setup finishes;
+ *  the per-feature switches live in Settings after that, on their owning pages. */
 @Composable
 private fun GoogleUsesPage(vm: app.vela.ui.map.MapViewModel, onBack: () -> Unit, onDone: () -> Unit) {
-    app.vela.ui.settings.SettingsScaffold(stringResource(R.string.settings_google_uses), onBack) { topRow ->
-        app.vela.ui.settings.sections.GoogleUsesSection(vm, topRow, title = false)
+    app.vela.ui.settings.SettingsScaffold(stringResource(R.string.settings_google_uses), onBack) { _ ->
+        Spacer(Modifier.height(4.dp))
+        Text(
+            stringResource(R.string.welcome_google_uses_links),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+        listOf(
+            stringResource(R.string.settings_places_source) to stringResource(R.string.settings_cat_places_map),
+            stringResource(R.string.settings_place_pages) to stringResource(R.string.settings_cat_place_pages),
+            stringResource(R.string.settings_transit_layer) to stringResource(R.string.settings_cat_layers),
+            stringResource(R.string.settings_route_traffic_on_tap) to stringResource(R.string.settings_cat_route_options),
+            stringResource(R.string.settings_live_rechecks) to stringResource(R.string.settings_cat_route_options),
+            stringResource(R.string.settings_other_locations_auto) to stringResource(R.string.settings_cat_search_behaviour),
+        ).forEach { (title, page) ->
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(page, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
         Spacer(Modifier.height(20.dp))
         Box(Modifier.padding(horizontal = 16.dp)) {
             WelcomeButton(stringResource(R.string.welcome_continue), autoFocus = false, onGetStarted = onDone)

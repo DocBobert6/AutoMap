@@ -37,6 +37,7 @@ import app.vela.ui.settings.GroupDivider
 import app.vela.ui.settings.Hint
 import app.vela.ui.settings.PageIntro
 import app.vela.ui.settings.SelectableRow
+import app.vela.ui.settings.CategoryRow
 import app.vela.ui.settings.SettingsGroup
 import app.vela.ui.settings.SettingsScaffold
 import app.vela.ui.settings.ToggleRow
@@ -49,9 +50,21 @@ internal fun AboutSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("vela_settings", android.content.Context.MODE_PRIVATE) }
-    SettingsScaffold(stringResource(R.string.settings_about), onBack) { topRow ->
+    var page by remember { mutableStateOf<String?>(null) }
+    if (page == null) {
+        SettingsScaffold(stringResource(R.string.settings_about), onBack) { _ ->
+            Spacer(Modifier.height(4.dp))
+            CategoryRow(stringResource(R.string.settings_cat_about), stringResource(R.string.settings_cat_about_sub)) { page = "about" }
+            CategoryRow(stringResource(R.string.settings_cat_updates), stringResource(R.string.settings_cat_updates_sub)) { page = "updates" }
+            Spacer(Modifier.height(24.dp))
+        }
+        return
+    }
+    val pageTitle = if (page == "about") stringResource(R.string.settings_cat_about) else stringResource(R.string.settings_cat_updates)
+    SettingsScaffold(pageTitle, { page = null }) { topRow ->
         Spacer(Modifier.height(4.dp))
         PageIntro(stringResource(R.string.settings_about_hint))
+        if (page == "about") {
         Spacer(Modifier.height(8.dp))
         Spacer(Modifier.height(8.dp))
         // The project itself (issue #739): people go back and forth between the app and GitHub.
@@ -187,6 +200,7 @@ internal fun AboutSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
             label = stringResource(R.string.whatsnew_show_after_updates),
             checked = app.vela.ui.WhatsNew.enabled.value,
             onCheckedChange = { app.vela.ui.WhatsNew.setEnabled(context, it) },
+            hint = stringResource(R.string.settings_whatsnew_toggle_hint),
         )
         GroupDivider()
         // AutoMap 2026-10-27: upstream Vela self-updater section REMOVED
@@ -283,7 +297,9 @@ internal fun AboutSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
         Spacer(Modifier.height(10.dp))
         } // end if (false) — upstream self-updater section
         }
+        } // about
         Spacer(Modifier.height(8.dp))
+        if (page == "updates") {
         // AutoMap updates (2026-10-27): the AutoSpace UpdateChecker pattern,
         // ported as AutoMapUpdater and pointed at DocBobert6/AutoMap. This
         // section is separate from the Vela self-updater section above on
@@ -358,6 +374,12 @@ internal fun AboutSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
                             Text(stringResource(R.string.settings_automap_update_install))
                         }
                     }
+                    // The About page's installer row warns an in-app update undoes an
+                    // Android Auto setup; repeat it here, at the Install button, so the
+                    // updater page does not contradict it (audit #22).
+                    if (app.vela.update.InstallSource.setForCar(updContext)) {
+                        Hint(stringResource(R.string.settings_installer_play, app.vela.update.InstallSource.installingPackage(updContext) ?: app.vela.update.InstallSource.initiatingPackage(updContext) ?: ""))
+                    }
                 }
                 is app.vela.update.AutoMapUpdater.State.Failed -> Hint(stringResource(R.string.settings_automap_update_failed, st.message))
                 else -> {}
@@ -371,6 +393,7 @@ internal fun AboutSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
             Hint(stringResource(R.string.settings_automap_update_caveat))
             Spacer(Modifier.height(10.dp))
         }
+        } // updates
         // Breathing room under the last control so the button doesn't sit right on the
         // gesture bar at the end of the scroll.
         Spacer(Modifier.height(56.dp))

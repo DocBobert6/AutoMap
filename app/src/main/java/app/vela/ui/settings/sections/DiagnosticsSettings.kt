@@ -42,6 +42,7 @@ import app.vela.ui.map.MapViewModel
 import app.vela.ui.settings.GroupDivider
 import app.vela.ui.settings.Hint
 import app.vela.ui.settings.PageIntro
+import app.vela.ui.settings.CategoryRow
 import app.vela.ui.settings.SettingsGroup
 import app.vela.ui.settings.SettingsScaffold
 import app.vela.ui.settings.ToggleRow
@@ -64,11 +65,28 @@ internal fun DiagnosticsSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onC
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("vela_settings", android.content.Context.MODE_PRIVATE) }
-    SettingsScaffold(stringResource(R.string.settings_diagnostics), onBack) { topRow ->
+    var page by remember { mutableStateOf<String?>(null) }
+    if (page == null) {
+        SettingsScaffold(stringResource(R.string.settings_diagnostics), onBack) { _ ->
+            Spacer(Modifier.height(4.dp))
+            CategoryRow(stringResource(R.string.settings_cat_diagnostics), stringResource(R.string.settings_cat_diagnostics_sub)) { page = "diagnostics" }
+            CategoryRow(stringResource(R.string.settings_cat_demo), stringResource(R.string.settings_cat_demo_sub)) { page = "demo" }
+            CategoryRow(stringResource(R.string.settings_cat_trips), stringResource(R.string.settings_cat_trips_sub)) { page = "trips" }
+            Spacer(Modifier.height(24.dp))
+        }
+        return
+    }
+    val pageTitle = when (page) {
+        "diagnostics" -> stringResource(R.string.settings_cat_diagnostics)
+        "demo" -> stringResource(R.string.settings_cat_demo)
+        else -> stringResource(R.string.settings_cat_trips)
+    }
+    SettingsScaffold(pageTitle, { page = null }) { topRow ->
         Spacer(Modifier.height(4.dp))
         LaunchedEffect(Unit) { vm.refreshDiagnostics() }
         PageIntro(stringResource(R.string.settings_diagnostics_hint))
         var showDiagConsent by remember { mutableStateOf(false) }
+        if (page == "diagnostics") {
         SettingsGroup {
         ToggleRow(
             label = stringResource(R.string.settings_share_diagnostics),
@@ -145,14 +163,18 @@ internal fun DiagnosticsSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onC
         }
         }
 
+        } // diagnostics (share + debug)
         // Demo modes (moved here 2026-09-17): test tools, kept apart from the settings people use
         // every day. The Google-style route picker used to sit beside them as an experiment; it is
         // the default now and lives in Settings > Navigation.
+        if (page == "demo") {
         Spacer(Modifier.height(4.dp))
         DemoModesGroup(vm)
+        } // demo
 
         // Trip recording - more invasive than diagnostics (it's your exact routes),
         // so it's a separate opt-in. Records nav GPS traces for replay testing.
+        if (page == "trips") {
         LaunchedEffect(Unit) { vm.refreshTripRecording() }
         var showTripConsent by remember { mutableStateOf(false) }
         var shareTrip by remember { mutableStateOf<app.vela.replay.TripMeta?>(null) }
@@ -400,6 +422,8 @@ internal fun DiagnosticsSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onC
                 text = { Text(stringResource(R.string.settings_trip_consent_body)) },
             )
         }
+        } // trips
+        if (page == "diagnostics") {
         var crashReports by remember { mutableStateOf(app.vela.diag.CrashCatcher.pending(context)) }
         if (crashReports.isNotEmpty()) {
             Spacer(Modifier.height(8.dp))
@@ -441,6 +465,7 @@ internal fun DiagnosticsSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onC
                 }
             }
         }
+        } // diagnostics crash reports
         if (showDiagConsent) {
             app.vela.ui.VelaDialog(
                 onDismissRequest = { showDiagConsent = false },

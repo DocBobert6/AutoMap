@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -13,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import app.vela.R
 import app.vela.ui.StartView
 import app.vela.ui.dpadHighlight // D-pad-only operation (docs/dpad.md)
+import app.vela.ui.settings.CategoryRow
 import app.vela.ui.settings.GroupDivider
 import app.vela.ui.settings.settingsAnchor
 import app.vela.ui.settings.SettingsGroup
@@ -25,10 +28,28 @@ import app.vela.ui.settings.ToggleRow
  * tilt, north lock, 3D, missing-building fill, house numbers). Cameras live under Navigation, places under Places
  * (settings reshuffle, 2026-09-17). */
 @Composable
-internal fun MapSettingsScreen(onBack: () -> Unit, homeSet: Boolean = false) {
+internal fun MapSettingsScreen(onBack: () -> Unit, homeSet: Boolean = false, onOpenSection: (app.vela.ui.settings.SettingsSection) -> Unit = {}) {
     val context = LocalContext.current
-    SettingsScaffold(stringResource(R.string.settings_map), onBack) { topRow ->
+    var page by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    val prefs = androidx.compose.runtime.remember { context.getSharedPreferences("vela_settings", android.content.Context.MODE_PRIVATE) }
+    if (page == null) {
+        SettingsScaffold(stringResource(R.string.settings_map), onBack) { _ ->
+            Spacer(Modifier.height(4.dp))
+            CategoryRow(stringResource(R.string.settings_cat_layers), stringResource(R.string.settings_cat_layers_sub)) { page = "layers" }
+            CategoryRow(stringResource(R.string.settings_cat_map_behaviour), stringResource(R.string.settings_cat_map_behaviour_sub)) { page = "behaviour" }
+            CategoryRow(stringResource(R.string.settings_cat_addresses), stringResource(R.string.settings_cat_addresses_sub)) { page = "addresses" }
+            Spacer(Modifier.height(24.dp))
+        }
+        return
+    }
+    val pageTitle = when (page) {
+        "layers" -> stringResource(R.string.settings_cat_layers)
+        "behaviour" -> stringResource(R.string.settings_cat_map_behaviour)
+        else -> stringResource(R.string.settings_cat_addresses)
+    }
+    SettingsScaffold(pageTitle, { page = null }) { topRow ->
         Spacer(Modifier.height(4.dp))
+        if (page == "layers") {
         SettingsGroup {
         // The top focusable control: Back routes its DOWN here, UP from here goes back to Back.
         LiveTrafficRow(switchModifier = topRow)
@@ -80,7 +101,10 @@ internal fun MapSettingsScreen(onBack: () -> Unit, homeSet: Boolean = false) {
             onCheckedChange = { app.vela.ui.ParkingButton.set(context, it) },
             hint = stringResource(R.string.settings_parking_button_hint),
         )
-        GroupDivider()
+        } // layers part 1
+        }
+        if (page == "behaviour") {
+        SettingsGroup {
         ToggleRow(
             label = stringResource(R.string.settings_two_finger_tilt),
             checked = app.vela.ui.MapTilt.on.value,
@@ -94,7 +118,10 @@ internal fun MapSettingsScreen(onBack: () -> Unit, homeSet: Boolean = false) {
             onCheckedChange = { app.vela.ui.NorthLock.set(context, it) },
             hint = stringResource(R.string.settings_keep_north_up_hint),
         )
-        GroupDivider()
+        } // behaviour part 1
+        }
+        if (page == "layers") {
+        SettingsGroup {
         ToggleRow(
             label = stringResource(R.string.settings_buildings_3d),
             checked = app.vela.ui.Buildings3d.on.value,
@@ -115,7 +142,39 @@ internal fun MapSettingsScreen(onBack: () -> Unit, homeSet: Boolean = false) {
             onCheckedChange = { app.vela.ui.BuildingOverlay.set(context, it) },
             hint = stringResource(R.string.settings_building_overlay_hint),
         )
+        // Compatibility rendering moved here from Performance (2026-10-28): a map-drawing
+        // escape hatch, so it lives with the other map-drawing toggles.
         GroupDivider()
+        var textureRender by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(prefs.getBoolean("texture_render", app.vela.ui.map.fragileGpuDefault())) }
+        var textureAutoMs by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(prefs.getLong("texture_render_auto_ms", 0L)) }
+        ToggleRow(
+            label = stringResource(R.string.settings_texture_render),
+            checked = textureRender,
+            onCheckedChange = { on ->
+                textureRender = on
+                prefs.edit().putBoolean("texture_render", on).remove("texture_render_auto_ms").apply()
+                textureAutoMs = 0L
+            },
+            hint = if (textureRender && textureAutoMs > 0L) {
+                stringResource(
+                    R.string.settings_texture_render_auto_hint,
+                    java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(textureAutoMs)),
+                )
+            } else stringResource(R.string.settings_texture_render_hint),
+        )
+        // Satellite gets a real Settings home here (it previously existed only in the
+        // layers sheet). Imagery from Esri, with Google as a fallback.
+        GroupDivider()
+        ToggleRow(
+            label = stringResource(R.string.map_layers_satellite),
+            checked = app.vela.ui.SatelliteLayer.on.value,
+            onCheckedChange = { app.vela.ui.SatelliteLayer.set(context, it) },
+            hint = stringResource(R.string.settings_cat_satellite_hint),
+        )
+        } // layers part 2
+        }
+        if (page == "behaviour") {
+        SettingsGroup {
         StartViewRows(homeSet)
         // Category shortcuts under the search bar (issue #654): the row, one button, or none.
         GroupDivider()
@@ -136,6 +195,10 @@ internal fun MapSettingsScreen(onBack: () -> Unit, homeSet: Boolean = false) {
             )
         }
         Hint(stringResource(R.string.settings_category_chips_hint))
+        } // behaviour part 2
+        }
+        if (page == "addresses") {
+        SettingsGroup {
         // House numbers: how far out they appear (issue #329). Numbers come from OpenStreetMap
         // and, in the US, OpenAddresses, so a missing number is usually missing data.
         GroupDivider()
@@ -156,27 +219,11 @@ internal fun MapSettingsScreen(onBack: () -> Unit, homeSet: Boolean = false) {
             )
         }
         Hint(stringResource(R.string.settings_house_numbers_hint))
-        // Which name a road or place label shows (issue #738): English where OpenStreetMap has
-        // one, then the basemap's machine romanization or the local script, or the local name alone.
+        // Map names moved to Appearance > Locale (2026-10-28): this row links there, so the
+        // option is not duplicated on two pages.
         GroupDivider()
-        Text(
-            stringResource(R.string.settings_map_names),
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.settingsAnchor(stringResource(R.string.settings_map_names)).padding(start = 20.dp, top = 12.dp, bottom = 4.dp),
-        )
-        listOf(
-            app.vela.ui.MapNames.ENGLISH_LATIN to stringResource(R.string.settings_map_names_english_latin),
-            app.vela.ui.MapNames.ENGLISH_LOCAL to stringResource(R.string.settings_map_names_english_local),
-            app.vela.ui.MapNames.LOCAL to stringResource(R.string.settings_map_names_local),
-            app.vela.ui.MapNames.LOCAL_ENGLISH to stringResource(R.string.settings_map_names_local_english),
-        ).forEach { (id, label) ->
-            SelectableRow(
-                label = label,
-                selected = app.vela.ui.MapNames.mode.value == id,
-                onClick = { app.vela.ui.MapNames.set(context, id) },
-            )
-        }
-        Hint(stringResource(R.string.settings_map_names_hint))
+        CategoryRow(stringResource(R.string.settings_map_names), stringResource(R.string.settings_cat_locale_sub)) { onOpenSection(app.vela.ui.settings.SettingsSection.APPEARANCE) }
+        } // addresses
         }
 
         Spacer(Modifier.height(24.dp))

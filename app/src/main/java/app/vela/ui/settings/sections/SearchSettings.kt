@@ -18,6 +18,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -29,8 +31,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.vela.R
 import app.vela.ui.map.MapViewModel
 import app.vela.ui.settings.GroupDivider
+import app.vela.ui.settings.Hint
 import app.vela.ui.settings.PageIntro
 import app.vela.ui.settings.SelectableRow
+import app.vela.ui.settings.CategoryRow
 import app.vela.ui.settings.SettingsGroup
 import app.vela.ui.settings.SettingsScaffold
 import app.vela.ui.settings.SubHead
@@ -49,8 +53,22 @@ import androidx.compose.foundation.shape.RoundedCornerShape as DpadShape
 internal fun SearchSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onOpenQuickChips: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    SettingsScaffold(stringResource(R.string.settings_search), onBack) { topRow ->
+    androidx.compose.runtime.LaunchedEffect(Unit) { vm.refreshAsr() }
+    var page by remember { mutableStateOf<String?>(null) }
+    if (page == null) {
+        SettingsScaffold(stringResource(R.string.settings_search), onBack) { _ ->
+            Spacer(Modifier.height(4.dp))
+            CategoryRow(stringResource(R.string.settings_cat_search_behaviour), stringResource(R.string.settings_cat_search_behaviour_sub)) { page = "behaviour" }
+            CategoryRow(stringResource(R.string.settings_cat_speech_recognition), stringResource(R.string.settings_cat_speech_recognition_sub)) { page = "speech" }
+            CategoryRow(stringResource(R.string.settings_cat_quick_search), stringResource(R.string.settings_cat_quick_search_sub)) { onOpenQuickChips() }
+            Spacer(Modifier.height(24.dp))
+        }
+        return
+    }
+    val pageTitle = if (page == "behaviour") stringResource(R.string.settings_cat_search_behaviour) else stringResource(R.string.settings_cat_speech_recognition)
+    SettingsScaffold(pageTitle, { page = null }) { topRow ->
         Spacer(Modifier.height(4.dp))
+        if (page == "behaviour") {
         SettingsGroup {
         ToggleRow(
             label = stringResource(R.string.settings_voice_search_toggle),
@@ -87,14 +105,14 @@ internal fun SearchSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onOpenQu
             },
             hint = stringResource(R.string.settings_contacts_search_hint),
         )
-        GroupDivider()
-        QuickChipsRow(onOpenQuickChips)
         }
 
         // What the mic and the search bar understand as commands (discussion #365), in the app
         // language, straight from the phrase list the parser is tested against.
         Spacer(Modifier.height(8.dp))
         VoiceCommandList()
+        } // behaviour
+        if (page == "speech") {
 
         // On-device voice search (tier-1): a PER-ENGINE picker (upstream 5d2a6636 + 137beea9).
         // Whisper (multilingual, smallest, the default) plus opt-in SenseVoice / Moonshine.
@@ -102,7 +120,6 @@ internal fun SearchSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onOpenQu
         // safety: every control is a FULL-WIDTH single focus stop - an installed engine renders a
         // "Use/Active" row AND a SEPARATE "Remove" row (never two nested targets in one row), a
         // not-installed engine a "Download" row. One download at a time (the collision guard).
-        LaunchedEffect(Unit) { vm.refreshAsr() }
         Spacer(Modifier.height(4.dp))
         PageIntro(stringResource(R.string.settings_asr_engines_hint))
         val anyAsrBusy = state.asrDownloadingId != null
@@ -241,7 +258,20 @@ internal fun SearchSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onOpenQu
                 )
             }
             }
+            Hint(stringResource(R.string.settings_voice_search_engine_hint))
         }
+        // Speech preload moved here from Performance (2026-10-28): it warms the
+        // recognition models, so it lives with the speech engines.
+        Spacer(Modifier.height(8.dp))
+        SettingsGroup {
+            ToggleRow(
+                label = stringResource(R.string.settings_speech_preload),
+                checked = app.vela.ui.SpeechPreload.on.value,
+                onCheckedChange = { app.vela.ui.SpeechPreload.set(context, it) },
+                hint = stringResource(R.string.settings_speech_preload_hint),
+            )
+        }
+        } // speech
         Spacer(Modifier.height(24.dp))
     }
 }

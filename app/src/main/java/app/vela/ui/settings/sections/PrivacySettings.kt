@@ -22,17 +22,33 @@ import app.vela.ui.settings.SettingsGroup
 import app.vela.ui.settings.SettingsScaffold
 import app.vela.ui.dpadHighlight // D-pad-only operation (docs/dpad.md)
 
-/** Privacy sub-screen: the how-Vela-handles-data explainer, the privacy policy link and Clear
- *  history. The places source moved to Places and live rechecks to Navigation (2026-09-17). */
+/** Privacy sub-screen (2026-10-28 restructure): a sub-hub listing Google-free & data,
+ *  What Google is used for (See also LINKS to the owning pages, not a second copy of their
+ *  rows — Robert's decision 3), and History. The old "what Google is used for" list and the
+ *  Google Maps links row moved to Navigation > Links from other apps. */
 @Composable
-internal fun PrivacySettingsScreen(vm: app.vela.ui.map.MapViewModel, onBack: () -> Unit) {
+internal fun PrivacySettingsScreen(vm: app.vela.ui.map.MapViewModel, onBack: () -> Unit, onOpenSection: (app.vela.ui.settings.SettingsSection) -> Unit = {}) {
     val context = LocalContext.current
-    SettingsScaffold(stringResource(R.string.settings_privacy), onBack) { topRow ->
+    var page by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    if (page == null) {
+        SettingsScaffold(stringResource(R.string.settings_privacy), onBack) { _ ->
+            Spacer(Modifier.height(4.dp))
+            app.vela.ui.settings.CategoryRow(stringResource(R.string.settings_cat_google_free), stringResource(R.string.settings_cat_google_free_sub)) { page = "googlefree" }
+            app.vela.ui.settings.CategoryRow(stringResource(R.string.settings_cat_google_uses), stringResource(R.string.settings_cat_google_uses_sub)) { page = "uses" }
+            app.vela.ui.settings.CategoryRow(stringResource(R.string.settings_cat_history), stringResource(R.string.settings_cat_history_sub)) { page = "history" }
+            Spacer(Modifier.height(24.dp))
+        }
+        return
+    }
+    val pageTitle = when (page) {
+        "googlefree" -> stringResource(R.string.settings_cat_google_free)
+        "uses" -> stringResource(R.string.settings_cat_google_uses)
+        else -> stringResource(R.string.settings_cat_history)
+    }
+    SettingsScaffold(pageTitle, { page = null }) { topRow ->
         Spacer(Modifier.height(4.dp))
+        if (page == "googlefree") {
         PageIntro(stringResource(R.string.settings_data_privacy_hint))
-        // The master switch (2026-09-21): one control instead of the four-toggle recipe the FAQ
-        // used to give, and it reaches the surfaces those toggles could not (search, Street View,
-        // transit, the satellite fallback, the traffic raster).
         SettingsGroup {
             app.vela.ui.settings.ToggleRow(
                 label = stringResource(R.string.settings_google_free),
@@ -41,8 +57,6 @@ internal fun PrivacySettingsScreen(vm: app.vela.ui.map.MapViewModel, onBack: () 
                 hint = stringResource(R.string.settings_google_free_hint),
                 switchModifier = topRow,
             )
-            // Only meaningful while the switch is on: whether a shared short link may still ask
-            // Google's shortener where it points.
             if (app.vela.ui.GoogleFree.on.value) {
                 app.vela.ui.settings.GroupDivider()
                 app.vela.ui.settings.ToggleRow(
@@ -53,14 +67,6 @@ internal fun PrivacySettingsScreen(vm: app.vela.ui.map.MapViewModel, onBack: () 
                 )
             }
         }
-        // With Google on: everything it is used for, switch by switch. The same rows sit on
-        // their own pages; this is the one place that lists them all.
-        if (!app.vela.ui.GoogleFree.on.value) {
-            Spacer(Modifier.height(8.dp))
-            GoogleUsesSection(vm)
-        }
-        // How long one Google session lives (2026-09-23, web/SessionRotation): a saved cookie is a
-        // pseudonymous history, a new one gets Google's limited view. Pointless with Google off.
         if (!app.vela.ui.GoogleFree.on.value) {
             Spacer(Modifier.height(8.dp))
             SettingsGroup {
@@ -81,8 +87,6 @@ internal fun PrivacySettingsScreen(vm: app.vela.ui.map.MapViewModel, onBack: () 
                         onClick = { rot.setMode(context, key) },
                     )
                 }
-                // What "every time" costs, shown once it is picked, so nobody wonders why the most
-                // private option is not the default (user 2026-09-23).
                 if (rot.mode.value == rot.LAUNCH) {
                     app.vela.ui.settings.Hint(stringResource(R.string.settings_google_session_launch_hint))
                 }
@@ -103,7 +107,6 @@ internal fun PrivacySettingsScreen(vm: app.vela.ui.map.MapViewModel, onBack: () 
                 )
             }
         }
-        MapsLinksGroup()
         Spacer(Modifier.height(8.dp))
         GoogleUsageGroup()
         Spacer(Modifier.height(8.dp))
@@ -124,10 +127,20 @@ internal fun PrivacySettingsScreen(vm: app.vela.ui.map.MapViewModel, onBack: () 
         ) { Text(stringResource(R.string.settings_privacy_button)) }
         }
         }
-        // Clear history (issue #425): one row for what used to be spread over three screens
-        // (Clear recents on the search page, Clear all under Parking history, trips one at a
-        // time under Diagnostics). Confirmed, since it cannot be undone.
-        Spacer(Modifier.height(8.dp))
+        } // googlefree
+        if (page == "uses") {
+        // See also links only: each row opens the page that OWNS the setting, so there is
+        // exactly one copy of every switch.
+        PageIntro(stringResource(R.string.settings_cat_google_uses_sub))
+        app.vela.ui.settings.CategoryRow(stringResource(R.string.settings_places_source), stringResource(R.string.settings_cat_places_map_sub)) { onOpenSection(app.vela.ui.settings.SettingsSection.PLACES) }
+        app.vela.ui.settings.CategoryRow(stringResource(R.string.settings_place_pages), stringResource(R.string.settings_cat_place_pages_sub)) { onOpenSection(app.vela.ui.settings.SettingsSection.PLACES) }
+        app.vela.ui.settings.CategoryRow(stringResource(R.string.settings_transit_layer), stringResource(R.string.settings_cat_layers_sub)) { onOpenSection(app.vela.ui.settings.SettingsSection.MAP) }
+        app.vela.ui.settings.CategoryRow(stringResource(R.string.settings_full_place_load), stringResource(R.string.settings_cat_place_pages_sub)) { onOpenSection(app.vela.ui.settings.SettingsSection.PLACES) }
+        app.vela.ui.settings.CategoryRow(stringResource(R.string.settings_other_locations_auto), stringResource(R.string.settings_cat_search_behaviour_sub)) { onOpenSection(app.vela.ui.settings.SettingsSection.SEARCH) }
+        app.vela.ui.settings.CategoryRow(stringResource(R.string.settings_route_traffic_on_tap), stringResource(R.string.settings_cat_route_options_sub)) { onOpenSection(app.vela.ui.settings.SettingsSection.NAVIGATION) }
+        app.vela.ui.settings.CategoryRow(stringResource(R.string.settings_live_rechecks), stringResource(R.string.settings_cat_route_options_sub)) { onOpenSection(app.vela.ui.settings.SettingsSection.NAVIGATION) }
+        } // uses
+        if (page == "history") {
         var confirmClear by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
         SettingsGroup {
         androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().settingsAnchor(stringResource(R.string.settings_clear_history)).padding(horizontal = 16.dp, vertical = 10.dp)) {
@@ -160,6 +173,10 @@ internal fun PrivacySettingsScreen(vm: app.vela.ui.map.MapViewModel, onBack: () 
                 Text(stringResource(R.string.settings_clear_history_confirm_body), style = MaterialTheme.typography.bodyMedium)
             }
         }
+        Spacer(Modifier.height(8.dp))
+        app.vela.ui.settings.CategoryRow(stringResource(R.string.settings_parking_history), stringResource(R.string.settings_cat_saved_routes_sub)) { onOpenSection(app.vela.ui.settings.SettingsSection.SAVED_PLACES) }
+        app.vela.ui.settings.CategoryRow(stringResource(R.string.settings_cat_trips), stringResource(R.string.settings_cat_trips_sub)) { onOpenSection(app.vela.ui.settings.SettingsSection.DIAGNOSTICS) }
+        } // history
         Spacer(Modifier.height(24.dp))
     }
 }
@@ -214,59 +231,3 @@ private fun googleUsageLabel(kind: String): String = when {
     else -> stringResource(R.string.google_usage_kind_other)
 }
 
-/** Whether Android hands Google Maps links to Vela (issue #614). Android 12+ never lets an app verify
- *  someone else's domain, so the links open in the browser until they are switched on under the
- *  app's "Open by default" page; this shows the state and opens that page. */
-@Composable
-private fun MapsLinksGroup() {
-    if (android.os.Build.VERSION.SDK_INT < 31) return
-    val context = LocalContext.current
-    var state by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(mapsLinkState(context)) }
-    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-    androidx.compose.runtime.DisposableEffect(owner) {
-        val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
-            if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) state = mapsLinkState(context)
-        }
-        owner.lifecycle.addObserver(obs)
-        onDispose { owner.lifecycle.removeObserver(obs) }
-    }
-    Spacer(Modifier.height(8.dp))
-    SettingsGroup {
-        app.vela.ui.settings.SubHead(stringResource(R.string.settings_maps_links))
-        app.vela.ui.settings.Hint(
-            stringResource(
-                when (state) {
-                    2 -> R.string.settings_maps_links_on
-                    1 -> R.string.settings_maps_links_partial
-                    else -> R.string.settings_maps_links_off
-                }
-            )
-        )
-        androidx.compose.foundation.layout.Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            FilledTonalButton(
-                modifier = Modifier.dpadHighlight(androidx.compose.material3.ButtonDefaults.filledTonalShape),
-                onClick = {
-                    runCatching {
-                        context.startActivity(
-                            android.content.Intent(
-                                android.provider.Settings.ACTION_APP_OPEN_BY_DEFAULT_SETTINGS,
-                                android.net.Uri.parse("package:" + context.packageName),
-                            ),
-                        )
-                    }
-                },
-            ) { Text(stringResource(R.string.settings_maps_links_open)) }
-        }
-    }
-}
-
-/** 0 = off, 1 = some of the Google Maps hosts, 2 = all of them. */
-private fun mapsLinkState(context: android.content.Context): Int = runCatching {
-    if (android.os.Build.VERSION.SDK_INT < 31) return 0
-    val m = context.getSystemService(android.content.pm.verify.domain.DomainVerificationManager::class.java)
-    val st = m.getDomainVerificationUserState(context.packageName) ?: return 0
-    if (!st.isLinkHandlingAllowed) return 0
-    val hosts = st.hostToStateMap
-    val on = hosts.count { it.value != android.content.pm.verify.domain.DomainVerificationUserState.DOMAIN_STATE_NONE }
-    when { on == 0 -> 0; on < hosts.size -> 1; else -> 2 }
-}.getOrDefault(0)

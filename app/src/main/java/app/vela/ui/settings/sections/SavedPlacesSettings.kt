@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import app.vela.R
 import app.vela.ui.map.MapViewModel
 import app.vela.ui.settings.PageIntro
+import app.vela.ui.settings.CategoryRow
 import app.vela.ui.settings.SettingsGroup
 import app.vela.ui.settings.SettingsScaffold
 import app.vela.ui.dpadRowSibling // D-pad-only operation (docs/dpad.md)
@@ -51,7 +52,18 @@ import app.vela.ui.item
 internal fun SavedPlacesSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onCloseSettings: () -> Unit = onBack) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    SettingsScaffold(stringResource(R.string.settings_saved_places), onBack) { topRow ->
+    var page by remember { mutableStateOf<String?>(null) }
+    if (page == null) {
+        SettingsScaffold(stringResource(R.string.settings_saved_places), onBack) { _ ->
+            Spacer(Modifier.height(4.dp))
+            CategoryRow(stringResource(R.string.settings_cat_saved_lists), stringResource(R.string.settings_cat_saved_lists_sub)) { page = "lists" }
+            CategoryRow(stringResource(R.string.settings_cat_saved_routes), stringResource(R.string.settings_cat_saved_routes_sub)) { page = "routes" }
+            Spacer(Modifier.height(24.dp))
+        }
+        return
+    }
+    val pageTitle = if (page == "lists") stringResource(R.string.settings_cat_saved_lists) else stringResource(R.string.settings_cat_saved_routes)
+    SettingsScaffold(pageTitle, { page = null }) { topRow ->
         Spacer(Modifier.height(4.dp))
         PageIntro(stringResource(R.string.settings_saved_places_hint))
         val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -63,6 +75,7 @@ internal fun SavedPlacesSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onC
                 toastImport(context, vm, res, places = true)
             }
         }
+        if (page == "lists") {
         SettingsGroup {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
             // D-pad: the root Column swallows bare LEFT/RIGHT, so this button pair drives its OWN
@@ -115,10 +128,13 @@ internal fun SavedPlacesSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onC
             ) { Text(stringResource(R.string.settings_import)) }
         }
         }
+        } // lists
         Spacer(Modifier.height(8.dp))
+        if (page == "routes") {
         SavedRoutesGroup(vm, onOpen = { vm.openSavedRoute(it); onCloseSettings() })
         Spacer(Modifier.height(8.dp))
         ParkingHistoryGroup(vm)
+        } // routes
         Spacer(Modifier.height(24.dp))
     }
 }
@@ -204,6 +220,7 @@ private fun SavedRoutesGroup(vm: MapViewModel, onOpen: (app.vela.core.model.Save
     val state by vm.state.collectAsStateWithLifecycle()
     var renaming by remember { mutableStateOf<app.vela.core.model.SavedRoute?>(null) }
     SettingsGroup(title = stringResource(R.string.settings_saved_routes)) {
+        Hint(stringResource(R.string.settings_saved_routes_hint))
         if (state.savedRoutes.isEmpty()) Hint(stringResource(R.string.settings_saved_routes_empty))
         state.savedRoutes.forEachIndexed { i, r ->
             if (i > 0) app.vela.ui.settings.GroupDivider()

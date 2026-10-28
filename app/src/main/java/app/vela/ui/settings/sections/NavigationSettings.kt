@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -36,6 +37,7 @@ import app.vela.R
 import app.vela.core.feedback.Haptics
 import app.vela.core.model.TravelMode
 import app.vela.ui.map.MapViewModel
+import app.vela.ui.settings.CategoryRow
 import app.vela.ui.settings.GroupDivider
 import app.vela.ui.settings.settingsAnchor
 import app.vela.ui.settings.Hint
@@ -55,9 +57,33 @@ import androidx.compose.foundation.shape.RoundedCornerShape as DpadShape
 internal fun NavigationSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("vela_settings", android.content.Context.MODE_PRIVATE) }
-    SettingsScaffold(stringResource(R.string.settings_navigation), onBack) { topRow ->
+    val navState by vm.state.collectAsStateWithLifecycle()
+    var page by remember { mutableStateOf<String?>(null) }
+    if (page == null) {
+        SettingsScaffold(stringResource(R.string.settings_navigation), onBack) { _ ->
+            Spacer(Modifier.height(4.dp))
+            CategoryRow(stringResource(R.string.settings_cat_guidance), stringResource(R.string.settings_cat_guidance_sub)) { page = "guidance" }
+            CategoryRow(stringResource(R.string.settings_cat_vehicle), stringResource(R.string.settings_cat_vehicle_sub)) { page = "vehicle" }
+            CategoryRow(stringResource(R.string.settings_cat_vehicle_colour), stringResource(R.string.settings_cat_vehicle_colour_sub)) { page = "vehiclecolour" }
+            CategoryRow(stringResource(R.string.settings_cat_cameras), stringResource(R.string.settings_cat_cameras_sub)) { page = "cameras" }
+            CategoryRow(stringResource(R.string.settings_cat_route_options), stringResource(R.string.settings_cat_route_options_sub)) { page = "routeoptions" }
+            CategoryRow(stringResource(R.string.settings_cat_links), stringResource(R.string.settings_cat_links_sub)) { page = "links" }
+            Spacer(Modifier.height(24.dp))
+        }
+        return
+    }
+    val pageTitle = when (page) {
+        "guidance" -> stringResource(R.string.settings_cat_guidance)
+        "vehicle" -> stringResource(R.string.settings_cat_vehicle)
+        "vehiclecolour" -> stringResource(R.string.settings_cat_vehicle_colour)
+        "cameras" -> stringResource(R.string.settings_cat_cameras)
+        "routeoptions" -> stringResource(R.string.settings_cat_route_options)
+        else -> stringResource(R.string.settings_cat_links)
+    }
+    SettingsScaffold(pageTitle, { page = null }) { topRow ->
         Spacer(Modifier.height(4.dp))
         var keepAwake by remember { mutableStateOf(prefs.getBoolean("keep_screen_on_nav", true)) }
+        if (page == "guidance") {
         SettingsGroup {
         ToggleRow(
             label = stringResource(R.string.settings_keep_screen_on),
@@ -201,7 +227,9 @@ internal fun NavigationSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
             ),
         )
         }
+        } // guidance group 1
         Spacer(Modifier.height(12.dp))
+        if (page == "vehicle") {
         SettingsGroup {
         Text(
             stringResource(R.string.settings_road_label),
@@ -241,6 +269,7 @@ internal fun NavigationSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
                 onClick = { app.vela.ui.PuckStyle.setSize(context, id) },
             )
         }
+        Hint("Sizes the arrow, car, UFO, ship and duck icons alike.")
         if (app.vela.ui.PuckStyle.shape.value == app.vela.ui.PuckStyle.SHAPE_ARROW) {
         GroupDivider()
         Text(
@@ -280,6 +309,9 @@ internal fun NavigationSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
                 onClick = { app.vela.ui.PuckStyle.setShape(context, id) },
             )
         }
+        if (app.vela.ui.PuckStyle.shape.value != app.vela.ui.PuckStyle.SHAPE_ARROW) {
+            Hint(stringResource(R.string.settings_arrow_colours_hint))
+        }
         // What the drive will show, drawn by the same code. The car preview lives in
         // the colour picker below, so it is only drawn here for the other shapes.
         if (!app.vela.ui.PuckStyle.isCar()) {
@@ -295,8 +327,13 @@ internal fun NavigationSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
             modifier = Modifier.padding(start = 20.dp, top = 4.dp).size(64.dp),
         )
         }
+        // The colour picker itself lives on its own page (2026-10-28): this row links
+        // there while the icon is the car, so the Vehicle page stays short.
         if (app.vela.ui.PuckStyle.isCar()) {
-            VehicleColorPicker()
+            GroupDivider()
+            CategoryRow(stringResource(R.string.settings_cat_vehicle_colour), stringResource(R.string.settings_cat_vehicle_colour_link_hint)) { page = "vehiclecolour" }
+        } else {
+            Hint(stringResource(R.string.settings_cat_vehicle_colour_link_hint))
         }
 
         // AutoMap 2026-10-27, Bluetooth-gated location puck (Robert, final
@@ -330,6 +367,7 @@ internal fun NavigationSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
             ) {
                 Text(stringResource(R.string.settings_car_bluetooth_permission))
             }
+            Hint(stringResource(R.string.settings_car_bt_hint))
         }
 
         var trafficLights by remember { mutableStateOf(prefs.getBoolean("nav_traffic_lights", true)) }
@@ -386,7 +424,11 @@ internal fun NavigationSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
             hint = stringResource(R.string.settings_speeding_alert_hint),
         )
         }
-
+        } // vehicle group
+        if (page == "vehiclecolour") {
+        VehicleColorPicker()
+        }
+        if (page == "guidance") {
         SettingsGroup {
         androidx.compose.foundation.layout.Column(Modifier.padding(horizontal = 16.dp)) {
         Text(stringResource(R.string.settings_vibrate_on_turns), style = MaterialTheme.typography.bodyMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium, modifier = Modifier.padding(top = 2.dp))
@@ -441,8 +483,27 @@ internal fun NavigationSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
         Hint(stringResource(R.string.settings_vibrate_hint))
         }
         }
-
+        // Turn declutter and building fade moved here from Performance (2026-10-28): both
+        // exist for the frame rate in turns, so they live with guidance.
         Spacer(Modifier.height(8.dp))
+        SettingsGroup {
+            ToggleRow(
+                label = stringResource(R.string.settings_turn_declutter),
+                checked = app.vela.ui.TurnDeclutterPref.on.value,
+                onCheckedChange = { app.vela.ui.TurnDeclutterPref.set(context, it) },
+                hint = stringResource(R.string.settings_turn_declutter_hint),
+            )
+            GroupDivider()
+            ToggleRow(
+                label = stringResource(R.string.settings_fade_buildings_on_turn),
+                checked = app.vela.ui.FadeBuildingsOnTurn.on.value,
+                onCheckedChange = { app.vela.ui.FadeBuildingsOnTurn.set(context, it) },
+                hint = stringResource(R.string.settings_fade_buildings_on_turn_hint),
+            )
+        }
+        } // guidance (vibrate + turn performance)
+        Spacer(Modifier.height(8.dp))
+        if (page == "links") {
         // What a location link from another app does (discussion #640).
         SettingsGroup(title = stringResource(R.string.settings_link_action)) {
             listOf(
@@ -460,9 +521,13 @@ internal fun NavigationSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
         }
         Hint(stringResource(R.string.settings_link_action_hint))
         Spacer(Modifier.height(8.dp))
+        MapsLinksGroup()
+        } // links
+        Spacer(Modifier.height(8.dp))
+        if (page == "cameras") {
         CameraSettingsGroup()
         Spacer(Modifier.height(8.dp))
-        SettingsGroup(title = stringResource(R.string.settings_road_alerts_group)) {
+        SettingsGroup {
             ToggleRow(
                 label = stringResource(R.string.settings_bridge_openings),
                 checked = app.vela.ui.BridgeAlert.on.value,
@@ -470,8 +535,40 @@ internal fun NavigationSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
                 hint = stringResource(R.string.settings_bridge_openings_hint),
             )
         }
+        } // cameras
+        Spacer(Modifier.height(8.dp))
+        if (page == "routeoptions") {
+        // Route avoids, the phone home that did not exist before 2026-10-28: the same prefs
+        // the car settings and the route chooser write, so all three agree.
+        SettingsGroup {
+            ToggleRow(
+                label = stringResource(R.string.car_setting_avoid_tolls),
+                checked = navState.avoidTolls,
+                onCheckedChange = { vm.setAvoidTolls(it) },
+                hint = stringResource(R.string.car_setting_avoid_tolls_hint),
+            )
+            GroupDivider()
+            ToggleRow(
+                label = stringResource(R.string.car_setting_avoid_highways),
+                checked = navState.avoidHighways,
+                onCheckedChange = { vm.setAvoidHighways(it) },
+                hint = stringResource(R.string.car_setting_avoid_highways_hint),
+            )
+            GroupDivider()
+            ToggleRow(
+                label = stringResource(R.string.car_setting_avoid_ferries),
+                checked = navState.avoidFerries,
+                onCheckedChange = { vm.setAvoidFerries(it) },
+                hint = stringResource(R.string.car_setting_avoid_ferries_hint),
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        SettingsGroup {
+            RouteTrafficOnTapRow(vm)
+        }
         Spacer(Modifier.height(8.dp))
         LiveRechecksGroup(vm)
+        } // routeoptions
         Spacer(Modifier.height(24.dp))
     }
 }

@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.ui.res.stringResource
@@ -165,6 +166,35 @@ internal fun SubHead(text: String) {
     )
 }
 
+/**
+ * One row of a category sub-hub (2026-10-28 restructure): a hub page lists its category pages
+ * with these rows, each opening a short, one-idea page. Title + one-line subtitle, one focus stop.
+ */
+@Composable
+internal fun CategoryRow(title: String, subtitle: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 3.dp)
+            .clip(DpadShape(26.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .dpadHighlight(DpadShape(26.dp))
+            .dpadClickable(onClick = onClick)
+            .padding(vertical = 14.dp, horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+        }
+        Icon(Sym.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
 /** The page-level "what this page is" caption. Plain small text (standard layout, no container). */
 @Composable
 internal fun PageIntro(text: String) {
@@ -217,6 +247,7 @@ internal fun ToggleRow(
     onCheckedChange: (Boolean) -> Unit,
     hint: String? = null,
     switchModifier: Modifier = Modifier,
+    enabled: Boolean = true,
     /** A marker the row stands for, drawn before the label: the map badge a camera setting turns on. */
     leading: (@Composable () -> Unit)? = null,
 ) {
@@ -240,8 +271,9 @@ internal fun ToggleRow(
         }
         VelaSwitch(
             checked = checked,
-            onCheckedChange = onCheckedChange,
+            onCheckedChange = if (enabled) onCheckedChange else null,
             modifier = switchModifier,
+            enabled = enabled,
         )
     }
 }

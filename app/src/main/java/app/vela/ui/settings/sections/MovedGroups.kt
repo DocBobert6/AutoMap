@@ -17,6 +17,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -360,3 +361,59 @@ internal fun ParkingHistoryGroup(vm: app.vela.ui.map.MapViewModel) {
             }
         }
 }
+
+/** Whether Android hands Google Maps links to Vela (issue #614). Android 12+ never lets an app verify
+ *  someone else's domain, so the links open in the browser until they are switched on under the
+ *  app's "Open by default" page; this shows the state and opens that page. */
+@Composable
+internal fun MapsLinksGroup() {
+    if (android.os.Build.VERSION.SDK_INT < 31) return
+    val context = LocalContext.current
+    var state by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(mapsLinkState(context)) }
+    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(owner) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
+            if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) state = mapsLinkState(context)
+        }
+        owner.lifecycle.addObserver(obs)
+        onDispose { owner.lifecycle.removeObserver(obs) }
+    }
+    Spacer(Modifier.height(8.dp))
+    SettingsGroup {
+        app.vela.ui.settings.SubHead(stringResource(R.string.settings_maps_links))
+        app.vela.ui.settings.Hint(
+            stringResource(
+                when (state) {
+                    2 -> R.string.settings_maps_links_on
+                    1 -> R.string.settings_maps_links_partial
+                    else -> R.string.settings_maps_links_off
+                }
+            )
+        )
+        androidx.compose.foundation.layout.Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            FilledTonalButton(
+                modifier = Modifier.dpadHighlight(androidx.compose.material3.ButtonDefaults.filledTonalShape),
+                onClick = {
+                    runCatching {
+                        context.startActivity(
+                            android.content.Intent(
+                                android.provider.Settings.ACTION_APP_OPEN_BY_DEFAULT_SETTINGS,
+                                android.net.Uri.parse("package:" + context.packageName),
+                            ),
+                        )
+                    }
+                },
+            ) { Text(stringResource(R.string.settings_maps_links_open)) }
+        }
+    }
+}
+
+private fun mapsLinkState(context: android.content.Context): Int = runCatching {
+    if (android.os.Build.VERSION.SDK_INT < 31) return 0
+    val m = context.getSystemService(android.content.pm.verify.domain.DomainVerificationManager::class.java)
+    val st = m.getDomainVerificationUserState(context.packageName) ?: return 0
+    if (!st.isLinkHandlingAllowed) return 0
+    val hosts = st.hostToStateMap
+    val on = hosts.count { it.value != android.content.pm.verify.domain.DomainVerificationUserState.DOMAIN_STATE_NONE }
+    when { on == 0 -> 0; on < hosts.size -> 1; else -> 2 }
+}.getOrDefault(0)

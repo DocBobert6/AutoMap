@@ -19,7 +19,6 @@ import app.vela.ui.map.MapViewModel
 import app.vela.ui.settings.sections.AboutSettingsScreen
 import app.vela.ui.settings.sections.AppearanceSettingsScreen
 import app.vela.ui.settings.sections.PrivacySettingsScreen
-import app.vela.ui.settings.sections.PerformanceSettingsScreen
 import app.vela.ui.settings.sections.DiagnosticsSettingsScreen
 import app.vela.ui.settings.sections.MapSettingsScreen
 import app.vela.ui.settings.sections.NavigationSettingsScreen
@@ -101,7 +100,7 @@ fun SettingsScreen(vm: MapViewModel, navController: androidx.navigation.NavHostC
                             onBack = close,
                         )
                         SettingsSection.APPEARANCE -> AppearanceSettingsScreen(vm, onBack = toHub)
-                        SettingsSection.MAP -> MapSettingsScreen(onBack = toHub, homeSet = state.home != null)
+                        SettingsSection.MAP -> MapSettingsScreen(onBack = toHub, homeSet = state.home != null, onOpenSection = { open(it, null) })
                         SettingsSection.PLACES -> PlacesSettingsScreen(onBack = toHub)
                         SettingsSection.NAVIGATION -> NavigationSettingsScreen(vm, onBack = toHub)
                         SettingsSection.VOICE -> VoiceSettingsScreen(vm, onBack = toHub, openLibrary = openVoiceLibrary)
@@ -113,10 +112,9 @@ fun SettingsScreen(vm: MapViewModel, navController: androidx.navigation.NavHostC
                             onOpenQuickChips = { navController.navigate(SettingsSection.QUICK_CHIPS.route) { launchSingleTop = true } },
                         )
                         SettingsSection.QUICK_CHIPS -> QuickChipsSettingsScreen(onBack = { navController.popBackStack() })
-                        SettingsSection.OFFLINE -> OfflineSettingsScreen(vm, onBack = toHub, onCloseSettings = close, onOpenVoice = { open(SettingsSection.VOICE, null) })
+                        SettingsSection.OFFLINE -> OfflineSettingsScreen(vm, onBack = toHub, onCloseSettings = close, onOpenVoice = { open(SettingsSection.VOICE, null) }, onOpenSearch = { open(SettingsSection.SEARCH, null) })
                         SettingsSection.SAVED_PLACES -> SavedPlacesSettingsScreen(vm, onBack = toHub, onCloseSettings = close)
-                        SettingsSection.PRIVACY -> PrivacySettingsScreen(vm, onBack = toHub)
-                        SettingsSection.PERFORMANCE -> PerformanceSettingsScreen(onBack = toHub)
+                        SettingsSection.PRIVACY -> PrivacySettingsScreen(vm, onBack = toHub, onOpenSection = { open(it, null) })
                         SettingsSection.DIAGNOSTICS -> DiagnosticsSettingsScreen(vm, onBack = toHub, onCloseSettings = close)
                         SettingsSection.ABOUT -> AboutSettingsScreen(vm, onBack = toHub)
                     }

@@ -90,14 +90,21 @@ internal fun SettingsHub(
             SettingsSection.OFFLINE to stringResource(R.string.settings_offline),
             SettingsSection.SAVED_PLACES to stringResource(R.string.settings_saved_places),
             SettingsSection.PRIVACY to stringResource(R.string.settings_privacy),
-            SettingsSection.PERFORMANCE to stringResource(R.string.settings_performance),
             SettingsSection.DIAGNOSTICS to stringResource(R.string.settings_diagnostics),
             SettingsSection.ABOUT to stringResource(R.string.settings_about),
         )
         if (searchQuery.isNotBlank()) {
-            val matches = SEARCH_INDEX.map { (res, section) -> stringResource(res) to section }
+            // Picker values as well as labels (2026-10-28): Alpha/Beta/Stable, Internal/SD,
+            // Town/Region/Far, Car/UFO/Ship/Duck, and the other short choices.
+            val valueMatches = SEARCH_VALUE_INDEX.map { (res, section) -> stringResource(res) to section }
                 .filter { it.first.contains(searchQuery.trim(), ignoreCase = true) }
-                .take(10)
+            // Labels first, then hint text (2026-10-28): a hint match shows its row's label.
+            val labelMatches = SEARCH_INDEX.map { (res, section) -> stringResource(res) to section }
+                .filter { it.first.contains(searchQuery.trim(), ignoreCase = true) }
+            val hintMatches = SEARCH_HINT_INDEX.map { (hintRes, labelRes, section) ->
+                stringResource(hintRes) to (stringResource(labelRes) to section)
+            }.filter { it.first.contains(searchQuery.trim(), ignoreCase = true) }.map { it.second }
+            val matches = (labelMatches + valueMatches + hintMatches).distinct().take(10)
             if (matches.isEmpty()) {
                 Text(
                     stringResource(R.string.settings_search_none),
@@ -161,7 +168,7 @@ internal fun SettingsHub(
         HubRow(
             icon = SymOutlined.Navigation,
             title = stringResource(R.string.settings_navigation),
-            subtitle = stringResource(R.string.settings_hub_navigation_sub),
+            subtitle = stringResource(R.string.settings_hub_navigation_sub2),
             modifier = rowModifier(SettingsSection.NAVIGATION, first = false),
             onClick = { onOpen(SettingsSection.NAVIGATION, null) },
         )
@@ -187,7 +194,7 @@ internal fun SettingsHub(
         HubRow(
             icon = SymOutlined.Star,
             title = stringResource(R.string.settings_saved_places),
-            subtitle = stringResource(R.string.settings_hub_saved_sub),
+            subtitle = stringResource(R.string.settings_hub_saved_places_sub),
             modifier = rowModifier(SettingsSection.SAVED_PLACES, first = false),
             onClick = { onOpen(SettingsSection.SAVED_PLACES, null) },
         )
@@ -201,16 +208,9 @@ internal fun SettingsHub(
         HubRow(
             icon = SymOutlined.Shield,
             title = stringResource(R.string.settings_privacy),
-            subtitle = stringResource(R.string.settings_hub_privacy_sub),
+            subtitle = stringResource(R.string.settings_hub_privacy_sub2),
             modifier = rowModifier(SettingsSection.PRIVACY, first = false),
             onClick = { onOpen(SettingsSection.PRIVACY, null) },
-        )
-        HubRow(
-            icon = SymOutlined.Speed,
-            title = stringResource(R.string.settings_performance),
-            subtitle = stringResource(R.string.settings_hub_performance_sub),
-            modifier = rowModifier(SettingsSection.PERFORMANCE, first = false),
-            onClick = { onOpen(SettingsSection.PERFORMANCE, null) },
         )
         HubRow(
             icon = SymOutlined.BugReport,
@@ -350,7 +350,7 @@ private val SEARCH_INDEX: List<Pair<Int, SettingsSection>> = listOf(
     R.string.settings_puck_shape to SettingsSection.NAVIGATION,
     R.string.settings_photos_on_tap to SettingsSection.PLACES,
     R.string.settings_details_retry to SettingsSection.PLACES,
-    R.string.settings_route_traffic_on_tap to SettingsSection.PRIVACY,
+    R.string.settings_route_traffic_on_tap to SettingsSection.NAVIGATION,
     R.string.settings_read_all_reviews to SettingsSection.PLACES,
     R.string.settings_load_photos to SettingsSection.PLACES,
     R.string.settings_hide_adult to SettingsSection.PLACES,
@@ -361,7 +361,7 @@ private val SEARCH_INDEX: List<Pair<Int, SettingsSection>> = listOf(
     R.string.settings_turn_arrows to SettingsSection.NAVIGATION,
     R.string.settings_route_bar to SettingsSection.NAVIGATION,
     R.string.settings_route_trail to SettingsSection.NAVIGATION,
-    R.string.settings_turn_declutter to SettingsSection.PERFORMANCE,
+    R.string.settings_turn_declutter to SettingsSection.NAVIGATION,
     R.string.settings_category_chips to SettingsSection.MAP,
     R.string.settings_road_label to SettingsSection.NAVIGATION,
     R.string.settings_prefer_buttons to SettingsSection.NAVIGATION,
@@ -418,9 +418,8 @@ private val SEARCH_INDEX: List<Pair<Int, SettingsSection>> = listOf(
     // Privacy
     R.string.settings_privacy_button to SettingsSection.PRIVACY,
     R.string.settings_google_free to SettingsSection.PRIVACY,
-    R.string.settings_google_uses to SettingsSection.PRIVACY,
     R.string.settings_google_free_links to SettingsSection.PRIVACY,
-    R.string.settings_maps_links to SettingsSection.PRIVACY,
+    R.string.settings_maps_links to SettingsSection.NAVIGATION,
     R.string.settings_storage to SettingsSection.OFFLINE,
     R.string.settings_live_rechecks to SettingsSection.NAVIGATION,
     R.string.settings_google_session to SettingsSection.PRIVACY,
@@ -431,10 +430,9 @@ private val SEARCH_INDEX: List<Pair<Int, SettingsSection>> = listOf(
     R.string.settings_share_diagnostics to SettingsSection.DIAGNOSTICS,
     R.string.settings_diag_redact to SettingsSection.DIAGNOSTICS,
     R.string.settings_name_trips to SettingsSection.DIAGNOSTICS,
-    R.string.settings_texture_render to SettingsSection.PERFORMANCE,
-    R.string.settings_speech_preload to SettingsSection.PERFORMANCE,
-    R.string.settings_full_place_load to SettingsSection.PERFORMANCE,
-    R.string.settings_performance to SettingsSection.PERFORMANCE,
+    R.string.settings_texture_render to SettingsSection.MAP,
+    R.string.settings_speech_preload to SettingsSection.SEARCH,
+    R.string.settings_full_place_load to SettingsSection.PLACES,
     R.string.settings_save_trips to SettingsSection.DIAGNOSTICS,
     R.string.settings_building_debug to SettingsSection.DIAGNOSTICS,
     R.string.settings_nav_trace to SettingsSection.DIAGNOSTICS,
@@ -443,7 +441,61 @@ private val SEARCH_INDEX: List<Pair<Int, SettingsSection>> = listOf(
     R.string.voice_capture_examples_title to SettingsSection.SEARCH,
     // About
     R.string.settings_version to SettingsSection.ABOUT,
-    R.string.settings_update_auto to SettingsSection.ABOUT,
-    R.string.settings_update_channel to SettingsSection.ABOUT,
-    R.string.settings_update_check_now to SettingsSection.ABOUT,
+    R.string.settings_automap_updates to SettingsSection.ABOUT,
+    R.string.settings_automap_update_auto to SettingsSection.ABOUT,
+    R.string.settings_automap_update_channel to SettingsSection.ABOUT,
+    R.string.settings_automap_update_check_now to SettingsSection.ABOUT,
+    R.string.settings_cat_vehicle_colour to SettingsSection.NAVIGATION,
+    R.string.settings_car_bluetooth_permission to SettingsSection.NAVIGATION,
+    R.string.settings_storage_internal to SettingsSection.OFFLINE,
+    R.string.settings_storage_sd to SettingsSection.OFFLINE,
+    R.string.settings_crash_export to SettingsSection.DIAGNOSTICS,
+    R.string.car_setting_avoid_tolls to SettingsSection.NAVIGATION,
+    R.string.car_setting_avoid_highways to SettingsSection.NAVIGATION,
+    R.string.car_setting_avoid_ferries to SettingsSection.NAVIGATION,
+    R.string.settings_car_always_on to SettingsSection.NAVIGATION,
+    R.string.settings_painted_roads to SettingsSection.MAP,
+    R.string.map_layers_satellite to SettingsSection.MAP,
+)
+
+/** Hint-text search (2026-10-28): hint resource -> its row's label resource -> section. A
+ *  hint match opens the same spoke as the row it explains. */
+private val SEARCH_HINT_INDEX: List<Triple<Int, Int, SettingsSection>> = listOf(
+    Triple(R.string.settings_google_free_hint, R.string.settings_google_free, SettingsSection.PRIVACY),
+    Triple(R.string.settings_places_source_open_hint, R.string.settings_places_source_open, SettingsSection.PLACES),
+    Triple(R.string.settings_live_rechecks_hint, R.string.settings_live_rechecks, SettingsSection.NAVIGATION),
+    Triple(R.string.settings_vibrate_hint, R.string.settings_vibrate_on_turns, SettingsSection.NAVIGATION),
+    Triple(R.string.settings_clear_history_hint, R.string.settings_clear_history, SettingsSection.PRIVACY),
+    Triple(R.string.settings_offline_cached_places_hint, R.string.settings_offline_cached_places, SettingsSection.OFFLINE),
+    Triple(R.string.settings_language_hint, R.string.settings_language, SettingsSection.APPEARANCE),
+    Triple(R.string.settings_map_colors_hint, R.string.settings_map_colors, SettingsSection.APPEARANCE),
+    Triple(R.string.settings_voice_volume_hint, R.string.settings_voice_volume, SettingsSection.VOICE),
+    Triple(R.string.settings_confirm_end_nav_hint, R.string.settings_confirm_end_nav, SettingsSection.NAVIGATION),
+    Triple(R.string.settings_spoken_detail_hint, R.string.settings_spoken_detail, SettingsSection.VOICE),
+    Triple(R.string.settings_asr_engines_hint, R.string.settings_asr_engines_title, SettingsSection.SEARCH),
+)
+
+/** Picker values (2026-10-28): short choice labels that search must find too. */
+private val SEARCH_VALUE_INDEX: List<Pair<Int, SettingsSection>> = listOf(
+    R.string.settings_automap_update_channel_stable to SettingsSection.ABOUT,
+    R.string.settings_automap_update_channel_beta to SettingsSection.ABOUT,
+    R.string.settings_automap_update_channel_alpha to SettingsSection.ABOUT,
+    R.string.settings_storage_internal to SettingsSection.OFFLINE,
+    R.string.settings_storage_sd to SettingsSection.OFFLINE,
+    R.string.settings_zoom_to_turn_floor_town to SettingsSection.NAVIGATION,
+    R.string.settings_zoom_to_turn_floor_region to SettingsSection.NAVIGATION,
+    R.string.settings_zoom_to_turn_floor_far to SettingsSection.NAVIGATION,
+    R.string.settings_puck_shape_car to SettingsSection.NAVIGATION,
+    R.string.settings_puck_shape_ufo to SettingsSection.NAVIGATION,
+    R.string.settings_puck_shape_ship to SettingsSection.NAVIGATION,
+    R.string.settings_puck_shape_duck to SettingsSection.NAVIGATION,
+    R.string.settings_puck_shape_arrow to SettingsSection.NAVIGATION,
+    R.string.settings_map_colors_modern to SettingsSection.APPEARANCE,
+    R.string.settings_map_colors_classic to SettingsSection.APPEARANCE,
+    R.string.settings_map_colors_contrast to SettingsSection.APPEARANCE,
+    R.string.settings_units_imperial to SettingsSection.APPEARANCE,
+    R.string.settings_units_metric to SettingsSection.APPEARANCE,
+    R.string.settings_voice_mode_on to SettingsSection.VOICE,
+    R.string.settings_voice_mode_alerts to SettingsSection.VOICE,
+    R.string.settings_voice_mode_off to SettingsSection.VOICE,
 )

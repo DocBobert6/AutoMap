@@ -28,14 +28,18 @@ object CarVoice {
             .apply()
     }
 
-    /** On or off, leaving Alerts only: the car settings switch. */
+    /** On or off, PRESERVING Alerts only (2026-10-28 settings restructure): the switch flips
+     *  only [VoiceGuide.muted] and never touches the alerts-only flag, so a driver in
+     *  Alerts only who flips the switch on and back off lands in Alerts only again, not in
+     *  full silence. The effective alerts state is muted AND alerts-only, as
+     *  [app.vela.ui.map.MapViewModel.setVoiceMode] computes it. */
     fun set(context: Context, voiceGuide: VoiceGuide, on: Boolean) {
-        voiceGuide.alertsOnly = false
         voiceGuide.muted = !on
-        app.vela.ui.VoiceAlertsOnly.on.value = false
+        val alerts = !on && voiceGuide.alertsOnly
+        app.vela.ui.VoiceAlertsOnly.on.value = alerts
         context.getSharedPreferences("vela_settings", Context.MODE_PRIVATE).edit()
             .putBoolean("spoken_directions", on)
-            .putBoolean("spoken_alerts_only", false)
+            .putBoolean("spoken_alerts_only", voiceGuide.alertsOnly)
             .apply()
     }
 }

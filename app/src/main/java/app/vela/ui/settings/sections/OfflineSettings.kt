@@ -40,6 +40,7 @@ import app.vela.ui.map.MapViewModel
 import app.vela.ui.settings.GroupDivider
 import app.vela.ui.settings.Hint
 import app.vela.ui.settings.PageIntro
+import app.vela.ui.settings.CategoryRow
 import app.vela.ui.settings.SettingsGroup
 import app.vela.ui.settings.SettingsScaffold
 import app.vela.ui.settings.SubHead
@@ -67,10 +68,26 @@ import org.maplibre.android.offline.OfflineRegion
  */
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-internal fun OfflineSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onCloseSettings: () -> Unit, onOpenVoice: () -> Unit = {}) {
+internal fun OfflineSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onCloseSettings: () -> Unit, onOpenVoice: () -> Unit = {}, onOpenSearch: () -> Unit = {}) {
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    SettingsScaffold(stringResource(R.string.settings_offline), onBack) { topRow ->
+    var page by remember { mutableStateOf<String?>(null) }
+    if (page == null) {
+        SettingsScaffold(stringResource(R.string.settings_offline), onBack) { _ ->
+            Spacer(Modifier.height(4.dp))
+            CategoryRow(stringResource(R.string.settings_cat_offline_areas), stringResource(R.string.settings_cat_offline_areas_sub)) { page = "areas" }
+            CategoryRow(stringResource(R.string.settings_cat_storage), stringResource(R.string.settings_cat_storage_sub)) { page = "storage" }
+            CategoryRow(stringResource(R.string.settings_cat_routing_downloads), stringResource(R.string.settings_cat_routing_downloads_sub)) { page = "routing" }
+            Spacer(Modifier.height(24.dp))
+        }
+        return
+    }
+    val pageTitle = when (page) {
+        "areas" -> stringResource(R.string.settings_cat_offline_areas)
+        "storage" -> stringResource(R.string.settings_cat_storage)
+        else -> stringResource(R.string.settings_cat_routing_downloads)
+    }
+    SettingsScaffold(pageTitle, { page = null }) { topRow ->
         Spacer(Modifier.height(4.dp))
         PageIntro(stringResource(R.string.settings_offline_hint))
         var regions by remember { mutableStateOf<List<OfflineRegion>>(emptyList()) }
@@ -78,6 +95,7 @@ internal fun OfflineSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onClose
         // -1 = not loaded yet; used only to decide the "saved areas predate offline addresses" nudge below.
         var offlineAddrCount by remember { mutableStateOf(-1) }
         LaunchedEffect(Unit) { vm.offlineAddressCount { offlineAddrCount = it } }
+        if (page == "areas") {
         SettingsGroup(title = stringResource(R.string.settings_offline_map_area)) {
         FilledTonalButton(
             // The top focusable control: Back routes its DOWN here, UP from here goes back to Back.
@@ -98,7 +116,10 @@ internal fun OfflineSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onClose
             onCheckedChange = { app.vela.ui.MapPoiPrefs.setPlacesWithDownloads(context, it) },
             hint = stringResource(R.string.settings_offline_places_with_downloads_hint),
         )
-        GroupDivider()
+        }
+        } // areas map-area part 1
+        if (page == "routing") {
+        SettingsGroup {
         // What a rebaked region is allowed to do on its own. Deltas make an update a few megabytes
         // instead of a few hundred, but they are still the user's bytes, so the default is off.
         // On Wi-Fi or mobile, published patches apply once a day by themselves; a full re-download
@@ -128,8 +149,11 @@ internal fun OfflineSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onClose
                 modifier = Modifier.padding(start = 20.dp, top = 8.dp).dpadHighlight(androidx.compose.foundation.shape.CircleShape),
             ) { Text(stringResource(R.string.settings_update_all_regions, pending.size)) }
         }
+        Hint(stringResource(R.string.settings_region_updates_hint))
         app.vela.ui.RegionUpdates.lastResult.value?.let { Hint(it) }
         }
+        } // routing region updates
+        if (page == "areas") {
         // Viewed places kept on the phone for offline opens (details, reviews, photos).
         SettingsGroup(title = stringResource(R.string.settings_offline_cached_places)) {
         ToggleRow(
@@ -161,6 +185,7 @@ internal fun OfflineSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onClose
             clear = app.vela.core.data.StreetViewCache::clear,
             onCleared = { placeCacheTick++ },
         )
+        Hint(stringResource(R.string.settings_offline_sv_hint))
         }
         if (regions.isNotEmpty() && offlineAddrCount == 0) {
             Surface(
@@ -186,6 +211,8 @@ internal fun OfflineSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onClose
             }
         }
 
+        } // areas cached places + banner
+        if (page == "storage") {
         // What offline data actually costs on this phone, ABOVE the catalog since 2026-09-16 (issue
         // #518: see what you have and clear the cache before scrolling a world of downloads). (Issue #214: 8 GB arrived unannounced,
         // and 533 MB of "empty" app is mostly the browsing cache with no way to clear it).
@@ -206,6 +233,13 @@ internal fun OfflineSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onClose
                 // Tappable: the voices and the speech models are managed on the Voice and Search
                 // pages, so the row takes you to the bigger of the two (Voice).
                 StorageRow(stringResource(R.string.settings_storage_voices), st.voicesMb, onClick = onOpenVoice)
+                Hint(stringResource(R.string.settings_storage_voices_hint))
+                androidx.compose.foundation.layout.Box(Modifier.padding(horizontal = 8.dp)) {
+                    androidx.compose.material3.TextButton(
+                        onClick = onOpenSearch,
+                        modifier = Modifier.dpadHighlight(androidx.compose.foundation.shape.CircleShape),
+                    ) { Text(stringResource(R.string.settings_cat_speech_recognition)) }
+                }
             } ?: Hint(stringResource(R.string.settings_storage_measuring))
             androidx.compose.foundation.layout.Box(Modifier.padding(horizontal = 8.dp)) {
                 androidx.compose.material3.TextButton(
@@ -269,11 +303,14 @@ internal fun OfflineSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onClose
                 }
             }
         }
+        } // storage
         Spacer(Modifier.height(8.dp))
+        if (page == "routing") {
         // WHAT IS ON THE PHONE, right under the storage figures and the delete button (issue #601):
         // the saved areas and every installed region, one list, so "what do I have" is answered in
         // one place instead of being read out of a 450-row catalog.
         SubHead(stringResource(R.string.settings_downloaded_title))
+        Hint(stringResource(R.string.settings_downloaded_hint))
         LaunchedEffect(Unit) { vm.refreshRoutingRegions() }
         val installedRegions = state.routingRegions.filter { it.id in state.routingInstalledIds }
         val loc = state.myLocation
@@ -442,6 +479,7 @@ internal fun OfflineSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onClose
                 }
             }
         }
+        } // routing
         Spacer(Modifier.height(24.dp))
     }
 }

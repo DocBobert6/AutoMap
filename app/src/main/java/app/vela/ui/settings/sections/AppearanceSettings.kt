@@ -8,11 +8,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalContext
@@ -22,6 +24,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.vela.R
 import app.vela.ui.Units
 import app.vela.ui.map.MapViewModel
+import app.vela.ui.settings.CategoryRow
 import app.vela.ui.settings.GroupDivider
 import app.vela.ui.settings.Hint
 import app.vela.ui.settings.SelectableRow
@@ -34,14 +37,35 @@ import app.vela.ui.dpadRowSibling
 import app.vela.ui.theme.AppTheme
 import app.vela.ui.theme.ThemeMode
 
-/** Appearance sub-screen: theme, interface size, map colors, Material You, units, language. */
+/** Appearance sub-screen (2026-10-28 restructure): a sub-hub listing Theme, Display, Map
+ *  style and Locale pages. No hub page stays one long list — each category page below is
+ *  short, one idea, with the same option holders as before, so nothing is lost in the move. */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 internal fun AppearanceSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    SettingsScaffold(stringResource(R.string.settings_appearance), onBack) { topRow ->
+    var page by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    if (page == null) {
+        SettingsScaffold(stringResource(R.string.settings_appearance), onBack) { _ ->
+            Spacer(Modifier.height(4.dp))
+            CategoryRow(stringResource(R.string.settings_cat_theme), stringResource(R.string.settings_cat_theme_sub)) { page = "theme" }
+            CategoryRow(stringResource(R.string.settings_cat_display), stringResource(R.string.settings_cat_display_sub)) { page = "display" }
+            CategoryRow(stringResource(R.string.settings_cat_map_style), stringResource(R.string.settings_cat_map_style_sub)) { page = "mapstyle" }
+            CategoryRow(stringResource(R.string.settings_cat_locale), stringResource(R.string.settings_cat_locale_sub)) { page = "locale" }
+            Spacer(Modifier.height(24.dp))
+        }
+        return
+    }
+    val pageTitle = when (page) {
+        "theme" -> stringResource(R.string.settings_cat_theme)
+        "display" -> stringResource(R.string.settings_cat_display)
+        "mapstyle" -> stringResource(R.string.settings_cat_map_style)
+        else -> stringResource(R.string.settings_cat_locale)
+    }
+    SettingsScaffold(pageTitle, { page = null }) { topRow ->
         Spacer(Modifier.height(4.dp))
+        if (page == "theme") {
         SettingsGroup {
         SelectableRow(
             label = stringResource(R.string.settings_follow_system),
@@ -128,20 +152,21 @@ internal fun AppearanceSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
         Hint(stringResource(R.string.settings_map_detail_hint))
 
         // Orthogonal to the mode above, and only meaningful alongside a FIXED choice: keep the app
-        // dark by preference, but drive by a light map in daylight. Hidden under AUTO, where it
-        // would claim to do something already happening.
-        if (AppTheme.mode.value != ThemeMode.AUTO) {
-            Spacer(Modifier.height(8.dp))
-            SettingsGroup {
-                ToggleRow(
-                    label = stringResource(R.string.settings_nav_day_night),
-                    checked = AppTheme.navDayNight.value,
-                    onCheckedChange = { AppTheme.setNavDayNight(context, it) },
-                    hint = stringResource(R.string.settings_nav_day_night_hint),
-                )
-            }
+        // dark by preference, but drive by a light map in daylight. Shown disabled under AUTO,
+        // where the app theme itself already follows daylight, instead of vanishing.
+        Spacer(Modifier.height(8.dp))
+        SettingsGroup {
+            ToggleRow(
+                label = stringResource(R.string.settings_nav_day_night),
+                checked = AppTheme.navDayNight.value,
+                onCheckedChange = { AppTheme.setNavDayNight(context, it) },
+                hint = if (AppTheme.mode.value == ThemeMode.AUTO) stringResource(R.string.settings_cat_auto_daylight) else stringResource(R.string.settings_nav_day_night_hint),
+                enabled = AppTheme.mode.value != ThemeMode.AUTO,
+            )
         }
+        } // theme
 
+        if (page == "display") {
         Spacer(Modifier.height(8.dp))
         SettingsGroup {
             ToggleRow(
@@ -223,9 +248,13 @@ internal fun AppearanceSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
                         )
                     }
                 }
+                Hint(stringResource(R.string.settings_ui_scale_hint))
             }
         }
 
+        } // display (part 1: transitions, font, size)
+
+        if (page == "mapstyle") {
         Spacer(Modifier.height(8.dp))
         // Map look: the Vela look on Liberty, or one of OpenFreeMap's other styles as served
         // (issue #750). The color sets below apply to the Vela look only.
@@ -257,7 +286,10 @@ internal fun AppearanceSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
             }
         }
 
-        if (app.vela.ui.MapLook.style.value.painted) {
+        // Colours/buttons only apply to the painted (Liberty) look: shown disabled on other
+        // looks instead of vanishing, so the user can see why they are unavailable.
+        val paintedLook = app.vela.ui.MapLook.style.value.painted
+        if (!paintedLook) Hint(stringResource(R.string.settings_cat_painted_only))
         Spacer(Modifier.height(8.dp))
         // Map color sets: Modern = the Google-app-sampled palette (default), Classic = the
         // archived pre-sample look (white roads, yellow motorways, true greens). The fleet
@@ -273,6 +305,7 @@ internal fun AppearanceSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
                     ).forEachIndexed { i, (id, label) ->
                         FilterChip(
                             selected = app.vela.ui.MapColors.current() == id,
+                            enabled = paintedLook,
                             onClick = { app.vela.ui.MapColors.set(context, id) },
                             label = { Text(label) },
                             shape = androidx.compose.foundation.shape.CircleShape,
@@ -298,6 +331,7 @@ internal fun AppearanceSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
                     ).forEachIndexed { i, (id, label) ->
                         FilterChip(
                             selected = app.vela.ui.MapButtonShape.mode.value == id,
+                            enabled = paintedLook,
                             onClick = { app.vela.ui.MapButtonShape.set(context, id) },
                             label = { Text(label) },
                             shape = androidx.compose.foundation.shape.CircleShape,
@@ -310,8 +344,9 @@ internal fun AppearanceSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
                 Hint(stringResource(R.string.settings_map_buttons_hint))
             }
         }
-        }
+        } // mapstyle
 
+        if (page == "theme") {
         // Material You (issue #15): tint the app's buttons, chips and accents from the
         // wallpaper palette. Android 12+ only - below S there is no dynamic palette, so
         // the row is not shown at all rather than shown dead.
@@ -326,7 +361,9 @@ internal fun AppearanceSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
                 )
             }
         }
+        } // theme (part 2: Material You)
 
+        if (page == "display") {
         Spacer(Modifier.height(8.dp))
         SettingsGroup(title = stringResource(R.string.settings_app_name_title)) {
             // Component state IS the persistence (survives reboots/updates); mirror it into
@@ -345,6 +382,9 @@ internal fun AppearanceSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
             )
         }
 
+        } // display (part 2: app name)
+
+        if (page == "locale") {
         Spacer(Modifier.height(8.dp))
         SettingsGroup(title = stringResource(R.string.settings_units)) {
             SelectableRow(
@@ -359,6 +399,7 @@ internal fun AppearanceSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
                 onClick = { Units.set(context, false) },
             )
         }
+        Hint(stringResource(R.string.settings_units_hint))
 
         Spacer(Modifier.height(8.dp))
         // The clock: the device setting unless overridden here (discussion #637). Transit times
@@ -427,6 +468,33 @@ internal fun AppearanceSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
             }
         }
         Hint(stringResource(R.string.settings_directions_language_hint))
+
+        // Map names moved here from Map (2026-10-28): which name a road or place label shows
+        // belongs with the language rows, not with map rendering.
+        Spacer(Modifier.height(8.dp))
+        androidx.compose.foundation.layout.Column(Modifier.padding(horizontal = 16.dp)) {
+            Text(
+                stringResource(R.string.settings_map_names),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(start = 4.dp, top = 12.dp, bottom = 4.dp),
+            )
+        }
+        SettingsGroup {
+            listOf(
+                app.vela.ui.MapNames.ENGLISH_LATIN to stringResource(R.string.settings_map_names_english_latin),
+                app.vela.ui.MapNames.ENGLISH_LOCAL to stringResource(R.string.settings_map_names_english_local),
+                app.vela.ui.MapNames.LOCAL to stringResource(R.string.settings_map_names_local),
+                app.vela.ui.MapNames.LOCAL_ENGLISH to stringResource(R.string.settings_map_names_local_english),
+            ).forEach { (id, label) ->
+                SelectableRow(
+                    label = label,
+                    selected = app.vela.ui.MapNames.mode.value == id,
+                    onClick = { app.vela.ui.MapNames.set(context, id) },
+                )
+            }
+        }
+        Hint(stringResource(R.string.settings_map_names_hint))
+        } // locale
         Spacer(Modifier.height(24.dp))
     }
 }

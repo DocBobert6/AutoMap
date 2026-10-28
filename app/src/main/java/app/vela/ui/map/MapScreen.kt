@@ -2647,7 +2647,7 @@ fun MapScreen(
             ) {
                 // The button and its tile panel (LayersPanel.kt); the gate above is the one thing
                 // MapScreen keeps.
-                LayersCorner(vm, landscapeChrome, darkTheme)
+                LayersCorner(vm, landscapeChrome, darkTheme, onOpenSettings = onOpenSettings)
             }
 
         // --- transient surfaces --------------------------------------------
