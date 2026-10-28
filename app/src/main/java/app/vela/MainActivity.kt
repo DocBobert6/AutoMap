@@ -46,6 +46,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Location freshness (2026-10-27): a collector alive but starved while the phone
+        // was locked/backgrounded must be restarted on return, not kept because its Job
+        // is non-null — otherwise a route entered after driving reads the parked fix.
+        runCatching { vm.refreshLocationIfStarved() }
         // The 12/24-hour clock setting can change while Vela sits in the background (issue #357).
         app.vela.ui.Clock24.refresh(this)
         // AutoMap updates (2026-10-27): AutoSpace-style on-app-opened check,

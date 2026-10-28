@@ -784,7 +784,7 @@ fun MapScreen(
         context, Manifest.permission.ACCESS_COARSE_LOCATION,
     ) == PackageManager.PERMISSION_GRANTED
     LaunchedEffect(Unit) {
-        if (hasLocation()) vm.startLocation()
+        if (hasLocation()) vm.refreshLocationIfStarved()
     }
     // Voice search has TWO paths (see VoiceSearch): tier-1 records + transcribes on-device with Vela's
     // own Whisper model (needs RECORD_AUDIO, asked at point of use); tier-2 hands off to an installed

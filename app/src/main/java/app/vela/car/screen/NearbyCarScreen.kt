@@ -61,7 +61,7 @@ class NearbyCarScreen(
         val res = results
             ?: return PlaceListNavigationTemplate.Builder().setTitle(title).setHeaderAction(Action.BACK).setLoading(true).build()
 
-        val here = deps.locationProvider.lastKnown()
+        val here = deps.locationProvider.lastKnownWithTime()?.takeIf { it.ageMs != Long.MAX_VALUE && it.ageMs <= 30_000L }?.point // fresh-checked (2026-10-27): a stale snapshot must not bias distances/sort or seed a stop origin
         val list = ItemList.Builder()
         if (res.isEmpty()) list.setNoItemsMessage(carContext.getString(app.vela.R.string.car_along_none))
         // PlaceListNavigationTemplate caps its list at six rows and throws past that.
@@ -122,7 +122,7 @@ class NearbyCarScreen(
     // Runs once, from init: the first template is the loading one, so only the answer invalidates.
     private fun search(c: QuickCategories.Chip) {
         lifecycleScope.launch {
-            val here = deps.locationProvider.lastKnown()
+            val here = deps.locationProvider.lastKnownWithTime()?.takeIf { it.ageMs != Long.MAX_VALUE && it.ageMs <= 30_000L }?.point // fresh-checked (2026-10-27): a stale snapshot must not bias distances/sort or seed a stop origin
             // A cancelled search is rethrown, never turned into "nothing found".
             val found = try {
                 deps.mapDataSource.search(c.query, here).places

@@ -64,16 +64,34 @@ class LocationProvider @Inject constructor(
         return if (lat.isNaN() || lng.isNaN()) null else LatLng(lat.toDouble(), lng.toDouble())
     }
 
+    /** A last-known point WITH its age, so callers can refuse a stale one instead of
+     *  silently routing from where the phone was parked. [ageMs] is wall-clock age;
+     *  Long.MAX_VALUE when the only source is the prefs cache with no stored time. */
+    data class KnownFix(val point: LatLng, val ageMs: Long)
+
     /** Most recent OS last-known across providers, falling back to our cache. */
     @SuppressLint("MissingPermission")
-    fun lastKnown(): LatLng? {
-        pinned?.let { return it }
-        val mgr = lm ?: return cachedLatLng()
+    fun lastKnown(): LatLng? = lastKnownWithTime()?.point
+
+    /** Same as [lastKnown], but the fix's age is kept instead of discarded. */
+    @SuppressLint("MissingPermission")
+    fun lastKnownWithTime(): KnownFix? {
+        pinned?.let { return KnownFix(it, 0L) }
+        val mgr = lm ?: return cachedLatLng()?.let { KnownFix(it, cachedAgeMs()) }
         val best = PROVIDERS
             .filter { mgr.allProviders.contains(it) }
             .mapNotNull { runCatching { mgr.getLastKnownLocation(it) }.getOrNull() }
             .maxByOrNull { it.time }
-        return best?.let { LatLng(it.latitude, it.longitude) } ?: cachedLatLng()
+        if (best != null) return KnownFix(
+            LatLng(best.latitude, best.longitude),
+            (System.currentTimeMillis() - best.time).coerceAtLeast(0L),
+        )
+        return cachedLatLng()?.let { KnownFix(it, cachedAgeMs()) }
+    }
+
+    private fun cachedAgeMs(): Long {
+        val t = prefs.getLong(KEY_TIME, -1L)
+        return if (t <= 0L) Long.MAX_VALUE else (System.currentTimeMillis() - t).coerceAtLeast(0L)
     }
 
     /**
@@ -224,6 +242,7 @@ class LocationProvider @Inject constructor(
         prefs.edit()
             .putFloat(KEY_LAT, loc.latitude.toFloat())
             .putFloat(KEY_LNG, loc.longitude.toFloat())
+            .putLong(KEY_TIME, loc.time)
             .apply()
     }
 
@@ -254,5 +273,6 @@ class LocationProvider @Inject constructor(
         const val CACHE_MOVE_M = 100f
         const val KEY_LAT = "last_lat"
         const val KEY_LNG = "last_lng"
+        const val KEY_TIME = "last_time"
     }
 }

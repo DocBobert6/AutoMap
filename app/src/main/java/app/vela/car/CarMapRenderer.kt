@@ -364,6 +364,19 @@ class CarMapRenderer(
         }
     }
 
+    /**
+     * The live car puck with its age (elapsed-realtime ms since the last fix the
+     * renderer accepted), or null if no fix has ever arrived. RoutePreview prefers
+     * this over LocationProvider.lastKnown(): the snapshot's timestamp was discarded
+     * and polling it for 15 s never made it fresher (parked-origin bug, 2026-10-27).
+     * Age Long.MAX_VALUE when a puck exists but no fix timestamp was recorded.
+     */
+    fun livePuckWithAgeMs(): Pair<LatLng, Long>? {
+        val p = puck ?: targetPuck ?: return null
+        val age = if (lastFixMs == 0L) Long.MAX_VALUE else android.os.SystemClock.elapsedRealtime() - lastFixMs
+        return p to age
+    }
+
     fun start() {
         collectJob?.cancel()
         collectJob = scope.launch {

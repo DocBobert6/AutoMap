@@ -54,7 +54,7 @@ class AlongRouteCarScreen(carContext: CarContext, private val deps: CarDeps) : S
                 .setSingleList(items.build())
                 .build()
         }
-        val here = deps.locationProvider.lastKnown()
+        val here = deps.locationProvider.lastKnownWithTime()?.takeIf { it.ageMs != Long.MAX_VALUE && it.ageMs <= 30_000L }?.point // fresh-checked (2026-10-27): a stale snapshot must not bias distances/sort or seed a stop origin
         val res = results
         if (res == null) {
             return ListTemplate.Builder().setTitle(q).setHeaderAction(Action.BACK).setLoading(true).build()
@@ -81,7 +81,7 @@ class AlongRouteCarScreen(carContext: CarContext, private val deps: CarDeps) : S
         query = q; results = null; loading = true
         invalidate()
         lifecycleScope.launch {
-            val here = deps.locationProvider.lastKnown()
+            val here = deps.locationProvider.lastKnownWithTime()?.takeIf { it.ageMs != Long.MAX_VALUE && it.ageMs <= 30_000L }?.point // fresh-checked (2026-10-27): a stale snapshot must not bias distances/sort or seed a stop origin
             val found = runCatching { deps.mapDataSource.search(q, here).places }.getOrDefault(emptyList())
             val sorted = here?.let { h -> found.sortedBy { it.location.distanceTo(h) } } ?: found
             results = sorted

@@ -2,6 +2,7 @@ package app.vela.car.screen
 
 import androidx.car.app.AppManager
 import androidx.car.app.CarContext
+import androidx.car.app.CarToast
 import androidx.car.app.Screen
 import android.text.SpannableString
 import android.text.Spanned
@@ -24,6 +25,7 @@ import androidx.lifecycle.lifecycleScope
 import app.vela.car.CarMapRenderer
 import app.vela.core.model.LatLng
 import app.vela.core.model.Route
+import app.vela.core.model.distanceTo
 import app.vela.core.model.TravelMode
 import app.vela.service.NavigationService
 import kotlinx.coroutines.launch
@@ -43,6 +45,12 @@ class RoutePreviewCarScreen(
     private var loading = true
     private var fetched = false
     private var origin: LatLng? = null
+    // Freshness (2026-10-27, parked-origin fix): originFreshAtMs is elapsed-realtime
+    // when the origin was verified fresh (live puck or a ≤30 s snapshot); 0 means the
+    // origin was never verified fresh and must not be routed from silently.
+    private var originFreshAtMs: Long = 0L
+    private var staleOrigin = false
+    private val freshWindowMs = 30_000L
 
     init { lifecycle.addObserver(this) }
 
@@ -74,7 +82,10 @@ class RoutePreviewCarScreen(
             // No location / no route found. RoutePreviewNavigationTemplate REQUIRES a navigate action
             // whenever its list is set (non-loading) — a "no items" list with none throws
             // "navigation action cannot be null". So show a MessageTemplate instead of the preview.
-            return MessageTemplate.Builder(carContext.getString(app.vela.R.string.car_no_route))
+            // A stale origin gets its own message: it is NOT a "no route" failure, it is a
+            // refusal to route from the parked point (2026-10-27 freshness fix).
+            val msg = if (staleOrigin) app.vela.R.string.car_waiting_gps else app.vela.R.string.car_no_route
+            return MessageTemplate.Builder(carContext.getString(msg))
                 .setTitle(destName)
                 .setHeaderAction(Action.BACK)
                 .build()
@@ -141,18 +152,32 @@ class RoutePreviewCarScreen(
         // Don't invalidate() here — this runs during onGetTemplate (which already returns the loading
         // template); invalidate mid-build is a no-op the host discourages. Only invalidate on completion.
         loading = true
+        staleOrigin = false
         lifecycleScope.launch {
-            // The GPS fix may still be locking when this screen opens — poll up to ~15 s for a location
-            // instead of giving up immediately (which left the screen stuck on "loading" forever).
-            var from = deps.locationProvider.lastKnown()
+            // Freshness first (2026-10-27, parked-origin fix): prefer the renderer's LIVE
+            // puck, fall back to a snapshot only if it is ≤30 s old, and keep waiting for
+            // a fresh fix for up to 30 s — polling lastKnown() alone never made it
+            // fresher, it just re-read the same parked snapshot. If nothing fresh lands,
+            // routes stay empty and the screen shows the waiting-for-GPS message
+            // instead of silently routing from the parked point.
+            val renderer = deps.mapRenderer(carContext)
+            var from: LatLng? = null
+            var fresh = false
             var tries = 0
-            while (from == null && tries < 30) {
+            while (tries < 60) {
+                val live = runCatching { renderer.livePuckWithAgeMs() }.getOrNull()
+                if (live != null && live.second <= freshWindowMs) { from = live.first; fresh = true; break }
+                val known = runCatching { deps.locationProvider.lastKnownWithTime() }.getOrNull()
+                if (known != null && known.ageMs != Long.MAX_VALUE && known.ageMs <= freshWindowMs) {
+                    from = known.point; fresh = true; break
+                }
                 kotlinx.coroutines.delay(500)
-                from = deps.locationProvider.lastKnown()
                 tries++
             }
             origin = from
-            routes = if (from == null) emptyList()
+            originFreshAtMs = if (fresh) android.os.SystemClock.elapsedRealtime() else 0L
+            staleOrigin = !fresh
+            routes = if (!fresh || from == null) emptyList()
             else runCatching {
                 // The avoid settings (car Settings or the phone's chooser); without them a car
                 // preview offered toll roads to a driver who had turned tolls off.
@@ -170,12 +195,35 @@ class RoutePreviewCarScreen(
     }
 
     private fun startNav() {
-        val from = origin ?: deps.locationProvider.lastKnown() ?: return
         val picked = routes.getOrNull(selected) ?: routes.firstOrNull() ?: return
         lifecycleScope.launch {
-            val named = if (picked.provisional) {
-                runCatching { deps.mapDataSource.nameRoute(picked, from, dest, TravelMode.DRIVE) }.getOrDefault(picked)
-            } else picked
+            // Go-time re-verification (2026-10-27): if the live puck is fresh and has
+            // moved > 50 m from the preview origin, re-fetch from the live puck — the
+            // preview route was computed from the old point. If the origin was never
+            // verified fresh and no fresh live fix exists, refuse to start from it.
+            val live = runCatching { deps.mapRenderer(carContext).livePuckWithAgeMs() }.getOrNull()
+            val liveFresh = live != null && live.second <= freshWindowMs
+            var from = origin
+            var routeToStart = picked
+            if (liveFresh && from != null && live.first.distanceTo(from) > 50.0) {
+                val freshRoutes = runCatching {
+                    deps.mapDataSource.directions(
+                        live.first, dest, TravelMode.DRIVE,
+                        avoidTolls = app.vela.core.data.RoutingPrefs.avoidTolls,
+                        avoidHighways = app.vela.core.data.RoutingPrefs.avoidHighways,
+                        avoidFerries = app.vela.core.data.RoutingPrefs.avoidFerries,
+                    )
+                }.getOrDefault(emptyList())
+                if (freshRoutes.isNotEmpty()) { from = live.first; routeToStart = freshRoutes.first() }
+            }
+            if (from == null || (originFreshAtMs == 0L && !liveFresh)) {
+                CarToast.makeText(carContext, carContext.getString(app.vela.R.string.car_waiting_gps), CarToast.LENGTH_LONG).show()
+                return@launch
+            }
+            val startFrom = from
+            val named = if (routeToStart.provisional) {
+                runCatching { deps.mapDataSource.nameRoute(routeToStart, startFrom, dest, TravelMode.DRIVE) }.getOrDefault(routeToStart)
+            } else routeToStart
             // Speak through the user's chosen engine, the same mapping as the phone's init path:
             // no pick or a vela.* pick means the in-process Piper voice when it is installed (the
             // service attaches the synth), else the system TTS. Until 2026-09-21 the car always

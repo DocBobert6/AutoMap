@@ -157,6 +157,11 @@ data class MapUiState(
                                      // when coarse fixes keep the ordinary stale timer from firing
     val compassHeading: Float? = null, // device facing (rotation-vector sensor) — browse cone when stopped
     val myLocationStale: Boolean = true, // gray the dot until/unless a live fix is recent
+    // Elapsed-realtime (SystemClock.elapsedRealtime) of the last ACCEPTED live fix; 0 =
+    // none yet, or a seed-only position whose age is unknown — both count as STALE for
+    // routing. Without this, no freshness gate on a route origin was even expressible:
+    // myLocation carried a point and no time (location-staleness audit, 2026-10-27).
+    val myLocationFixMs: Long = 0L,
     val myAccuracyM: Float? = null, // the last live fix's reported accuracy radius (m); null = unknown/simulated
     val parkingSpot: LatLng? = null, // one-tap "parked here" pin — survives restarts (prefs)
     val parkedAtMillis: Long = 0L,   // when it was saved (for the sheet/history labels)
@@ -692,8 +697,13 @@ class MapViewModel @Inject constructor(
             tm?.networkCountryIso?.takeIf { it.isNotBlank() } ?: tm?.simCountryIso?.takeIf { it.isNotBlank() }
         }.getOrNull() ?: java.util.Locale.getDefault().country.takeIf { it.isNotBlank() }
         // A simulated location (Settings → demo) wins the seed so the app opens "there".
-        val seed = app.vela.ui.SimLocation.point.value ?: locationProvider.lastKnown()
-        _state.update { it.copy(center = seed, myLocation = it.myLocation ?: seed) }
+        // The seed's age is stamped too: a last-known seed hours old must NOT count as a
+        // fresh fix for routing (the parked-origin bug) — an unknown age stamps 0 = stale.
+        val seedFix = locationProvider.lastKnownWithTime()
+        val seed = app.vela.ui.SimLocation.point.value ?: seedFix?.point
+        val seedFixMs = if (seedFix != null && seedFix.ageMs != Long.MAX_VALUE)
+            (android.os.SystemClock.elapsedRealtime() - seedFix.ageMs).coerceAtLeast(0L) else 0L
+        _state.update { it.copy(center = seed, myLocation = it.myLocation ?: seed, myLocationFixMs = it.myLocationFixMs.takeIf { v -> v != 0L } ?: seedFixMs) }
         // Decide the offline basemap BEFORE the first style load: a process that starts with no
         // signal and loads the remote style first leaves the engine's glyph and sprite managers
         // with requests that never answer, and a local style loaded afterwards never completes a
@@ -892,7 +902,7 @@ class MapViewModel @Inject constructor(
             // Kill any stale-timer armed by the last REAL fix: the pinned demo dot gets no fresh
             // fixes, so a leftover timer grayed it ~30 s in and nothing ever turned it blue again.
             staleTimerJob?.cancel(); staleTimerJob = null
-            _state.update { it.copy(myLocation = sim, center = it.center ?: sim, myLocationStale = false, showPsdsTip = false, myAccuracyM = null) }
+            _state.update { it.copy(myLocation = sim, center = it.center ?: sim, myLocationStale = false, showPsdsTip = false, myAccuracyM = null, myLocationFixMs = android.os.SystemClock.elapsedRealtime()) }
             return
         }
         // Permission granted during the session (the locate button's ask, "Only this time"): that
@@ -1073,7 +1083,7 @@ class MapViewModel @Inject constructor(
                 startAwaitsFix = false
                 _state.update {
                     it.copy(
-                        myLocation = here, myBearing = bearing, mySpeed = speed,
+                        myLocation = here, myLocationFixMs = nowMs, myBearing = bearing, mySpeed = speed,
                         myFixRaw = if (here === prev) it.myFixRaw else rawHere, // an outlier hold keeps the old raw too
                         // The fix's OWN accepted measurement, null when it had none (or the gate
                         // rejected it) — the puck Kalman's measurement stream must never see a
@@ -1121,6 +1131,91 @@ class MapViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    // ---- Location freshness (2026-10-27, parked-origin fix) ---------------------------
+    // The phone feed starves while backgrounded/locked (no background-location grant, by
+    // design — not added here), and the car preview used to read a timestamp-less snapshot.
+    // So a route origin must prove it is fresh, and a starved collector must be restarted
+    // on return instead of being kept because its Job is non-null.
+
+    private var routeWaitJob: Job? = null
+
+    /** True when the phone's last accepted fix is recent enough to route from. */
+    private fun myLocationFresh(nowMs: Long = android.os.SystemClock.elapsedRealtime()): Boolean {
+        val fixMs = _state.value.myLocationFixMs
+        return fixMs != 0L && nowMs - fixMs <= FRESH_LOCATION_MS
+    }
+
+    /**
+     * Foreground-return refresh, called from MainActivity.onResume and from the map's
+     * launch effect. If the collector is alive but no fix has arrived for > 12 s it is
+     * starved: cancel and restart it (re-registering LocationManager listeners) instead
+     * of the old blind `locationJob != null → return` no-op. Also adopts a fresher
+     * last-known fix — the car session's own collector may have cached one while the
+     * phone feed was starved — but only if it is actually fresh.
+     */
+    fun refreshLocationIfStarved() {
+        if (_state.value.replaying) return
+        if (app.vela.ui.SimLocation.point.value != null) return
+        val nowMs = android.os.SystemClock.elapsedRealtime()
+        val fixMs = _state.value.myLocationFixMs
+        val starved = locationJob != null && fixMs != 0L && nowMs - fixMs > STALE_LOCATION_MS
+        val neverFixed = locationJob != null && fixMs == 0L
+        if (locationJob == null) { startLocation(); return }
+        if (starved || neverFixed) {
+            locationJob?.cancel(); locationJob = null
+            staleTimerJob?.cancel(); staleTimerJob = null
+            _state.update { it.copy(myLocationStale = true) }
+            startLocation()
+        }
+        // Adopt a fresher snapshot than the phone's own fix, if one exists.
+        val known = runCatching { locationProvider.lastKnownWithTime() }.getOrNull()
+        if (known != null && known.ageMs != Long.MAX_VALUE && known.ageMs <= FRESH_LOCATION_MS) {
+            val knownFixMs = (nowMs - known.ageMs).coerceAtLeast(0L)
+            if (knownFixMs > fixMs) {
+                _state.update { it.copy(myLocation = known.point, myLocationFixMs = knownFixMs, myLocationStale = false) }
+            }
+        }
+    }
+
+    /**
+     * Freshness gate for a phone route request. Returns true when the caller may route
+     * from [origin] now. When the origin is the phone's own location and it is stale
+     * (or null), the request is HELD: status shows "locating…", the collector is
+     * restarted if starved, and the request re-runs from the first fresh fix. On
+     * timeout the status warns and the request is dropped — it is NEVER routed
+     * silently from the parked point. A hand-picked origin bypasses the gate.
+     */
+    private fun gateRouteOrigin(mode: TravelMode, origin: LatLng?): Boolean {
+        if (origin != null && myLocationFresh()) return true
+        if (origin != null && _state.value.directionsOrigin?.location == origin) return true
+        // Stale or missing phone location: hold, don't route.
+        routeWaitJob?.cancel()
+        _state.update {
+            it.copy(status = appContext.getString(R.string.route_locating))
+        }
+        refreshLocationIfStarved()
+        val wasOpen = _state.value.directionsOpen
+        routeWaitJob = viewModelScope.launch {
+            val deadline = android.os.SystemClock.elapsedRealtime() + LOCATE_WAIT_MS
+            while (android.os.SystemClock.elapsedRealtime() < deadline) {
+                kotlinx.coroutines.delay(500)
+                if (myLocationFresh() && _state.value.travelMode == mode && (!wasOpen || _state.value.directionsOpen)) {
+                    routeWaitJob = null
+                    _state.update { it.copy(status = null) }
+                    route(mode)
+                    return@launch
+                }
+                if (wasOpen && !_state.value.directionsOpen) return@launch
+            }
+            // Timeout: warn, offer no route. The user can retry (which re-waits) or pick
+            // a start point by hand — the parked point is never used silently.
+            _state.update {
+                it.copy(status = appContext.getString(R.string.route_stale_timeout))
+            }
+        }
+        return false
     }
 
     // Speed plausibility-gate state: the baseline is the last ACCEPTED measurement — never a
@@ -6574,6 +6669,12 @@ class MapViewModel @Inject constructor(
         // The "from" endpoint: a custom origin if set, else your live location.
         val fromPoint = s.directionsOrigin?.location ?: s.myLocation
         // reversed → from the place back to the from-point; else → from-point to the place.
+        // Freshness gate (2026-10-27): a stale phone location must never route silently
+        // from the parked point. A hand-picked origin bypasses it; a stale (or missing)
+        // live origin holds the request until a fresh fix arrives (or times out with a
+        // warning). The reversed case routes FROM the place, so the live point is only
+        // the dest and needs no gate.
+        if (!s.directionsReversed && s.directionsOrigin == null && !gateRouteOrigin(mode, fromPoint)) return
         val origin = (if (s.directionsReversed) place else fromPoint) ?: return
         val dest = (if (s.directionsReversed) fromPoint else place) ?: return
         destination = dest
@@ -10710,6 +10811,12 @@ class MapViewModel @Inject constructor(
                                               // dense metro's padded box can carry 1000+, and every handed
                                               // symbol is re-collided per drag frame (budget-GPU jank)
         const val STALE_LOCATION_MS = 12_000L // gray the dot after this long with no fix
+        // A route origin older than this is stale: never route silently from it (2026-10-27
+        // freshness fix — the parked-origin bug). 30 s covers a normal GPS gap (garage exit)
+        // without letting a miles-old parked fix through.
+        const val FRESH_LOCATION_MS = 30_000L
+        // How long a route request waits for a fresh fix before giving up with a warning.
+        const val LOCATE_WAIT_MS = 30_000L
         const val SPEED_HOLD_MS = 3_000L // hold a speedless-fix speed at most this long, then show 0
         const val SPEED_ZERO_MS = 6_000L // no fixes AT ALL for this long → zero the mph. Two full cycles
                                          // of the worst normal chipset cadence (~3 s under canopy) — at
