@@ -602,7 +602,14 @@ class CarMapRenderer(
                             else org.json.JSONArray(listOf(1.15, az, 90.0 - elev))
                         }
                     }.getOrNull()
-                    CarStyle.inject(it, app.vela.ui.map.TRAFFIC_TILES, twins = look.painted, paintDensity = carContext.resources.displayMetrics.density, lightPosition = sunLight)
+                    // Phase D: the car bake follows the puck — inside
+                    // a hosted region, that region's bake (and only
+                    // that region's); outside every region, null here
+                    // leaves CarStyle on the California fallback.
+                    val regionalPaintUrl = runCatching {
+                        puck?.let { app.vela.core.data.PaintedRegions.pickUrl(it.lat, it.lng) }
+                    }.getOrNull()
+                    CarStyle.inject(it, app.vela.ui.map.TRAFFIC_TILES, twins = look.painted, paintDensity = carContext.resources.displayMetrics.density, lightPosition = sunLight, paintUrl = regionalPaintUrl)
                 }
         } else null
         loadedPlain = patchedJson == null

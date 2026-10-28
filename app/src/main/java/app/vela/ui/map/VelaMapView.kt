@@ -3126,7 +3126,13 @@ fun VelaMapView(
             val dial = if (app.vela.ui.PaintedRoadsPref.on.value) app.vela.ui.AppTune.local("paintedRoads")?.toInt() ?: 0 else 0
             if (dial != mode) { runCatching { PaintedRoadsLayer.clear(style) }; box = null; marks = emptyList(); mode = dial }
             when (dial) {
-                1 -> runCatching { PaintedRoadsLayer.applyBaked(style, darkTheme) }
+                1 -> runCatching {
+                    // Phase D: the baked source follows the camera, so
+                    // panning into a hosted region loads that region's
+                    // bake (and only that region's), not California's.
+                    val t = mapRef?.cameraPosition?.target
+                    PaintedRoadsLayer.applyBaked(style, darkTheme, t?.latitude, t?.longitude)
+                }
                 2 -> {
                     val cam = mapRef?.cameraPosition
                     val t = cam?.target

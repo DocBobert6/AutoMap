@@ -41,7 +41,7 @@ internal object CarStyle {
      *  phone's real-metre expressions, translated to JSON verbatim. */
     /** [lightPosition] is the style-light position [radial, azimuthal, polar] for
      *  sun-angle building shading (Build 18); null keeps the style default. */
-    fun inject(json: String, trafficTiles: String, twins: Boolean = true, paintDensity: Float = 2.0f, lightPosition: JSONArray? = null): String {
+    fun inject(json: String, trafficTiles: String, twins: Boolean = true, paintDensity: Float = 2.0f, lightPosition: JSONArray? = null, paintUrl: String? = null): String {
         val style = runCatching { JSONObject(json) }.getOrNull() ?: return json
         val sources = style.optJSONObject("sources") ?: return json
         val src = when {
@@ -99,7 +99,12 @@ internal object CarStyle {
         // Painted roads (Build 11): the streamed regional bake, above the last bridge
         // layer like the phone's, below the route and labels. Only for the Vela look.
         if (twins) {
-            val paintUrl = runCatching { "pmtiles://" + app.vela.core.config.VelaLinks.paintedRoads() }.getOrNull()
+            // Phase D: a caller-supplied regional bake wins; without
+            // one, the California bake stands as before. The caller
+            // supplies at most one URL (PaintedRegions.pick), so the
+            // overlap never double-draws.
+            val paintUrl = paintUrl
+                ?: runCatching { "pmtiles://" + app.vela.core.config.VelaLinks.paintedRoads() }.getOrNull()
             if (paintUrl != null) {
                 sources.put(PAINT_SRC, JSONObject().put("type", "vector").put("url", paintUrl))
                 fun metersOf(prop: Any): JSONArray {

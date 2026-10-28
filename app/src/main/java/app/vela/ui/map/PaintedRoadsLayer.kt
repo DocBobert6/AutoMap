@@ -60,12 +60,23 @@ internal object PaintedRoadsLayer {
         lastMarks = null; lastKey = null
     }
 
-    /** Dial 1: the California bake, streamed by range request. */
-    fun applyBaked(style: Style, dark: Boolean) {
-        val key = "baked|$dark"
+    /**
+     * Dial 1: a streamed regional bake. Phase D: when [lat]/[lng] is
+     * inside a hosted painted region, exactly that region's bake is
+     * loaded (see [PaintedRegions.pick] — priority, then smallest
+     * area, so the Cincinnati/Northern-Kentucky overlap loads the
+     * metro file only, never both); outside every hosted region the
+     * California bake ([BAKED_URL]) stands as before. The region id
+     * is part of the key, so crossing a region boundary swaps the
+     * source instead of keeping the previous region's markings.
+     */
+    fun applyBaked(style: Style, dark: Boolean, lat: Double? = null, lng: Double? = null) {
+        val region = if (lat != null && lng != null) app.vela.core.data.PaintedRegions.pick(lat, lng) else null
+        val url = region?.let { "pmtiles://${it.url}" } ?: BAKED_URL
+        val key = "baked|$dark|${region?.id ?: "california"}"
         if (key == lastKey && style.getSource(BAKED_SRC) != null) return
         clear(style)
-        style.addSource(VectorSource(BAKED_SRC, BAKED_URL))
+        style.addSource(VectorSource(BAKED_SRC, url))
         addLayers(style, BAKED_SRC, "paint", dark)
         lastKey = key
     }
