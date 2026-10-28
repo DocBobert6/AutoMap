@@ -256,8 +256,8 @@ internal fun AppearanceSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
 
         if (page == "mapstyle") {
         Spacer(Modifier.height(8.dp))
-        // Map look: the Vela look on Liberty, or one of OpenFreeMap's other styles as served
-        // (issue #750). The color sets below apply to the Vela look only.
+        // Map look (Phase F: LOCKED to Liberty/AutoMap — the other looks are shown
+        // disabled, not removed, so the lock is visible rather than silent).
         SettingsGroup(title = stringResource(R.string.settings_map_look)) {
             androidx.compose.foundation.layout.Column(Modifier.padding(horizontal = 16.dp)) {
                 FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -273,6 +273,7 @@ internal fun AppearanceSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
                         }
                         FilterChip(
                             selected = app.vela.ui.MapLook.style.value == look,
+                            enabled = look == app.vela.core.data.tiles.MapStyle.LIBERTY,
                             onClick = { app.vela.ui.MapLook.set(context, look) },
                             label = { Text(stringResource(label)) },
                             shape = androidx.compose.foundation.shape.CircleShape,
@@ -283,6 +284,7 @@ internal fun AppearanceSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
                     }
                 }
                 Hint(stringResource(R.string.settings_map_look_hint))
+                Hint(stringResource(R.string.settings_map_palette_locked))
             }
         }
 
@@ -291,9 +293,8 @@ internal fun AppearanceSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
         val paintedLook = app.vela.ui.MapLook.style.value.painted
         if (!paintedLook) Hint(stringResource(R.string.settings_cat_painted_only))
         Spacer(Modifier.height(8.dp))
-        // Map color sets: Modern = the Google-app-sampled palette (default), Classic = the
-        // archived pre-sample look (white roads, yellow motorways, true greens). The fleet
-        // default is remote-pushable via calibration.json; an explicit pick here wins.
+        // Map color sets (Phase F: LOCKED to Modern — Classic/Contrast shown disabled,
+        // not removed, so the lock is visible rather than silent).
         SettingsGroup(title = stringResource(R.string.settings_map_colors)) {
             androidx.compose.foundation.layout.Column(Modifier.padding(horizontal = 16.dp)) {
                 FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -305,7 +306,7 @@ internal fun AppearanceSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
                     ).forEachIndexed { i, (id, label) ->
                         FilterChip(
                             selected = app.vela.ui.MapColors.current() == id,
-                            enabled = paintedLook,
+                            enabled = paintedLook && id == app.vela.ui.MapColors.MODERN,
                             onClick = { app.vela.ui.MapColors.set(context, id) },
                             label = { Text(label) },
                             shape = androidx.compose.foundation.shape.CircleShape,

@@ -1218,6 +1218,7 @@
     <string name="settings_map_colors_classic">Classic</string>
     <string name="settings_map_colors_contrast">Contrast</string>
     <string name="settings_map_colors_hint">Modern (the default) matches the Google app\'s current palette. Classic is AutoMap\'s earlier look: white roads, yellow motorways, true greens. Contrast is a night map with warm streets on slate land, for a glance from a mount; by day it draws as Modern. Only applies to the Liberty look.</string>
+    <string name="settings_map_palette_locked">AutoMap\'s day and night palettes are locked: the AutoMap look and Modern colors are the only map look and color set, so no other look or color pick can change them. Automatic, Day and Night still choose between the locked day and night palettes.</string>
     <string name="shortcut_home">Home</string>
     <string name="shortcut_work">Work</string>
     <string name="map_satellite_attribution" translatable="false">Esri, Maxar, Earthstar Geographics</string>

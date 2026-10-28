@@ -181,7 +181,7 @@ internal object CarStyle {
         // Bridge casings widen x1.3 so an overpass reads against the road below;
         // a dark translucent offset line under the first bridge layer acts as the
         // deck shadow; exit shields grow (icon 1 -> 1.35, text 10 -> 13) whenever
-        // they are visible. The Build 5 declutter still hides shields during nav.
+        // they are visible. Phase F: the Build 5 declutter no longer hides shields during nav.
         for (l in out) {
             val id = l.optString("id")
             if (id.startsWith("bridge_") && id.endsWith("_casing")) {

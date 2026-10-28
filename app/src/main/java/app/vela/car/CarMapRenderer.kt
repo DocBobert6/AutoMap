@@ -1035,14 +1035,15 @@ class CarMapRenderer(
     private var buildingFadeApplied = 1f
 
     /** AutoMap car nav declutter (Build 5): the phone's drive-nav visibility rules, ported.
-     *  While navigating, POI tiers, transit stops, highway shields, bike/trail accents,
+     *  While navigating, POI tiers, transit stops, bike/trail accents,
      *  transit lines, hamlet labels, one-way arrows and address overlays hide, so the route,
-     *  signs and turn guidance own the map; everything returns on nav end. Hillshade is
-     *  deliberately NOT in the list: it has its own toggle (Build 17), and the phone's
+     *  signs and turn guidance own the map; everything returns on nav end. Highway shields
+     *  STAY (Phase F): Build 15 enlarged them for overpass/exit emphasis, and the declutter
+     *  no longer hides them during nav — the other non-essential labels hide instead.
+     *  Hillshade is deliberately NOT in the list: it has its own toggle (Build 17), and the phone's
      *  effect excludes it for the same reason. Gated on TurnDeclutterPref like the phone. */
     private val DECLUTTER_LAYERS = listOf(
         "poi_r1", "poi_r7", "poi_r20", "poi_transit", "vela-transit-stops",
-        "highway-shield-non-us", "highway-shield-us-interstate", "road_shield_us",
         "vela-bikeroutes", "vela-trails", "vela-transit",
         "label_other", "label_village",
         "road_one_way_arrow", "road_one_way_arrow_opposite",

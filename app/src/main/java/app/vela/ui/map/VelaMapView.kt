@@ -1730,9 +1730,8 @@ fun VelaMapView(
             style.getLayer(TRANSIT_STOPS_LAYER)
                 ?.setProperties(PropertyFactory.visibility(if (navMode) Property.NONE else Property.VISIBLE))
         }
-        // CAR-MODE strip (drive nav only, 2026-07-16 - the battery report): basemap highway
-        // shields (a wall of badges including the other carriageway's; the banner's chips carry
-        // the route refs), bike/trail accent lines, hillshade, the transit-lines accent, and the
+        // CAR-MODE strip (drive nav only, 2026-07-16 - the battery report): bike/trail
+        // accent lines, hillshade, the transit-lines accent, and the
         // address-overlay number layers (their minZoom arms at 17 during slow nav, fetching tiles
         // for labels nobody reads while driving - the VM also skips their per-viewport refresh
         // while DRIVE-navigating). Walking and biking keep all of it: a bike route NEEDS the bike
@@ -1764,7 +1763,9 @@ fun VelaMapView(
         runCatching {
             (
                 listOf(
-                    "highway-shield-non-us", "highway-shield-us-interstate", "road_shield_us",
+                    // Phase F: highway shields are NOT in this list any more — Build 15
+                    // enlarged them for overpass/exit emphasis and they stay visible
+                    // during nav; the other non-essential labels below hide instead.
                     "vela-bikeroutes", "vela-trails", TRANSIT_LAYER,
                     // Neighborhood/hamlet titles (2026-07-16): the read-by-nobody label tier.
                     // WATER names deliberately STAY (user 2026-07-16: liked them, and rivers are
