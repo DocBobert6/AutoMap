@@ -35,6 +35,10 @@ jobs:
     steps:
       - name: Checkout AutoMap source tree
         uses: actions/checkout@v4
+        with:
+          # Depth 2 so the Attach step can read the work commit's message
+          # even when HEAD is a BUILD_LOG commit pushed after it.
+          fetch-depth: 2
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -124,8 +128,26 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk "$ASSET"
           ls -lh "$ASSET"
           sha256sum "$ASSET"
+          # Real per-build release notes (2026-10-28, alpha.16): the release
+          # body is the work commit's message, which already carries the
+          # full summary of what changed — NOT a hardcoded boilerplate
+          # paragraph. The in-app Updates page shows this body before
+          # Download, so a boilerplate body would show boilerplate,
+          # not features. If HEAD is a BUILD_LOG commit (pushed after
+          # the work commit), its parent is the work commit.
+          if git log -1 --format=%B | grep -q 'BUILD_LOG'; then
+            NOTES_COMMIT="HEAD~1"
+          else
+            NOTES_COMMIT="HEAD"
+          fi
+          git log -1 --format=%B "$NOTES_COMMIT" > /tmp/release-notes.txt
+          test -s /tmp/release-notes.txt
+          cat /tmp/release-notes.txt
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create "$TAG" --prerelease --repo "$GITHUB_REPOSITORY" \
               --title "AutoMap $VERSION (alpha, signed)" \
-              --notes "Alpha build, signed with the stable AutoMap release key. This build requires uninstalling any debug-signed build first; signed alphas after this one should update in-app. In-app updates check this release channel (Alpha)."
+              --notes-file /tmp/release-notes.txt
+          # Always set the body from the work commit, so a re-run or a
+          # pre-existing tag cannot leave stale boilerplate in place.
+          gh release edit "$TAG" --notes-file /tmp/release-notes.txt --repo "$GITHUB_REPOSITORY"
           gh release upload "$TAG" "$ASSET" --clobber --repo "$GITHUB_REPOSITORY"
