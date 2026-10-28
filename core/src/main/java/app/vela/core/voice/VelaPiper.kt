@@ -18,7 +18,7 @@ import java.io.File
  */
 object VelaPiper {
     const val ENGINE_ID = "vela.piper" // STABLE — do not change (VoiceGuide routing + the voice_engine pref)
-    const val LABEL = "Vela voice"
+    const val LABEL = "AutoMap voice"
 
     /** The fleet default voice — what onboarding downloads and a fresh install activates. HFC Female is a
      *  bright, clear single-speaker US voice (picked by ear as the most Google-Maps-like). Remotely

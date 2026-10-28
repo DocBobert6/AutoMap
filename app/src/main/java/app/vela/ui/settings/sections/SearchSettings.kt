@@ -218,7 +218,7 @@ internal fun SearchSettingsScreen(vm: MapViewModel, onBack: () -> Unit, onOpenQu
         }
         }
         // The engine picker only matters when there's actually a choice (the model AND a voice app,
-        // or two voice apps): "Vela Voice" = AUTO (the model wins, provider as graceful fallback),
+        // or two voice apps): "AutoMap Voice" = AUTO (the model wins, provider as graceful fallback),
         // "Android default" = the implicit intent Android routes, or each installed app pinned by name
         // so Android never interjects its own chooser. Enumerated off the main thread (a binder query
         // + per-app label load, the same class of call as the TTS engine list).

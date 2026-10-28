@@ -91,12 +91,12 @@ object NavTrace {
         val (snapshot, evs) = synchronized(rows) { if (rows.isEmpty()) return null else rows.toList() to events.toList() }
         return runCatching {
             val dir = File(context.cacheDir, "export").apply { mkdirs() }
-            val file = File(dir, "vela-nav-trace-${java.text.SimpleDateFormat("yyyy-MM-dd-HHmm", java.util.Locale.US).format(java.util.Date())}.csv")
+            val file = File(dir, "automap-nav-trace-${java.text.SimpleDateFormat("yyyy-MM-dd-HHmm", java.util.Locale.US).format(java.util.Date())}.csv")
             file.bufferedWriter().use { w ->
-                w.write("# Vela nav smoothness trace. No position data: bearings, along-route\n")
+                w.write("# AutoMap nav smoothness trace. No position data: bearings, along-route\n")
                 w.write("# distance, speed and frame timings only, safe to attach to an issue.\n")
                 // What a report is read against: without the build nobody can tell which camera ran.
-                w.write("# vela ${app.vela.BuildConfig.VERSION_NAME} (build ${app.vela.BuildConfig.VERSION_CODE})\n")
+                w.write("# automap ${app.vela.BuildConfig.VERSION_NAME} (build ${app.vela.BuildConfig.VERSION_CODE})\n")
                 w.write("# android ${android.os.Build.VERSION.RELEASE} (sdk ${android.os.Build.VERSION.SDK_INT}), ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}\n")
                 val sp = prefs(context)
                 w.write("# settings: north_up_start=${sp.getBoolean("nav_north_up", false)} texture_render=${sp.getBoolean("texture_render", false)}" +
@@ -111,7 +111,7 @@ object NavTrace {
             }
             shareFileIntent(
                 context, file, "text/csv",
-                "Vela nav smoothness trace",
+                "AutoMap nav smoothness trace",
                 "Nav camera trace (no location data).",
                 "Share nav trace",
             )

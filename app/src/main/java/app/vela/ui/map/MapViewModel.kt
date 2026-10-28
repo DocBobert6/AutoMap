@@ -630,7 +630,7 @@ class MapViewModel @Inject constructor(
                     app.vela.ui.map.MapPerf.reset(); _state.first { it.navigating }
                     // The drive's first note: what it ran on. No account, no place.
                     app.vela.diag.TripNote.add(
-                        "build: Vela ${app.vela.BuildConfig.VERSION_NAME} (${app.vela.BuildConfig.VERSION_CODE}), Android ${android.os.Build.VERSION.RELEASE}, " +
+                        "build: AutoMap ${app.vela.BuildConfig.VERSION_NAME} (${app.vela.BuildConfig.VERSION_CODE}), Android ${android.os.Build.VERSION.RELEASE}, " +
                             "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}, voice ${_state.value.selectedEngine?.packageName ?: "system"}, " +
                             "places ${app.vela.ui.MapPoiPrefs.placesSource.value}, icon ${app.vela.ui.PuckStyle.key()}",
                     )
@@ -8288,9 +8288,9 @@ class MapViewModel @Inject constructor(
         downloadVoice(defaultVoiceId())
     }
 
-    /** The Vela voice a fresh install downloads — the fleet default (calibration) for English,
+    /** The AutoMap voice a fresh install downloads — the fleet default (calibration) for English,
      *  else the directions language's recommended voice. Public: the voice browser brands this id
-     *  "Vela voice" and offers a one-tap reinstall when it's missing (user 2026-07-18, after a
+     *  "AutoMap voice" and offers a one-tap reinstall when it's missing (user 2026-07-18, after a
      *  crash mid-install left them hunting the list for which voice was the right one). */
     fun defaultVoiceId(): String {
         val lang = app.vela.ui.AppLocale.directionsEffective().language

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Declares Vela as a templated car app so Android Auto lists it in the launcher
+<!-- Declares AutoMap as a templated car app so Android Auto lists it in the launcher
      (with "unknown sources" enabled for sideloads; Play would need the nav category
      review otherwise). -->
 <automotiveApp>

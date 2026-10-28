@@ -2,7 +2,7 @@
 <paths>
     <!-- The downloaded voice-engine APK lives in filesDir/engines/. -->
     <files-path name="engines" path="engines/" />
-    <!-- The self-updater's downloaded Vela APK lives in filesDir/updates/. -->
+    <!-- The self-updater's downloaded AutoMap APK lives in filesDir/updates/. -->
     <files-path name="updates" path="updates/" />
     <!-- AutoMapUpdater downloads to cacheDir/updates/ (2026-10-28 crash fix:
          without this cache root, FileProvider.getUriForFile threw

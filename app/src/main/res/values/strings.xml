@@ -1441,6 +1441,7 @@
     <string name="settings_map_names_hint">Romanized names are made by machine where OpenStreetMap has no English name, and read badly in Hebrew and some other scripts. The app language and the voice do not change.</string>
     <string name="settings_project">Project</string>
     <string name="settings_project_hint">The website has the overview and the press page. Source code, bug reports and discussions are on GitHub.</string>
+    <string name="settings_project_credit">AutoMap is a slipstream of Vela (GPLv3). The Website and GitHub buttons below open the upstream Vela project.</string>
     <string name="settings_project_site_button">Website</string>
     <string name="settings_project_github_button">AutoMap on GitHub</string>
     <string name="mapvm_rechecking_connection">Checking the connection…</string>

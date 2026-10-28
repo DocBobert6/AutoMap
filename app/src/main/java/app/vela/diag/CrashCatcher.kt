@@ -41,7 +41,7 @@ object CrashCatcher {
         val sw = StringWriter()
         ex.printStackTrace(PrintWriter(sw))
         val text = buildString {
-            append("Vela crash report\n")
+            append("AutoMap crash report\n")
             append("when: ").append(System.currentTimeMillis()).append('\n')
             append("version: ").append(BuildConfig.VERSION_NAME).append(" (").append(BuildConfig.VERSION_CODE).append(")\n")
             append("android: API ").append(Build.VERSION.SDK_INT)
@@ -79,8 +79,8 @@ object CrashCatcher {
         return shareFileIntent(
             context, newest,
             mime = "text/plain",
-            subject = "Vela crash report",
-            text = "Attached: a Vela crash report (stack trace + diagnostics).",
+            subject = "AutoMap crash report",
+            text = "Attached: an AutoMap crash report (stack trace + diagnostics).",
             title = "Share crash report",
         )
     }

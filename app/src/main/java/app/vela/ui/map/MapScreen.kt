@@ -2760,7 +2760,7 @@ fun MapScreen(
                         VoiceDownloadCard(installing = state.voiceInstalling, pct = state.voiceDownloadPct ?: 0f, onCancel = { vm.cancelVoiceDownload() })
                     }
                     // The speech model download (started from the mic offer or Settings) gets the
-                    // same card - it's also called Vela voice, so the one label fits both.
+                    // same card - it's also called AutoMap voice, so the one label fits both.
                     if (state.asrDownloadPct != null) {
                         VoiceDownloadCard(installing = state.asrInstalling, pct = state.asrDownloadPct ?: 0f, onCancel = { vm.cancelAsrDownload() })
                     }
@@ -5848,7 +5848,7 @@ private fun RegionDownloadCard(name: String, places: Boolean, pct: Int, area: Bo
     }
 }
 
-/** "A newer Vela is out" card (self-updater): download with progress, then the system
+/** "A newer AutoMap is out" card (self-updater): download with progress, then the system
  *  installer takes over. "Not now" silences this version until a newer one appears. */
 @Composable
 private fun UpdateCard(

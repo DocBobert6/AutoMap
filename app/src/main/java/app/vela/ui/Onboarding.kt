@@ -36,7 +36,7 @@ object Onboarding {
      *  answered. A denial gets one plain-words are-you-sure in VelaRoot, then the app moves on. */
     val showNotifPrompt = mutableStateOf(false)
 
-    /** True for the single session where the one-time "download the Vela neural voice?" prompt should
+    /** True for the single session where the one-time "download the AutoMap neural voice?" prompt should
      *  show — offered right after the notification step so the best voice is one tap away. Suppressed
      *  once the model is present or the user has answered. */
     val showVoicePrompt = mutableStateOf(false)

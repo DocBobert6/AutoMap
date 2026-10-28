@@ -129,7 +129,7 @@ object PiperCatalog {
 
     /** True when the catalog ships a downloadable voice for [langCode]. False for languages Piper
      *  can't train (Japanese: espeak-ng has no Japanese phonemizer), where spoken guidance falls to
-     *  the phone's own system TTS instead of a Vela voice. Drives the "get a Vela voice" vs "add a
+     *  the phone's own system TTS instead of an AutoMap voice. Drives the "get an AutoMap voice" vs "add a
      *  system voice" fork in the no-voice nudge. */
     fun hasVoiceFor(langCode: String): Boolean = ALL.any { it.langCode == langCode }
 

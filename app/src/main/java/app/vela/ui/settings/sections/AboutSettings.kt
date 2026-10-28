@@ -71,6 +71,7 @@ internal fun AboutSettingsScreen(vm: MapViewModel, onBack: () -> Unit) {
         SettingsGroup(title = stringResource(R.string.settings_project)) {
         androidx.compose.foundation.layout.Column(Modifier.padding(horizontal = 16.dp)) {
         Hint(stringResource(R.string.settings_project_hint))
+        Hint(stringResource(R.string.settings_project_credit))
         Spacer(Modifier.height(4.dp))
         // Two doors, each its own link, so either host can move without the other going dark.
         val projFocus = remember { List(2) { FocusRequester() } }

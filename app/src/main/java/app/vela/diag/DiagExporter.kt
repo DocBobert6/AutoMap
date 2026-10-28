@@ -32,7 +32,7 @@ class DiagExporter @Inject constructor(
         val redact = context.getSharedPreferences("vela_settings", Context.MODE_PRIVATE).getBoolean(REDACT_PREF, false)
 
         val json = buildString {
-            append("{\"app\":\"Vela\",\"schema\":1,\"exportedAt\":").append(System.currentTimeMillis())
+            append("{\"app\":\"AutoMap\",\"schema\":1,\"exportedAt\":").append(System.currentTimeMillis())
             append(",\"version\":").append(quote("${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"))
             append(",\"android\":").append(quote("API ${Build.VERSION.SDK_INT} — ${Build.MANUFACTURER} ${Build.MODEL}"))
             // Touchscreen, keypad-first and the D-pad devices behind it (SettingsDump.input).
@@ -53,14 +53,14 @@ class DiagExporter @Inject constructor(
         }
 
         val dir = File(context.cacheDir, "diag").apply { mkdirs() }
-        val file = File(dir, "vela-diag-${java.text.SimpleDateFormat("yyyy-MM-dd-HHmm", java.util.Locale.US).format(java.util.Date())}.json")
+        val file = File(dir, "automap-diag-${java.text.SimpleDateFormat("yyyy-MM-dd-HHmm", java.util.Locale.US).format(java.util.Date())}.json")
         file.writeText(json)
 
         return shareFileIntent(
             context, file,
             mime = "application/json",
-            subject = "Vela debug session (${events.size} events)",
-            text = "Attached: a Vela diagnostics export to help debug an issue.",
+            subject = "AutoMap debug session (${events.size} events)",
+            text = "Attached: an AutoMap diagnostics export to help debug an issue.",
             title = "Share debug session",
         )
     }
