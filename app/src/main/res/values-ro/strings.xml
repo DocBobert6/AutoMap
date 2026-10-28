@@ -437,7 +437,7 @@
     <string name="settings_diag_consent_title">Activezi funcția de diagnosticare?</string>
     <string name="settings_diag_consent_body">AutoMap va păstra un jurnal local succint al căutărilor, traseelor și eventualelor erori. Acesta nu părăsește niciodată telefonul, cu excepția cazului în care apeși pe „Export” și alegi unde să-l trimiți. Poți dezactiva această funcție oricând pentru a șterge jurnalul.</string>
     <string name="settings_about">Despre</string>
-    <string name="settings_about_hint">AutoMap este un client de hărți fără servicii Google: folosește OpenTiles pentru harta de bază, preia date de la Google pentru puncte de interes (POI), oferă rute și estimări ale timpului de sosire (ETA) în funcție de trafic, iar vocea este o voce Piper care rulează pe telefon. Licențiat sub GPLv3. Nu sunt necesare serviciile Play.</string>    <string name="settings_version">Versiune</string>
+    <string name="settings_about_hint">AutoMap este un client de hărți: folosește OpenTiles pentru harta de bază, preia date de la Google pentru puncte de interes (POI), oferă rute și estimări ale timpului de sosire (ETA) în funcție de trafic, iar vocea este o voce Piper care rulează pe telefon. Licențiat sub GPLv3. Nu sunt necesare serviciile Play.</string>    <string name="settings_version">Versiune</string>
     <string name="settings_version_line">AutoMap %1$s (asamblare %2$d)</string>
     <string name="settings_installer_play">Aplicația a fost instalată de %1$s. Această instalare este configurată pentru Android Auto; o actualizare din aplicație ar anula această configurare, așa că actualizează folosind același program de instalare.</string>
     <string name="settings_installer_started_by">Instalarea a fost inițiată de %1$s, iar acesta este elementul verificat de versiunile mai recente ale Android Auto.</string>
@@ -717,13 +717,13 @@
     <string name="steps_live_traffic">trafic în timp real</string>
     <string name="steps_close_cd">Închide pașii</string>
     <string name="steps_continue">Continuă</string>
-    <string name="welcome_tagline">Hărți și navigație, fără Google.</string>
+    <string name="welcome_tagline">Hărți și navigație.</string>
     <string name="welcome_feature_no_tracking_title">Fără urmărire</string>
     <string name="welcome_feature_private_body">Fără cont, fără reclame, fără statistici și fără serverul AutoMap.</string>
     <string name="welcome_feature_places_title">Locuri și trasee reale</string>
     <string name="welcome_feature_places_body">Căutare în timp real, recenzii, fotografii, informații despre transportul public și indicații de navigare care țin cont de traficul rutier.</string>
     <string name="welcome_feature_open_source_title">Gratuit și cu sursă deschisă</string>
-    <string name="welcome_feature_open_source_body">GPLv3, concepută pentru GrapheneOS și alte telefoane fără servicii Google.</string>
+    <string name="welcome_feature_open_source_body">GPLv3, concepută pentru telefoane Android.</string>
     <string name="welcome_get_started">Să începem</string>
     <string name="welcome_continue">Continuă</string>
     <string name="welcome_cameras_title">Camere pentru plăcuțe</string>

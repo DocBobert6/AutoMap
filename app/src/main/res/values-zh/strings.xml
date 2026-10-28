@@ -157,7 +157,7 @@
     <string name="settings_diag_consent_title">开启诊断？</string>
     <string name="settings_diag_consent_body">AutoMap 将在本地保留一份关于您的搜索、路线和错误的简短日志。除非您点按“导出”并选择发送位置，否则它绝不离开手机。可随时关闭以清除日志。</string>
     <string name="settings_about">关于</string>
-    <string name="settings_about_hint">AutoMap 是一款去谷歌化的地图客户端：底图来自开放图块，兴趣点、路线和路况预计时间来自对 Google 的抓取，语音使用在手机上运行的 Piper 语音。GPLv3 许可。无需 Play 服务。</string>    <string name="settings_version">版本</string>
+    <string name="settings_about_hint">AutoMap 是一款地图客户端：底图来自开放图块，兴趣点、路线和路况预计时间来自对 Google 的抓取，语音使用在手机上运行的 Piper 语音。GPLv3 许可。无需 Play 服务。</string>    <string name="settings_version">版本</string>
     <string name="settings_version_line">AutoMap %1$s（构建 %2$d）</string>
     <!-- format -->
     <string name="settings_collapse">收起</string>
@@ -394,12 +394,12 @@
     <string name="steps_close_cd">关闭步骤</string>
     <string name="steps_continue">继续直行</string>
     <!-- welcome: WelcomeScreen.kt -->
-    <string name="welcome_tagline">地图与导航，去谷歌化。</string>
+    <string name="welcome_tagline">地图与导航。</string>
     <string name="welcome_feature_no_tracking_title">无追踪</string>
     <string name="welcome_feature_places_title">真实的地点与路线</string>
     <string name="welcome_feature_places_body">实时搜索、评价、照片、公交，以及考虑路况的路线。</string>
     <string name="welcome_feature_open_source_title">免费且开源</string>
-    <string name="welcome_feature_open_source_body">GPLv3 许可，为 GrapheneOS 及其他去谷歌手机打造。</string>
+    <string name="welcome_feature_open_source_body">GPLv3 许可，为 Android 手机打造。</string>
     <string name="welcome_get_started">开始使用</string>    <!-- search: SearchBar.kt -->
     <string name="search_close_cd">关闭搜索</string>
     <string name="search_placeholder">搜索</string>

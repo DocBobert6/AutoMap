@@ -623,13 +623,13 @@
     <string name="steps_live_traffic">promet v živo</string>
     <string name="steps_close_cd">Zapri navodila</string>
     <string name="steps_continue">Nadaljuj</string>
-    <string name="welcome_tagline">Zemljevidi in navigacija brez Googla.</string>
+    <string name="welcome_tagline">Zemljevidi in navigacija.</string>
     <string name="welcome_feature_no_tracking_title">Brez sledenja</string>
     <string name="welcome_feature_private_body">Brez računa, oglasov, analitike in strežnika AutoMap.</string>
     <string name="welcome_feature_places_title">Resnični kraji in poti</string>
     <string name="welcome_feature_places_body">Iskanje v živo, ocene, fotografije, javni prevoz in poti s prometnimi podatki.</string>
     <string name="welcome_feature_open_source_title">Brezplačno in odprtokodno</string>
-    <string name="welcome_feature_open_source_body">Licenca GPLv3; zasnovano za GrapheneOS in druge telefone brez Googla.</string>
+    <string name="welcome_feature_open_source_body">Licenca GPLv3; zasnovano za telefone Android.</string>
     <string name="welcome_get_started">Začni</string>
     <string name="welcome_continue">Nadaljuj</string>
     <string name="welcome_cameras_title">Kamere za registrske tablice</string>

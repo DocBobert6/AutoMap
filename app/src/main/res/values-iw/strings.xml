@@ -142,7 +142,7 @@
     <string name="settings_diag_consent_title">להפעיל אבחון?</string>
     <string name="settings_diag_consent_body">AutoMap תשמור יומן מקומי קצר של החיפושים, המסלולים וכל שגיאה. הוא לעולם לא עוזב את הטלפון אלא אם תקיש \"ייצא\" ותבחר לאן לשלוח. כבה בכל עת כדי למחוק את היומן.</string>
     <string name="settings_about">אודות</string>
-    <string name="settings_about_hint">AutoMap הוא לקוח מפות ללא Google: אריחים פתוחים למפת הבסיס, נתוני Google שנאספים למקומות, ניתוב וזמני הגעה מודעי-תנועה, וקול Piper שרץ על הטלפון. GPLv3. ללא צורך ב-Play Services.</string>    <string name="settings_version">גרסה</string>
+    <string name="settings_about_hint">AutoMap הוא לקוח מפות: אריחים פתוחים למפת הבסיס, נתוני Google שנאספים למקומות, ניתוב וזמני הגעה מודעי-תנועה, וקול Piper שרץ על הטלפון. GPLv3. ללא צורך ב-Play Services.</string>    <string name="settings_version">גרסה</string>
     <string name="settings_version_line">AutoMap %1$s  (בנייה %2$d)</string>
     <string name="settings_installer_play">הותקן על ידי %1$s. ההתקנה הזו מוגדרת ל-Android Auto; עדכון מתוך האפליקציה יבטל את זה, לכן עדכן דרך אותו מתקין.</string>
     <string name="settings_installer_none">הותקן ידנית (לא נרשם מתקין). Android Auto לא יציג את ההתקנה הזו.</string>
@@ -375,12 +375,12 @@
     <string name="steps_live_traffic">תנועה בזמן אמת</string>
     <string name="steps_close_cd">סגור שלבים</string>
     <string name="steps_continue">המשך</string>
-    <string name="welcome_tagline">מפות וניווט, בלי תלות ב־Google.</string>
+    <string name="welcome_tagline">מפות וניווט.</string>
     <string name="welcome_feature_no_tracking_title">ללא מעקב</string>
     <string name="welcome_feature_places_title">מקומות &amp; מסלולים אמיתיים</string>
     <string name="welcome_feature_places_body">חיפוש חי, ביקורות, תמונות, תחבורה ציבורית, ומסלולים מודעי-תנועה.</string>
     <string name="welcome_feature_open_source_title">חינמי &amp; קוד פתוח</string>
-    <string name="welcome_feature_open_source_body">GPLv3, נבנה עבור GrapheneOS וטלפונים אחרים ללא Google.</string>
+    <string name="welcome_feature_open_source_body">GPLv3, נבנה עבור טלפוני Android.</string>
     <string name="welcome_get_started">בואו נתחיל</string>    <string name="search_close_cd">סגור חיפוש</string>
     <string name="search_fill_cd">הכנס לתיבת החיפוש</string>
     <string name="search_placeholder">חיפוש</string>

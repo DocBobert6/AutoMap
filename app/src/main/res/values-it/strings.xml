@@ -144,7 +144,7 @@
     <string name="settings_diag_consent_title">Attivare la diagnostica?</string>
     <string name="settings_diag_consent_body">AutoMap conserverà un breve registro locale delle tue ricerche, dei percorsi e di eventuali errori. Non lascia mai il telefono finché non tocchi Esporta e scegli dove inviarlo. Disattivala in qualsiasi momento per cancellare il registro.</string>
     <string name="settings_about">Informazioni</string>
-    <string name="settings_about_hint">AutoMap è un client di mappe degoogled: riquadri aperti per la mappa di base, dati Google estratti per i POI, percorsi ed ETA con traffico, una voce Piper che gira sul telefono. GPLv3. Nessun Play Services richiesto.</string>    <string name="settings_version">Versione</string>
+    <string name="settings_about_hint">AutoMap è un client di mappe: riquadri aperti per la mappa di base, dati Google estratti per i POI, percorsi ed ETA con traffico, una voce Piper che gira sul telefono. GPLv3. Nessun Play Services richiesto.</string>    <string name="settings_version">Versione</string>
     <string name="settings_version_line">AutoMap %1$s  (build %2$d)</string>
     <string name="settings_installer_play">Installato da %1$s. Questa installazione è configurata per Android Auto; un aggiornamento dall\'app la annullerebbe, quindi aggiorna con lo stesso installer.</string>
     <string name="settings_installer_none">Installato manualmente (nessun installer registrato). Android Auto non mostrerà questa installazione.</string>
@@ -382,12 +382,12 @@
     <string name="steps_live_traffic">traffico in tempo reale</string>
     <string name="steps_close_cd">Chiudi passaggi</string>
     <string name="steps_continue">Prosegui</string>
-    <string name="welcome_tagline">Mappe e navigazione, degoogled.</string>
+    <string name="welcome_tagline">Mappe e navigazione.</string>
     <string name="welcome_feature_no_tracking_title">Nessun tracciamento</string>
     <string name="welcome_feature_places_title">Luoghi e percorsi reali</string>
     <string name="welcome_feature_places_body">Ricerca in tempo reale, recensioni, foto, mezzi pubblici e indicazioni che tengono conto del traffico.</string>
     <string name="welcome_feature_open_source_title">Gratuita e open source</string>
-    <string name="welcome_feature_open_source_body">GPLv3, creata per GrapheneOS e altri telefoni de-Googled.</string>
+    <string name="welcome_feature_open_source_body">GPLv3, creata per telefoni Android.</string>
     <string name="welcome_get_started">Inizia</string>    <string name="search_close_cd">Chiudi ricerca</string>
     <string name="search_fill_cd">Inserisci nella barra di ricerca</string>
     <string name="search_placeholder">Cerca</string>

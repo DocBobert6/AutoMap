@@ -126,7 +126,7 @@
     <string name="settings_diag_consent_title">Activer les diagnostics ?</string>
     <string name="settings_diag_consent_body">AutoMap conservera un court journal local de vos recherches, itinéraires et erreurs éventuelles. Il ne quitte jamais le téléphone tant que vous n\'appuyez pas sur Exporter et ne choisissez pas une destination. Désactivez-le à tout moment pour effacer le journal.</string>
     <string name="settings_about">À propos</string>
-    <string name="settings_about_hint">AutoMap est un client cartographique dégooglisé : tuiles ouvertes pour le fond de carte, extraction de Google pour les lieux, le routage et les estimations tenant compte du trafic, une voix Piper qui tourne sur le téléphone. GPLv3. Ne nécessite pas les Play Services.</string>    <string name="settings_version">Version</string>
+    <string name="settings_about_hint">AutoMap est un client cartographique : tuiles ouvertes pour le fond de carte, extraction de Google pour les lieux, le routage et les estimations tenant compte du trafic, une voix Piper qui tourne sur le téléphone. GPLv3. Ne nécessite pas les Play Services.</string>    <string name="settings_version">Version</string>
     <string name="settings_version_line">AutoMap %1$s  (build %2$d)</string>
     <string name="settings_version_copied">Version copiée</string>
     <string name="settings_collapse">Réduire</string>
@@ -345,12 +345,12 @@
     <string name="steps_live_traffic">trafic en temps réel</string>
     <string name="steps_close_cd">Fermer les étapes</string>
     <string name="steps_continue">Continuer</string>
-    <string name="welcome_tagline">Cartes et navigation, dégooglisées.</string>
+    <string name="welcome_tagline">Cartes et navigation.</string>
     <string name="welcome_feature_no_tracking_title">Aucun suivi</string>
     <string name="welcome_feature_places_title">Vrais lieux et itinéraires</string>
     <string name="welcome_feature_places_body">Recherche en direct, avis, photos, transports et itinéraires tenant compte du trafic.</string>
     <string name="welcome_feature_open_source_title">Gratuit et open source</string>
-    <string name="welcome_feature_open_source_body">GPLv3, conçu pour GrapheneOS et autres téléphones dégooglisés.</string>
+    <string name="welcome_feature_open_source_body">GPLv3, conçu pour les téléphones Android.</string>
     <string name="welcome_get_started">Commencer</string>    <string name="search_close_cd">Fermer la recherche</string>
     <string name="search_placeholder">Rechercher</string>
     <string name="search_offline">Hors ligne</string>

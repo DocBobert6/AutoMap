@@ -144,7 +144,7 @@
     <string name="settings_diag_consent_title">Ativar o diagnóstico?</string>
     <string name="settings_diag_consent_body">O AutoMap vai manter um breve registo local das suas pesquisas, percursos e quaisquer erros. Nunca sai do telemóvel a menos que toque em Exportar e escolha para onde o enviar. Desligue quando quiser para apagar o registo.</string>
     <string name="settings_about">Acerca</string>
-    <string name="settings_about_hint">O AutoMap é um cliente de mapas sem Google: mosaicos abertos para o mapa base, dados da Google recolhidos para POIs, percursos e ETAs sensíveis ao trânsito, e uma voz Piper que corre no telemóvel. GPLv3. Não requer os Serviços Play.</string>    <string name="settings_version">Versão</string>
+    <string name="settings_about_hint">O AutoMap é um cliente de mapas: mosaicos abertos para o mapa base, dados da Google recolhidos para POIs, percursos e ETAs sensíveis ao trânsito, e uma voz Piper que corre no telemóvel. GPLv3. Não requer os Serviços Play.</string>    <string name="settings_version">Versão</string>
     <string name="settings_version_line">AutoMap %1$s  (compilação %2$d)</string>
     <string name="settings_installer_play">Instalado por %1$s. Esta instalação está preparada para o Android Auto; uma atualização dentro da aplicação desfaria isso, por isso atualize com o mesmo instalador.</string>
     <string name="settings_installer_none">Instalado manualmente (sem instalador registado). O Android Auto não vai listar esta instalação.</string>
@@ -382,12 +382,12 @@
     <string name="steps_live_traffic">trânsito em direto</string>
     <string name="steps_close_cd">Fechar etapas</string>
     <string name="steps_continue">Continuar</string>
-    <string name="welcome_tagline">Mapas e navegação, sem Google.</string>
+    <string name="welcome_tagline">Mapas e navegação.</string>
     <string name="welcome_feature_no_tracking_title">Sem rastreio</string>
     <string name="welcome_feature_places_title">Locais e percursos reais</string>
     <string name="welcome_feature_places_body">Pesquisa em direto, avaliações, fotos, transportes e direções sensíveis ao trânsito.</string>
     <string name="welcome_feature_open_source_title">Gratuito e de código aberto</string>
-    <string name="welcome_feature_open_source_body">GPLv3, criado para o GrapheneOS e outros telemóveis sem Google.</string>
+    <string name="welcome_feature_open_source_body">GPLv3, criado para telemóveis Android.</string>
     <string name="welcome_get_started">Começar</string>    <string name="search_close_cd">Fechar pesquisa</string>
     <string name="search_fill_cd">Colocar na caixa de pesquisa</string>
     <string name="search_placeholder">Pesquisar</string>

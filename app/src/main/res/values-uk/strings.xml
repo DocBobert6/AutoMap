@@ -125,7 +125,7 @@
     <string name="settings_diag_consent_title">Увімкнути діагностику?</string>
     <string name="settings_diag_consent_body">AutoMap вестиме короткий локальний журнал ваших пошуків, маршрутів і будь-яких помилок. Він ніколи не залишає телефон, доки ви не натиснете «Експорт» і не оберете, куди його надіслати. Вимкніть будь-коли, щоб стерти журнал.</string>
     <string name="settings_about">Про застосунок</string>
-    <string name="settings_about_hint">AutoMap, це клієнт карт без Google: відкриті плитки для базової карти, зібрані з Google дані про місця, маршрутизація та ETA з урахуванням трафіку, голос Piper, що працює на телефоні. GPLv3. Play Services не потрібні.</string>    <string name="settings_version">Версія</string>
+    <string name="settings_about_hint">AutoMap, це клієнт карт: відкриті плитки для базової карти, зібрані з Google дані про місця, маршрутизація та ETA з урахуванням трафіку, голос Piper, що працює на телефоні. GPLv3. Play Services не потрібні.</string>    <string name="settings_version">Версія</string>
     <string name="settings_version_line">AutoMap %1$s  (збірка %2$d)</string>
     <string name="settings_version_copied">Версію скопійовано</string>
     <string name="settings_collapse">Згорнути</string>
@@ -345,12 +345,12 @@
     <string name="steps_live_traffic">трафік у реальному часі</string>
     <string name="steps_close_cd">Закрити кроки</string>
     <string name="steps_continue">Прямуйте далі</string>
-    <string name="welcome_tagline">Карти й навігація без Google.</string>
+    <string name="welcome_tagline">Карти й навігація.</string>
     <string name="welcome_feature_no_tracking_title">Без стеження</string>
     <string name="welcome_feature_places_title">Справжні місця й маршрути</string>
     <string name="welcome_feature_places_body">Живий пошук, відгуки, фото, транспорт і маршрути з урахуванням трафіку.</string>
     <string name="welcome_feature_open_source_title">Безкоштовний і з відкритим кодом</string>
-    <string name="welcome_feature_open_source_body">GPLv3, створено для GrapheneOS та інших телефонів без Google.</string>
+    <string name="welcome_feature_open_source_body">GPLv3, створено для Android-телефонів.</string>
     <string name="welcome_get_started">Почати</string>    <string name="search_close_cd">Закрити пошук</string>
     <string name="search_placeholder">Пошук</string>
     <string name="search_offline">Офлайн</string>

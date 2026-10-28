@@ -125,7 +125,7 @@
     <string name="settings_diag_consent_title">Включить диагностику?</string>
     <string name="settings_diag_consent_body">AutoMap будет вести короткий локальный журнал ваших поисков, маршрутов и любых ошибок. Он никогда не покидает телефон, пока вы не нажмёте «Экспорт» и не выберете, куда его отправить. Выключите в любой момент, чтобы стереть журнал.</string>
     <string name="settings_about">О приложении</string>
-    <string name="settings_about_hint">AutoMap, это дегуглённый клиент карт: открытые тайлы для основной карты, данные Google для мест, маршрутизация и ETA с учётом пробок, голос Piper, работающий на телефоне. GPLv3. Play Services не требуются.</string>    <string name="settings_version">Версия</string>
+    <string name="settings_about_hint">AutoMap, это клиент карт: открытые тайлы для основной карты, данные Google для мест, маршрутизация и ETA с учётом пробок, голос Piper, работающий на телефоне. GPLv3. Play Services не требуются.</string>    <string name="settings_version">Версия</string>
     <string name="settings_version_line">AutoMap %1$s  (сборка %2$d)</string>
     <string name="settings_version_copied">Версия скопирована</string>
     <string name="settings_collapse">Свернуть</string>
@@ -345,12 +345,12 @@
     <string name="steps_live_traffic">пробки в реальном времени</string>
     <string name="steps_close_cd">Закрыть шаги</string>
     <string name="steps_continue">Продолжайте движение</string>
-    <string name="welcome_tagline">Карты и навигация без Google.</string>
+    <string name="welcome_tagline">Карты и навигация.</string>
     <string name="welcome_feature_no_tracking_title">Без слежки</string>
     <string name="welcome_feature_places_title">Настоящие места и маршруты</string>
     <string name="welcome_feature_places_body">Актуальный поиск, отзывы, фото, транспорт и маршруты с учётом пробок.</string>
     <string name="welcome_feature_open_source_title">Бесплатно и с открытым кодом</string>
-    <string name="welcome_feature_open_source_body">GPLv3, создано для GrapheneOS и других дегуглённых телефонов.</string>
+    <string name="welcome_feature_open_source_body">GPLv3, создано для Android-телефонов.</string>
     <string name="welcome_get_started">Начать</string>    <string name="search_close_cd">Закрыть поиск</string>
     <string name="search_placeholder">Поиск</string>
     <string name="search_offline">Офлайн</string>

@@ -157,7 +157,7 @@
     <string name="settings_diag_consent_title">診断をオンにしますか？</string>
     <string name="settings_diag_consent_body">AutoMap は検索、経路、エラーの短いログを端末内に保存します。「エクスポート」をタップして送信先を選ばない限り、端末の外に出ることはありません。いつでもオフにでき、オフにするとログは消去されます。</string>
     <string name="settings_about">このアプリについて</string>
-    <string name="settings_about_hint">AutoMap は脱Googleの地図クライアントです。ベースマップにはオープンな地図タイル、場所・経路・交通状況を反映した到着予測には Google から取得したデータ、音声には端末上で動く Piper の音声を使用しています。GPLv3。Play 開発者サービスは不要です。</string>    <string name="settings_version">バージョン</string>
+    <string name="settings_about_hint">AutoMap は地図クライアントです。ベースマップにはオープンな地図タイル、場所・経路・交通状況を反映した到着予測には Google から取得したデータ、音声には端末上で動く Piper の音声を使用しています。GPLv3。Play 開発者サービスは不要です。</string>    <string name="settings_version">バージョン</string>
     <string name="settings_version_line">AutoMap %1$s（ビルド %2$d）</string>
     <!-- format -->
     <string name="settings_collapse">折りたたむ</string>
@@ -394,12 +394,12 @@
     <string name="steps_close_cd">ルート詳細を閉じる</string>
     <string name="steps_continue">直進</string>
     <!-- welcome: WelcomeScreen.kt -->
-    <string name="welcome_tagline">地図とナビを、脱Googleで。</string>
+    <string name="welcome_tagline">地図とナビ。</string>
     <string name="welcome_feature_no_tracking_title">トラッキングなし</string>
     <string name="welcome_feature_places_title">リアルな場所情報とルート</string>
     <string name="welcome_feature_places_body">リアルタイム検索、クチコミ、写真、公共交通機関、交通状況を反映した経路。</string>
     <string name="welcome_feature_open_source_title">無料・オープンソース</string>
-    <string name="welcome_feature_open_source_body">GPLv3。GrapheneOS をはじめとする脱Google端末のために作られています。</string>
+    <string name="welcome_feature_open_source_body">GPLv3。Android 端末のために作られています。</string>
     <string name="welcome_get_started">はじめる</string>    <!-- search: SearchBar.kt -->
     <string name="search_close_cd">検索を閉じる</string>
     <string name="search_placeholder">検索</string>

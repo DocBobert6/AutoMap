@@ -126,7 +126,7 @@
     <string name="settings_diag_consent_title">Slå på diagnostik?</string>
     <string name="settings_diag_consent_body">AutoMap håller en kort lokal logg över dina sökningar, rutter och eventuella fel. Den lämnar aldrig telefonen om du inte trycker på Exportera och väljer var den ska skickas. Slå av den när som helst för att radera loggen.</string>
     <string name="settings_about">Om</string>
-    <string name="settings_about_hint">AutoMap är en avgooglad kartklient: öppna rutor för baskartan, skrapad Google för intressepunkter, ruttning och trafikmedvetna ankomsttider, en Piper-röst som körs på telefonen. GPLv3. Inga Play Services krävs.</string>    <string name="settings_version">Version</string>
+    <string name="settings_about_hint">AutoMap är en kartklient: öppna rutor för baskartan, skrapad Google för intressepunkter, ruttning och trafikmedvetna ankomsttider, en Piper-röst som körs på telefonen. GPLv3. Inga Play Services krävs.</string>    <string name="settings_version">Version</string>
     <string name="settings_version_line">AutoMap %1$s  (bygge %2$d)</string>
     <string name="settings_version_copied">Version kopierad</string>
     <string name="settings_collapse">Fäll ihop</string>
@@ -345,12 +345,12 @@
     <string name="steps_live_traffic">realtidstrafik</string>
     <string name="steps_close_cd">Stäng steg</string>
     <string name="steps_continue">Fortsätt</string>
-    <string name="welcome_tagline">Kartor &amp; navigering, avgooglade.</string>
+    <string name="welcome_tagline">Kartor &amp; navigering.</string>
     <string name="welcome_feature_no_tracking_title">Ingen spårning</string>
     <string name="welcome_feature_places_title">Riktiga platser &amp; rutter</string>
     <string name="welcome_feature_places_body">Sökning i realtid, recensioner, foton, kollektivtrafik och trafikmedvetna vägbeskrivningar.</string>
     <string name="welcome_feature_open_source_title">Fri &amp; öppen källkod</string>
-    <string name="welcome_feature_open_source_body">GPLv3, byggd för GrapheneOS och andra avgooglade telefoner.</string>
+    <string name="welcome_feature_open_source_body">GPLv3, byggd för Android-telefoner.</string>
     <string name="welcome_get_started">Kom igång</string>    <string name="search_close_cd">Stäng sökning</string>
     <string name="search_placeholder">Sök</string>
     <string name="search_offline">Offline</string>
