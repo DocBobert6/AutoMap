@@ -4,6 +4,10 @@
     <files-path name="engines" path="engines/" />
     <!-- The self-updater's downloaded Vela APK lives in filesDir/updates/. -->
     <files-path name="updates" path="updates/" />
+    <!-- AutoMapUpdater downloads to cacheDir/updates/ (2026-10-28 crash fix:
+         without this cache root, FileProvider.getUriForFile threw
+         IllegalArgumentException at install time and killed the app). -->
+    <cache-path name="updates" path="updates/" />
     <!-- Exported diagnostics bundle (cacheDir/diag/) shared via the system sheet. -->
     <cache-path name="diag" path="diag/" />
     <!-- Exported saved-places JSON (cacheDir/export/) shared via the system sheet. -->

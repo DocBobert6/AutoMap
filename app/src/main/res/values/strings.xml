@@ -909,7 +909,7 @@
     <string name="settings_automap_update_download" translatable="false">Download update</string>
     <string name="settings_automap_update_install" translatable="false">Install update</string>
     <string name="settings_automap_update_failed" translatable="false">Update check failed: %1$s</string>
-    <string name="settings_automap_update_caveat" translatable="false">Alpha builds are debug-signed for now, so an update may need the previous build uninstalled first. Updates come from the private AutoMap repo on GitHub, and an unauthenticated check cannot read a private repo, so a 404 here means the check could not reach the releases, not that you are up to date.</string>    <string name="settings_place_pages">Place pages</string>
+    <string name="settings_automap_update_caveat" translatable="false">Alpha builds are signed with the stable AutoMap release key, so a signed alpha should update in-app over the previous signed alpha. Updates come from the public AutoMap repo on GitHub, and a 404 here means the check could not reach the releases, not that you are up to date.</string>    <string name="settings_place_pages">Place pages</string>
     <plurals name="place_transit_stops"> <!-- format -->
         <item quantity="one">%1$d stop</item>
         <item quantity="other">%1$d stops</item>

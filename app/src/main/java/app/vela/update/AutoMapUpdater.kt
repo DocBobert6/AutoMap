@@ -37,31 +37,31 @@ import java.security.MessageDigest
  *   A saved channel always wins over the default.
  * - APK pick does NOT exclude "debug" names. AutoSpace excluded them
  *   because its debug builds are local dev builds; AutoMap's published
- *   alphas ARE debug-signed builds (AutoMap-*.apk), so excluding them
- *   would make the updater find nothing at all.
+ *   alphas were debug-signed builds (AutoMap-*.apk) before alpha.7,
+ *   so excluding them would then have made the updater find nothing
+ *   at all. The pick is kept permissive for compatibility.
  * - No car-session / drive-ended / notification hooks. AutoSpace has a
  *   car session model; Vela does not have an equivalent, so those hooks
  *   are not forced in. The automatic check runs on app opened (see the
  *   MainActivity onResume hook) and the manual Check button always works.
  * - Debug gate kept (AutoSpace rule): automatic checks never run on
- *   debug builds. That means the automatic check is dormant on the
- *   current debug-signed alphas and activates on release-signed
- *   builds; the manual Check for updates button is NOT gated and works
- *   on any build. This is stated in the Settings copy, not hidden.
+ *   debug builds. Published alphas are release-signed (since
+ *   alpha.7), so the automatic check is live on them; the manual
+ *   Check for updates button is NOT gated and works on any build.
+ *   This is stated in the Settings copy, not hidden.
  * - A 404 from GitHub is NOT treated as "no stable release yet".
- *   AutoSpace could treat it that way because its repo is public.
- *   AutoMap's repo is private (decided 2026-10-26), so an unauthenticated
- *   releases check 404s even when releases exist. Treating that as
- *   "up to date" would silently lie. A 404 therefore surfaces as a
- *   Failed state naming the private repo, so the limitation is visible
- *   instead of shipped as a false "up to date".
+ *   AutoMap's repo is public (since 2026-10-27, alpha.7), but a 404
+ *   can still mean the check could not reach the releases (e.g. the
+ *   Stable channel's releases/latest, which excludes prereleases).
+ *   Treating that as "up to date" would silently lie. A 404 therefore
+ *   surfaces as a Failed state, so the limitation is visible instead
+ *   of shipped as a false "up to date".
  * - No token, no browser-page fallback. Robert decided 2026-10-26
  *   explicitly against both: this updater is the AutoSpace pattern,
- *   nothing else. Until release signing lands, a CI debug build also
- *   cannot install over an earlier build (different ephemeral key each
- *   run), so an in-app update may still need the old build uninstalled
- *   first. That caveat is in the Settings copy; seamless updates are
- *   not promised before release signing.
+ *   nothing else. Since alpha.7, alphas are signed with one stable
+ *   release key, so a signed alpha should update in-app over the
+ *   previous signed alpha; only a debug-signed build still needs the
+ *   old build uninstalled first.
  */
 object AutoMapUpdater {
 
@@ -190,26 +190,39 @@ object AutoMapUpdater {
         }, "automap-update").start()
     }
 
-    /** Hands the downloaded APK to Android's installer, via the unknown-sources flow if needed. */
+    /** Hands the downloaded APK to Android's installer, via the unknown-sources flow if needed.
+     *  2026-10-28 crash fix: this used to sit outside any try/catch, so a
+     *  FileProvider/install failure (e.g. a missing provider root) killed
+     *  the app with no dialog. Now any failure lands in a Failed state
+     *  with a message instead. All install entry points (download thread,
+     *  onAppOpened, Ready-UI Install button) funnel through here. */
     fun install(context: Context) {
         val ready = flow.value as? State.Ready ?: return
-        val pm = context.packageManager
-        if (!pm.canRequestPackageInstalls()) {
-            installWhenAllowed = true
+        try {
+            val pm = context.packageManager
+            if (!pm.canRequestPackageInstalls()) {
+                installWhenAllowed = true
+                context.startActivity(
+                    Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:${context.packageName}"),
+                    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+                return
+            }
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", ready.apk)
             context.startActivity(
-                Intent(
-                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                    Uri.parse("package:${context.packageName}"),
-                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                Intent(Intent.ACTION_VIEW)
+                    .setDataAndType(uri, "application/vnd.android.package-archive")
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK),
             )
-            return
+        } catch (e: Exception) {
+            android.util.Log.w("AutoMapUpdate", "update: install failed: ${e.message}")
+            flow.value = State.Failed(
+                "Could not open the installer: ${e.message ?: "unknown error"}. Try downloading again.",
+                ready.release,
+            )
         }
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", ready.apk)
-        context.startActivity(
-            Intent(Intent.ACTION_VIEW)
-                .setDataAndType(uri, "application/vnd.android.package-archive")
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
     }
 
     /** The newest release with an APK that [channel] takes. Drafts never count. */
@@ -223,10 +236,10 @@ object AutoMapUpdater {
         }
         try {
             if (conn.responseCode == 404) {
-                // Private-repo 404 is indistinguishable from "no release" over
-                // an unauthenticated request, and AutoMap's repo is private,
-                // so this must surface as a failure, not as "up to date".
-                error("GitHub answered 404. The AutoMap repo is private, so an unauthenticated check cannot read its releases.")
+                // A 404 is indistinguishable from "no release" over an
+                // unauthenticated request, so this must surface as a
+                // failure, not as "up to date".
+                error("GitHub answered 404, so the update check could not read the releases. Try again.")
             }
             if (conn.responseCode !in 200..299) error("GitHub answered ${conn.responseCode}")
             val body = conn.inputStream.bufferedReader().use { it.readText() }
